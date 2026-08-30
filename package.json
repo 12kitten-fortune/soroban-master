@@ -1,0 +1,17 @@
+{
+  "name": "soroban-master",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "日本の本格そろばんを世界へ。そろばん・見取り算・フラッシュ暗算の学習アプリ",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

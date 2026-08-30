@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>そろばん道場</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- サイドバー -->
+      <aside class="sidebar">
+        <div class="brand">🧮 そろばん道場<small>全国珠算連盟準拠</small></div>
+        <nav class="side-nav">
+          <button class="nav" data-view="grades">🏠 ホーム</button>
+          <button class="nav active" data-view="grades">📘 級・段を選ぶ</button>
+          <div class="nav-sec">学習する</div>
+          <button class="nav subj-nav" data-subj="kake">✏️ かけ算</button>
+          <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
+          <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
+          <button class="nav subj-nav" data-subj="flash">⚡ フラッシュ暗算</button>
+          <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
+          <button class="nav" data-view="records">📊 記録を見る</button>
+          <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
+        </nav>
+      </aside>
+
+      <!-- メイン -->
+      <div class="content">
+        <div class="topbar">
+          <h2 id="pageTitle">級・段を選ぶ</h2>
+          <div class="topbar-right">
+            <button id="examInfoBtn" class="pill">🎓 検定内容について</button>
+            <div class="avatar-mini"><span id="avatarMini">🧒</span><div><b id="nameMini">そろ太くん</b><br><small id="rankMini">未取得</small></div></div>
+          </div>
+        </div>
+
+        <!-- 級・段を選ぶ -->
+        <div id="view-grades" class="view">
+          <div class="grades-layout">
+            <div class="grades-main card">
+              <div class="chips" id="subjectChips">
+                <button class="chip active" data-subj="mitori">🧮 みとり算</button>
+                <button class="chip" data-subj="kake">✏️ かけ算</button>
+                <button class="chip" data-subj="wari">➗ わり算</button>
+                <button class="chip" data-subj="flash">⚡ フラッシュ暗算</button>
+                <button class="chip" data-subj="anzan">💭 あんざん</button>
+              </div>
+              <div id="gradeGrid" class="grade-grid"></div>
+              <div class="options">
+                <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> 制限時間タイマーを使う</label>
+                <label class="toggle"><input type="checkbox" id="examMode" /> 全問回答してから採点（検定方式）</label>
+                <div id="gradeInfo" class="sub"></div>
+                <button id="startBtn">▶ はじめる（Enter）</button>
+              </div>
+            </div>
+
+            <aside class="stats-panel">
+              <div class="card profile-card">
+                <div class="avatar-big" id="avatarBig">🧒</div>
+                <div><b id="nameBig">そろ太くん</b><br><span class="rank-badge" id="rankBig">未取得</span></div>
+              </div>
+              <div class="card effort-card">
+                <h4>今月のがんばり</h4>
+                <div class="effort-row"><span>学習日数</span><b><span id="effortDays">0</span>日</b></div>
+                <div class="chart" id="effortChart"></div>
+                <div class="effort-row"><span>合計時間</span><b id="effortTotal">0分</b></div>
+              </div>
+              <div class="card best-card">
+                <h4>自己ベスト</h4>
+                <div id="bestList"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- プレイ -->
+        <div id="view-play" class="view hidden">
+          <div class="card">
+            <div class="play-hud">
+              <button id="quitBtn" class="ghost">← もどる</button>
+              <span id="playGrade"></span>
+              <span id="playTimer">⏱ 0:00.0</span>
+              <span id="playProgress">0 / 0</span>
+            </div>
+            <div class="problem-wrap">
+              <div id="playProblem" class="problem"></div>
+              <div id="playMark" class="mark hidden"></div>
+            </div>
+            <div id="playSorobanWrap">
+              <div class="sub">そろばんで答えを作ろう（マウス／数字キー：五玉と一玉が同時に動く。中央の赤い点＝一の位）</div>
+              <div id="soroban2" class="soroban"></div>
+              <div class="value-row">
+                <span class="small">そろばん：</span><b id="soroban2Value" class="soroban-value">0</b>
+                <button id="clearSoroban2" class="ghost">0にする</button>
+              </div>
+              <div class="btn-row">
+                <button id="answerBtn">✓ こたえる</button>
+                <button id="showSteps" class="ghost">🧮 解き方をみる</button>
+              </div>
+              <div id="steps" class="steps hidden"></div>
+            </div>
+            <form id="playInputWrap" class="answer-row hidden">
+              <input id="playInput" type="number" inputmode="numeric" placeholder="答え" autocomplete="off" />
+              <button type="submit">こたえる</button>
+            </form>
+            <div id="playFlashWrap" class="hidden">
+              <div id="flashInfo" class="sub"></div>
+              <label class="toggle"><input type="checkbox" id="flashExamMode" /> 検定モード（20問・140/200点で合格）</label>
+              <div id="flashProgress" class="sub"></div>
+              <div id="flashDisplay" class="flash-display">▶ を押してスタート</div>
+              <button id="flashStart">▶ スタート</button>
+              <form id="flashForm" class="answer-row hidden">
+                <input id="flashInput" type="number" inputmode="numeric" placeholder="合計は？" autocomplete="off" />
+                <button type="submit">こたえる</button>
+              </form>
+            </div>
+            <div id="playResult" class="result"></div>
+          </div>
+        </div>
+
+        <!-- 記録 -->
+        <div id="view-records" class="view hidden">
+          <div class="card">
+            <h3>今月のがんばり</h3>
+            <div id="recEffort" class="sub"></div>
+          </div>
+          <div class="card">
+            <h3>自己ベストタイム（級・段 × 種目）</h3>
+            <div id="recordsTable"></div>
+          </div>
+        </div>
+
+        <!-- 設定 -->
+        <div id="view-settings" class="view hidden">
+          <div class="card">
+            <h3>プロフィール</h3>
+            <label class="field">ニックネーム<input id="nameInput" maxlength="12" /></label>
+            <div class="field">アバター<div id="avatarPicker" class="avatar-picker"></div></div>
+            <button id="saveProfileBtn">保存</button>
+            <p id="saveMsg" class="sub"></p>
+          </div>
+        </div>
+
+        <!-- レクチャー -->
+        <div id="view-lesson" class="view hidden">
+          <div class="card">
+            <details open><summary>① 各部と「入れる・払う」</summary><div class="lesson-body"><p>枠・梁・桁・定位点・一玉(=1)・五玉(=5)。中央の<b>赤い点＝一の位（小数点）</b>。梁に寄せる＝入れる／離す＝払う。始めは「ご破算」で0に。</p></div></details>
+            <details><summary>② 指づかい</summary><div class="lesson-body"><ul><li>一玉を上げる＝親指／下げる＝人差し指／五玉＝人差し指</li><li>6〜9は五玉＋一玉を同時に（このアプリは数字キーで同時操作可）。</li></ul></div></details>
+            <details><summary>③ 5の友</summary><div class="lesson-body"><p>1↔4 / 2↔3。たし算：五玉を入れて5の友を払う（4＋1＝五玉入れて4払う）。ひき算は逆。</p></div></details>
+            <details><summary>④ 10の友（繰り上がり・繰り下がり）</summary><div class="lesson-body"><p>1↔9 / 2↔8 / 3↔7 / 4↔6 / 5↔5。繰り上がり：隣に1、10の友を払う（7＋6→13）。繰り下がりは逆（13−6→7）。</p></div></details>
+            <details><summary>⑤ 掛け算</summary><div class="lesson-body"><p>両置き→片落とし→両落とし。先に定位点で一の位を決めると答えをそのまま読める。九九1桁は「が」＝0に注意。</p></div></details>
+            <details><summary>⑥ 検定基準（級）</summary><div class="lesson-body"><p>珠算＝各種目15問・7分・150点満点中100点以上。暗算＝20問・3分・100点満点中70点以上。フラッシュ＝20問・200点満点中140点以上。（段位の難易度は自動目安）</p></div></details>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
