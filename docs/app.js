@@ -111,9 +111,13 @@ function genWari({ D, dv, qd }) {
 function mitoriDisplay(nums) { const fmt = (x) => x.toLocaleString(); return nums.map((v, i) => (i === 0 ? fmt(v) : `${v < 0 ? "−" : "+"} ${fmt(Math.abs(v))}`)).join("\n") + "\n――――\n= ?"; }
 function genProblemFor(g, subj) {
   const diff = difficulty(g, subj); if (!diff) return null;
-  if (subj === "mitori" || subj === "anzan") { const p = genMitori(diff); return { display: mitoriDisplay(p.nums), answer: p.answer, nums: p.nums }; }
-  if (subj === "kake") return genKake(diff);
-  if (subj === "wari") return genWari(diff);
+  if (subj === "mitori" || subj === "anzan") {
+    const p = genMitori(diff);
+    const compact = p.nums.map((v, i) => (i === 0 ? String(v) : (v < 0 ? "−" : "+") + Math.abs(v))).join("");
+    return { display: mitoriDisplay(p.nums), compact, answer: p.answer, nums: p.nums };
+  }
+  if (subj === "kake") { const p = genKake(diff); return { ...p, compact: p.display }; }
+  if (subj === "wari") { const p = genWari(diff); return { ...p, compact: p.display }; }
 }
 const groupInt = (s) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
@@ -350,7 +354,7 @@ function startSession(subj) {
   if (subj === "flash") return startFlash(grade);
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
   const cf = SUBJECT[subj];
-  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null };
+  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: cf.answer, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null };
   $("#playMark").classList.add("hidden");
   showView("play");
   $("#playRest").classList.add("hidden");
@@ -377,12 +381,19 @@ function nextPlayProblem() {
   const prog = session.mode === "end" ? `回答 ${Math.min(session.idx + 1, session.N)} / ${session.N}` : `${Math.min(session.idx + 1, session.N)} / ${session.N}　正解 ${session.correct}`;
   $("#playProgress").textContent = prog;
   $("#steps").classList.add("hidden");
-  if (session.cf.answer === "soroban") sorobanQuiz.clear();
+  if (session.answerBy === "soroban") sorobanQuiz.clear();
   else { $("#playInput").value = ""; $("#playInput").focus(); }
 }
 function onQuizChange(p) {
   $("#soroban2Value").textContent = p.disp;
   sorobanParts = p;
+}
+function sectionResultHTML(sec) {
+  const rows = sec.items.map((it, i) =>
+    `<div class="qrow"><span class="qn">${i + 1}</span><span class="qq">${it.compact}</span>` +
+    `<span class="qa">=${it.user}${it.ok ? "" : ` <s>${it.ans}</s>`}</span>` +
+    `<span class="qm ${it.ok ? "ok" : "ng"}">${it.ok ? "◎" : "×"}</span></div>`).join("");
+  return `<div class="section-score">${sec.label}：<b>${sec.correct} / ${sec.N}</b>　タイム ${fmtClock(sec.sec)}</div><div class="qlist">${rows}</div>`;
 }
 function currentSorobanAnswer() {
   return sorobanParts.fracStr === "" ? Number(sorobanParts.intStr) : NaN;
@@ -392,7 +403,7 @@ function submitAnswer(val) {
   if (!session || session.locking) return;
   const ok = val === session.cur.answer;
   if (ok) session.correct++;
-  session.results.push(ok);
+  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer });
   if (session.mode === "end") {
     neutralSnd(); // 検定方式：正誤を明かさず最後にまとめて採点
     advance();
@@ -421,7 +432,7 @@ function finishSession() {
   const completed = session.idx >= session.N, cf = session.cf;
   let msg = "";
   if (session.mode === "end" && session.results.length) {
-    msg += `<div class="marks">` + session.results.map((r) => `<span class="mk ${r ? "ok" : "ng"}">${r ? "◎" : "×"}</span>`).join("") + `</div>`;
+    msg += `<div class="marks">` + session.results.map((r) => `<span class="mk ${r.ok ? "ok" : "ng"}">${r.ok ? "◎" : "×"}</span>`).join("") + `</div>`;
   }
   msg += `タイム <b>${fmtClock(el)}</b>　正解 ${session.correct} / ${session.N}`;
   let cls = "ok";
@@ -492,13 +503,14 @@ function runStep() {
 }
 function startQuizSection(step) {
   const grade = routineState.grade, cf = SUBJECT[step.subj];
-  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, timed: !!step.timed, mode: "each", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
+  // 本日の練習は全セクションで動かせるそろばんを使い、採点は最後にまとめて（mode:end）
+  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: "soroban", timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
   $("#playMark").classList.add("hidden");
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
-  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
-  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
+  $("#playSorobanWrap").classList.remove("hidden");
+  $("#playInputWrap").classList.add("hidden");
   $("#playFlashWrap").classList.add("hidden");
   $("#showSteps").style.display = step.subj === "mitori" ? "" : "none";
   const total = routineState.steps.filter((s) => s.rest == null).length;
@@ -510,13 +522,11 @@ function startQuizSection(step) {
 }
 function finishRoutineSection() {
   const el = (performance.now() - session.start) / 1000;
-  routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el });
+  routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el, items: session.results });
   correctSnd();
-  const s = session; session = null;
-  $("#playProblem").textContent = "セクション終了！";
-  $("#playResult").className = "result ok";
-  $("#playResult").innerHTML = `${s.label}：正解 <b>${s.correct} / ${s.N}</b>　タイム ${fmtClock(el)}<br><button id="nextStepBtn">次へ ▶</button>`;
-  $("#nextStepBtn").onclick = () => { routineState.stepIdx++; runStep(); };
+  session = null;
+  routineState.stepIdx++;
+  runStep(); // 自動で次（休憩 or 次セット）へ
 }
 function showRest(step) {
   session = null;
@@ -528,7 +538,9 @@ function showRest(step) {
   $("#playFlashWrap").classList.add("hidden");
   $("#playResult").textContent = ""; $("#playGrade").textContent = "本日の練習：休憩"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
   $("#playRest").classList.remove("hidden");
-  $("#restNext").textContent = step.next ? `つぎは：${step.next}` : "";
+  const last = routineState.sections[routineState.sections.length - 1];
+  $("#restResult").innerHTML = last ? sectionResultHTML(last) : "";
+  $("#restNext").textContent = step.next ? `つぎは：${step.next}（自動で始まります）` : "";
   let left = step.rest;
   const render = () => ($("#restTimer").textContent = fmtClock(left));
   render();
@@ -555,8 +567,10 @@ function finishRoutine() {
   $("#playProblem").textContent = "🎉 本日の練習 完了！";
   $("#playGrade").textContent = `成績発表（${rs.grade.key}）`; $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
   const rows = rs.sections.map((s) => `<div class="brow"><span>${s.label}</span><b>${s.correct}/${s.N}　${fmtClock(s.sec)}</b></div>`).join("");
+  const last = rs.sections[rs.sections.length - 1];
+  const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div><br><button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${detail}<br><button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
 }
@@ -634,7 +648,7 @@ document.addEventListener("keydown", (e) => {
     else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { moveGrade(-1); e.preventDefault(); }
     else if (e.key === "Enter") { startSession(subject); e.preventDefault(); }
   } else if (!$("#view-play").classList.contains("hidden")) {
-    if (session && session.cf.answer === "soroban") {
+    if (session && session.answerBy === "soroban") {
       if (e.key === "Enter") { submitAnswer(currentSorobanAnswer()); e.preventDefault(); }
       else sorobanQuiz.handleKey(e);
     }

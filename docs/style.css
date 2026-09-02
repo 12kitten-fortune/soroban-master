@@ -143,6 +143,20 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .graph { width: 100%; max-width: 560px; height: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px; display: block; }
 .marks { font-size: 20px; letter-spacing: 3px; margin-bottom: 8px; font-weight: 700; }
 
+/* 採点結果の全問リスト */
+.rest-result { max-width: 460px; margin: 14px auto 0; text-align: left; }
+.section-score { font-size: 16px; font-weight: 700; color: var(--frame); margin: 6px 0; text-align: center; }
+.qlist { max-height: 46vh; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+.qrow { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid #f0ece2; font-size: 15px; }
+.qrow:last-child { border-bottom: none; }
+.qrow .qn { color: #999; width: 22px; text-align: right; }
+.qrow .qq { flex: 1; font-variant-numeric: tabular-nums; }
+.qrow .qa { color: #555; font-variant-numeric: tabular-nums; }
+.qrow .qa s { color: var(--accent); }
+.qrow .qm { font-size: 20px; font-weight: 800; width: 26px; text-align: center; }
+.qrow .qm.ok { color: #e0322b; }
+.qrow .qm.ng { color: var(--accent); }
+
 @media (max-width: 820px) {
   .app { flex-direction: column; }
   .sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
