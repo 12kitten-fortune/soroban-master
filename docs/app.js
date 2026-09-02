@@ -102,7 +102,7 @@ function genMitori({ digits, terms }) {
   return { nums, answer: total };
 }
 function genFlashNums({ digits, terms }) { const nums = []; let t = 0; for (let i = 0; i < terms; i++) { const v = randDigits(digits); nums.push(v); t += v; } return { nums, answer: t }; }
-function genKake({ a, b }) { const f1 = randDigits(a), f2 = randDigits(b); return { display: `${f1.toLocaleString()} × ${f2.toLocaleString()}`, answer: f1 * f2 }; }
+function genKake({ a, b }) { const f1 = randDigits(a), f2 = randDigits(b); return { display: `${f1.toLocaleString()} × ${f2.toLocaleString()}`, answer: f1 * f2, fa: f1, fb: f2 }; }
 function genWari({ D, dv, qd }) {
   for (let t = 0; t < 300; t++) {
     const divisor = randDigits(dv);
@@ -110,9 +110,9 @@ function genWari({ D, dv, qd }) {
     if (qd) { qLow = Math.max(qLow, Math.pow(10, qd - 1)); qHigh = Math.min(qHigh, Math.pow(10, qd) - 1); } else qLow = Math.max(qLow, 1);
     if (qLow > qHigh) continue;
     const q = Math.floor(Math.random() * (qHigh - qLow + 1)) + qLow;
-    return { display: `${(divisor * q).toLocaleString()} ÷ ${divisor.toLocaleString()}`, answer: q };
+    return { display: `${(divisor * q).toLocaleString()} ÷ ${divisor.toLocaleString()}`, answer: q, dividend: divisor * q, divisor, quotient: q };
   }
-  return { display: "0 ÷ 1", answer: 0 };
+  return { display: "0 ÷ 1", answer: 0, dividend: 0, divisor: 1, quotient: 0 };
 }
 function mitoriDisplay(nums) { const fmt = (x) => x.toLocaleString(); return nums.map((v, i) => (i === 0 ? fmt(v) : `${v < 0 ? "−" : "+"} ${fmt(Math.abs(v))}`)).join("\n") + "\n――――\n= ?"; }
 function genProblemFor(g, subj) {
@@ -368,7 +368,7 @@ function startSession(subj) {
   $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
   $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
-  $("#showSteps").style.display = subj === "mitori" ? "" : "none";
+  $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(subj) ? "" : "none";
   $("#playGrade").textContent = `${grade.key}／${cf.name}` + (session.timed ? "（検定）" : "（記録）");
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   playTimer = setInterval(tickPlay, 150);
@@ -382,6 +382,7 @@ function tickPlay() {
 }
 function nextPlayProblem() {
   session.cur = genProblemFor(session.grade, session.subj);
+  stepCtx = { subj: session.subj, cur: session.cur }; // 解き方用（完了後も参照できるよう保持）
   $("#playProblem").textContent = session.cur.display;
   $("#playMark").classList.add("hidden");
   const prog = session.mode === "end" ? `回答 ${Math.min(session.idx + 1, session.N)} / ${session.N}` : `${Math.min(session.idx + 1, session.N)} / ${session.N}　正解 ${session.correct}`;
@@ -518,7 +519,7 @@ function startQuizSection(step) {
   $("#playSorobanWrap").classList.remove("hidden");
   $("#playInputWrap").classList.add("hidden");
   $("#playFlashWrap").classList.add("hidden");
-  $("#showSteps").style.display = step.subj === "mitori" ? "" : "none";
+  $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(step.subj) ? "" : "none";
   const total = routineState.steps.filter((s) => s.rest == null).length;
   const done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
   $("#playGrade").textContent = `本日の練習 ${done + 1}/${total}：${step.label}`;
@@ -600,11 +601,37 @@ function solveSteps(nums) {
   nums.forEach((v, i) => { const abs = Math.abs(v), digits = String(abs).split("").reverse().map(Number), out = []; for (let p = 0; p < digits.length; p++) v < 0 ? subToPlace(board, p, digits[p], out) : addToPlace(board, p, digits[p], out); terms.push({ label: i === 0 ? `${abs.toLocaleString()} を置く` : `${v < 0 ? "ひく" : "たす"} ${abs.toLocaleString()}`, moves: out, running: boardValue(board) }); });
   return terms;
 }
+let stepCtx = null;
+function mitoriStepsHTML(nums) {
+  return solveSteps(nums).map((t) => `<div class="term"><div class="term-head">${t.label}</div>` + t.moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${t.running.toLocaleString()}</div></div>`).join("");
+}
+function kakeStepsHTML(a, b, ans) {
+  const bs = String(b).split("").reverse();
+  const moves = [];
+  bs.forEach((ch, i) => {
+    const dig = +ch; if (dig === 0) return;
+    const pp = a * dig * Math.pow(10, i);
+    moves.push(`${a.toLocaleString()} × ${dig}${i ? "（" + "0".repeat(i) + "をつける）" : ""} = ${pp.toLocaleString()}`);
+  });
+  return `<div class="term"><div class="term-head">部分積をたして計算</div>` + moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${ans.toLocaleString()}</div></div>`;
+}
+function wariStepsHTML(dividend, divisor, q) {
+  return `<div class="term"><div class="term-head">わり算の考え方</div>` +
+    `<div class="move">${dividend.toLocaleString()} ÷ ${divisor.toLocaleString()} を、上の位から順に計算します。</div>` +
+    `<div class="move">たしかめ：答え × わる数 ＝ ${q.toLocaleString()} × ${divisor.toLocaleString()} = ${(q * divisor).toLocaleString()}</div>` +
+    `<div class="move run">→ ${q.toLocaleString()}</div></div>`;
+}
 $("#showSteps").addEventListener("click", () => {
   const box = $("#steps");
   if (!box.classList.contains("hidden")) return box.classList.add("hidden");
-  if (!session || !session.cur || !session.cur.nums) return;
-  box.innerHTML = solveSteps(session.cur.nums).map((t) => `<div class="term"><div class="term-head">${t.label}</div>` + t.moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${t.running.toLocaleString()}</div></div>`).join("");
+  if (!stepCtx || !stepCtx.cur) return;
+  const c = stepCtx.cur, subj = stepCtx.subj;
+  let html = "";
+  if (subj === "mitori" || subj === "anzan") { if (!c.nums) return; html = mitoriStepsHTML(c.nums); }
+  else if (subj === "kake") html = kakeStepsHTML(c.fa, c.fb, c.answer);
+  else if (subj === "wari") html = wariStepsHTML(c.dividend, c.divisor, c.quotient);
+  else return;
+  box.innerHTML = html;
   box.classList.remove("hidden");
 });
 
