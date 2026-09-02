@@ -31,6 +31,20 @@ const FLASH_STD = {
   4: { digits: 2, terms: 5, sec: 4.0 }, 3: { digits: 2, terms: 7, sec: 4.0 }, 2: { digits: 2, terms: 10, sec: 5.0 },
   1: { digits: 3, terms: 5, sec: 4.0 },
 };
+// フラッシュ暗算 段位（全珠連基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
+const FLASH_DAN = {
+  1: { digits: 2, terms: 15, sec: 10 }, 2: { digits: 3, terms: 4, sec: 4 }, 3: { digits: 3, terms: 6, sec: 5 },
+  4: { digits: 3, terms: 8, sec: 6 }, 5: { digits: 3, terms: 10, sec: 7 }, 6: { digits: 3, terms: 12, sec: 8 },
+  7: { digits: 3, terms: 15, sec: 8 }, 8: { digits: 3, terms: 15, sec: 6 }, 9: { digits: 3, terms: 15, sec: 4 },
+  10: { digits: 3, terms: 15, sec: 3 },
+};
+// フラッシュ暗算 11〜20級（練習級・加盟教室の目安。総秒数）
+const FLASH_KYU_LOW = {
+  20: { digits: 1, terms: 2, sec: 7 }, 19: { digits: 1, terms: 3, sec: 7 }, 18: { digits: 1, terms: 4, sec: 8 },
+  17: { digits: 1, terms: 5, sec: 9 }, 16: { digits: 1, terms: 6, sec: 9 }, 15: { digits: 1, terms: 7, sec: 10 },
+  14: { digits: 1, terms: 8, sec: 11 }, 13: { digits: 1, terms: 10, sec: 12 }, 12: { digits: 1, terms: 12, sec: 12 },
+  11: { digits: 2, terms: 10, sec: 12 },
+};
 const SUBJECT = {
   mitori: { name: "みとり算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
   kake: { name: "かけ算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
@@ -60,7 +74,7 @@ function difficulty(g, subj) {
       // 11〜20級：入門（自動目安）。かけ・わりは無し
       const terms = Math.max(2, 5 - Math.floor((k - 10) / 2));
       if (subj === "mitori" || subj === "anzan") return { digits: 1, terms };
-      if (subj === "flash") return { digits: 1, terms, sec: 4.5 };
+      if (subj === "flash") return FLASH_KYU_LOW[k];
       return null;
     }
   } else {
@@ -69,7 +83,7 @@ function difficulty(g, subj) {
     if (subj === "kake") return { a: 5 + Math.floor((d - 1) / 4), b: 4 + Math.floor((d - 1) / 5) };
     if (subj === "wari") return { D: 7 + Math.floor(d / 2), dv: 3 + Math.floor((d - 1) / 4), qd: null };
     if (subj === "anzan") return { digits: 3, terms: 5 + d };
-    if (subj === "flash") return { digits: 3, terms: 10 + Math.floor(d / 2), sec: Math.max(2.0, 3.4 - d * 0.14) };
+    if (subj === "flash") return FLASH_DAN[d];
   }
 }
 
