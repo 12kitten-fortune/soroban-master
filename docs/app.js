@@ -8,17 +8,23 @@ const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 let session = null, playTimer = null;
 
 /* ============================================================ 検定基準（級） */
+// 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
 const SOROBAN_STD = {
-  10: { mitori: { digits: 2, terms: 5 }, kake: { a: 2, b: 1 }, wari: null },
-  9: { mitori: { digits: 2, terms: 5 }, kake: { a: 2, b: 1 }, wari: null },
-  8: { mitori: { digits: 2, terms: 10 }, kake: { a: 3, b: 1 }, wari: { D: 3, dv: 1, qd: 2 } },
-  7: { mitori: { digits: 2, terms: 15 }, kake: { a: 2, b: 2 }, wari: { D: 4, dv: 1, qd: 3 } },
+  1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } },
+  2: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 3 }, wari: { D: 7, dv: 3, qd: 4 } },
+  3: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } },
+  4: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 2, qd: 3 } },
+  5: { mitori: { digits: 4, terms: 10 }, kake: { a: 3, b: 3 }, wari: { D: 4, dv: 2, qd: 2 } },
   6: { mitori: { digits: 3, terms: 10 }, kake: { a: 3, b: 2 }, wari: { D: 4, dv: 2, qd: 2 } },
-  5: { mitori: { digits: 3, terms: 15 }, kake: { a: 4, b: 2 }, wari: { D: 5, dv: 2, qd: 3 } },
-  4: { mitori: { digits: 4, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 3, qd: 2 } },
-  3: { mitori: { digits: 4, terms: 15 }, kake: { a: 4, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } },
-  2: { mitori: { digits: 5, terms: 15 }, kake: { a: 5, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } },
-  1: { mitori: { digits: 5, terms: 20 }, kake: { a: 5, b: 4 }, wari: { D: 7, dv: 3, qd: 4 } },
+  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 3, b: 1 }, wari: { D: 3, dv: 1, qd: 2 } },
+  8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },
+  9: { mitori: { digits: 2, terms: 6 }, kake: { a: 2, b: 1 }, wari: null },
+  10: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },
+  11: { mitori: { digits: 1, terms: 7 }, kake: null, wari: null },
+  12: { mitori: { digits: 1, terms: 6 }, kake: null, wari: null },
+  13: { mitori: { digits: 1, terms: 5 }, kake: null, wari: null },
+  14: { mitori: { digits: 1, terms: 4 }, kake: null, wari: null },
+  15: { mitori: { digits: 1, terms: 3 }, kake: null, wari: null },
 };
 const ANZAN_STD = {
   10: { digits: 1, terms: 3 }, 9: { digits: 1, terms: 4 }, 8: { digits: 2, terms: 4 }, 7: { digits: 2, terms: 5 },
@@ -47,10 +53,10 @@ const FLASH_KYU_LOW = {
   11: { digits: 1, terms: 6, sec: 4 },
 };
 const SUBJECT = {
-  mitori: { name: "みとり算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
+  mitori: { name: "みとり算", answer: "soroban", N: 10, per: 10, pass: 70, limit: 420 },
   kake: { name: "かけ算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
   wari: { name: "わり算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
-  anzan: { name: "あんざん", answer: "input", N: 20, per: 5, pass: 70, limit: 180 },
+  anzan: { name: "あんざん", answer: "input", N: 10, per: 10, pass: 70, limit: 180 },
   flash: { name: "フラッシュ暗算", answer: "flash" },
 };
 
@@ -65,25 +71,25 @@ const currentGrade = () => GRADES[gradeIdx];
 function difficulty(g, subj) {
   if (g.band === "kyu") {
     const k = g.kyu;
-    if (k <= 10) {
-      if (subj === "mitori") return SOROBAN_STD[k].mitori;
-      if (subj === "kake") return SOROBAN_STD[k].kake;
-      if (subj === "wari") return SOROBAN_STD[k].wari;
-      if (subj === "anzan") return ANZAN_STD[k];
-      if (subj === "flash") return FLASH_STD[k];
+    if (k <= 15) {
+      const s = SOROBAN_STD[k];
+      if (subj === "mitori") return s.mitori;
+      if (subj === "kake") return s.kake;
+      if (subj === "wari") return s.wari;
+      if (subj === "anzan") return { digits: Math.max(1, s.mitori.digits - 1), terms: s.mitori.terms }; // 暗算は珠算見取より1桁やさしめ
+      if (subj === "flash") return k <= 10 ? FLASH_STD[k] : FLASH_KYU_LOW[k];
     } else {
-      // 11〜20級：入門（自動目安）。かけ・わりは無し
-      const terms = Math.max(2, 5 - Math.floor((k - 10) / 2));
-      if (subj === "mitori" || subj === "anzan") return { digits: 1, terms };
+      // 16〜20級：導入（見取・暗算・フラッシュのみ）
+      if (subj === "mitori" || subj === "anzan") return { digits: 1, terms: 2 };
       if (subj === "flash") return FLASH_KYU_LOW[k];
       return null;
     }
   } else {
-    const d = g.dan;
-    if (subj === "mitori") return { digits: 4 + Math.floor((d - 1) / 5), terms: 20 + d };
-    if (subj === "kake") return { a: 5 + Math.floor((d - 1) / 4), b: 4 + Math.floor((d - 1) / 5) };
-    if (subj === "wari") return { D: 7 + Math.floor(d / 2), dv: 3 + Math.floor((d - 1) / 4), qd: null };
-    if (subj === "anzan") return { digits: 3, terms: 5 + d };
+    const d = g.dan; // 段位は目安（実際の検定は小数混じり50問）
+    if (subj === "mitori") return { digits: 5 + Math.floor((d - 1) / 3), terms: 15 };
+    if (subj === "kake") return { a: 5 + Math.floor((d - 1) / 3), b: 4 + Math.floor((d - 1) / 4) };
+    if (subj === "wari") return { D: 8 + Math.floor(d / 2), dv: 4 + Math.floor((d - 1) / 4), qd: null };
+    if (subj === "anzan") return { digits: 4 + Math.floor((d - 1) / 3), terms: 15 };
     if (subj === "flash") return FLASH_DAN[d];
   }
 }
@@ -278,7 +284,7 @@ function updateInfo() {
   const cf = SUBJECT[subject];
   let info = `<b>${g.key}／${cf.name}</b>：${specText(g, subject)}`;
   if (cf.answer !== "flash") info += `　｜ ${cf.N}問・制限${cf.limit / 60}分・合格${cf.pass}点`;
-  if (g.band === "dan" || g.kyu > 10) info += ` <span class="note">※目安</span>`;
+  if (g.band === "dan" || g.kyu > 15) info += ` <span class="note">※目安</span>`;
   $("#gradeInfo").innerHTML = info;
   $("#timerToggleWrap").style.display = cf.answer === "flash" ? "none" : "";
 }
