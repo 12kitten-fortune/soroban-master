@@ -25,11 +25,12 @@ const ANZAN_STD = {
   6: { digits: 2, terms: 3 }, 5: { digits: 2, terms: 4 }, 4: { digits: 2, terms: 5 }, 3: { digits: 2, terms: 6 },
   2: { digits: 2, terms: 8 }, 1: { digits: 3, terms: 5 },
 };
+// フラッシュ暗算 10〜1級（全珠連。10/7/5/3/1級は指定値、他は補間。すべて2桁）
 const FLASH_STD = {
-  10: { digits: 1, terms: 3, sec: 4.0 }, 9: { digits: 1, terms: 4, sec: 4.0 }, 8: { digits: 1, terms: 5, sec: 4.0 },
-  7: { digits: 1, terms: 7, sec: 4.0 }, 6: { digits: 2, terms: 3, sec: 4.0 }, 5: { digits: 2, terms: 4, sec: 4.0 },
-  4: { digits: 2, terms: 5, sec: 4.0 }, 3: { digits: 2, terms: 7, sec: 4.0 }, 2: { digits: 2, terms: 10, sec: 5.0 },
-  1: { digits: 3, terms: 5, sec: 4.0 },
+  10: { digits: 2, terms: 2, sec: 4 }, 9: { digits: 2, terms: 3, sec: 5 }, 8: { digits: 2, terms: 4, sec: 7 },
+  7: { digits: 2, terms: 5, sec: 8 }, 6: { digits: 2, terms: 6, sec: 9 }, 5: { digits: 2, terms: 7, sec: 10 },
+  4: { digits: 2, terms: 8, sec: 11 }, 3: { digits: 2, terms: 10, sec: 12 }, 2: { digits: 2, terms: 12, sec: 13 },
+  1: { digits: 2, terms: 15, sec: 13 },
 };
 // フラッシュ暗算 段位（全珠連基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
 const FLASH_DAN = {
