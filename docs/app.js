@@ -35,12 +35,12 @@ const ANZAN_STD = {
   6: { digits: 2, terms: 3 }, 5: { digits: 2, terms: 4 }, 4: { digits: 2, terms: 5 }, 3: { digits: 2, terms: 6 },
   2: { digits: 2, terms: 8 }, 1: { digits: 3, terms: 5 },
 };
-// フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。低い級はやさしく・秒数ゆったり）
+// フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。1個あたり約0.8秒で一定）
 const FLASH_STD = {
-  10: { digits: 1, terms: 3, sec: 5 }, 9: { digits: 1, terms: 4, sec: 5 }, 8: { digits: 1, terms: 5, sec: 6 },
-  7: { digits: 1, terms: 7, sec: 7 }, 6: { digits: 2, terms: 3, sec: 5 }, 5: { digits: 2, terms: 4, sec: 6 },
-  4: { digits: 2, terms: 5, sec: 7 }, 3: { digits: 2, terms: 7, sec: 8 }, 2: { digits: 2, terms: 10, sec: 9 },
-  1: { digits: 3, terms: 5, sec: 7 },
+  10: { digits: 1, terms: 3, sec: 2.4 }, 9: { digits: 1, terms: 4, sec: 3.2 }, 8: { digits: 1, terms: 5, sec: 4.0 },
+  7: { digits: 1, terms: 7, sec: 5.6 }, 6: { digits: 2, terms: 3, sec: 2.4 }, 5: { digits: 2, terms: 4, sec: 3.2 },
+  4: { digits: 2, terms: 5, sec: 4.0 }, 3: { digits: 2, terms: 7, sec: 5.6 }, 2: { digits: 2, terms: 10, sec: 8.0 },
+  1: { digits: 3, terms: 5, sec: 4.0 },
 };
 // フラッシュ暗算 段位（全珠連基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
 const FLASH_DAN = {
@@ -720,19 +720,20 @@ async function runFlash() {
   const p = genFlashNums(flashSpec); flashAnswer = p.answer;
   const interval = Math.round((flashSpec.sec / flashSpec.terms) * 1000);
   const disp = $("#flashDisplay");
+  const N = p.nums.length, slot = interval;
+  const blankMs = Math.min(120, Math.round(slot * 0.22)), showMs = slot - blankMs; // 各数字：表示showMs＋空白blankMs（合計slotで一定）
+  // 進捗ドット（あと何個かが見える＝終わったと勘違いしない・口数も分かる）
+  $("#flashDots").innerHTML = Array.from({ length: N }, () => `<span class="dot"></span>`).join("");
+  const dots = $("#flashDots").querySelectorAll(".dot");
   for (const n of [3, 2, 1]) { disp.textContent = n; flashTick(440); await sleep(500); }
-  disp.textContent = ""; await sleep(400); // 「用意」の間（最初が急に出ないように）
-  // 各数字の表示開始を t0 + i*slot に固定＝スピードを一定に（先頭・末尾のブレを解消）
-  const slot = interval;
-  const blink = Math.min(90, Math.floor(slot * 0.18)); // 切り替わりが分かる一瞬の空白
-  const N = p.nums.length, t0 = performance.now();
+  disp.textContent = ""; await sleep(400); // 用意の間
   for (let i = 0; i < N; i++) {
-    await sleepUntil(t0 + i * slot);
-    disp.textContent = "";
-    await sleepUntil(t0 + i * slot + blink);
     disp.textContent = p.nums[i].toLocaleString(); flashBeep(i); // 数字が出た瞬間に音
+    if (dots[i]) dots[i].classList.add("on");
+    await sleep(showMs);
+    disp.textContent = ""; await sleep(blankMs);
   }
-  await sleepUntil(t0 + N * slot); // 最後の数字も同じ長さ見せてから
+  $("#flashDots").innerHTML = "";
   disp.textContent = "= ?"; flashReadySnd();
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   $("#flashStart").disabled = false; flashBusy = false;
