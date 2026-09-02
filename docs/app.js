@@ -615,8 +615,47 @@ function solveSteps(nums) {
   return terms;
 }
 let stepCtx = null;
+// そろばんの図（SVG）。value を cols 桁で表示し、changed の位は黄色で強調
+function beadEl(x, y, active) {
+  return `<ellipse cx="${x}" cy="${y}" rx="8.5" ry="4.6" fill="${active ? "#d1782f" : "#cdbda2"}" stroke="#7a3b16" stroke-width="0.6"/>`;
+}
+function sorobanSVG(value, cols, changed) {
+  const digits = String(Math.abs(value)).padStart(cols, "0").slice(-cols).split("").map(Number);
+  const cw = 22, bh = 12, top = 2, barY = top + 2 * bh, earthTop = barY + 4, H = earthTop + 5 * bh + 2, W = cols * cw;
+  let g = "";
+  for (let c = 0; c < cols; c++) if (changed && changed.has(c)) g += `<rect x="${c * cw}" y="0" width="${cw}" height="${H}" fill="#fff3c4"/>`;
+  for (let c = 0; c < cols; c++) {
+    const x = c * cw + cw / 2, d = digits[c], heaven = d >= 5, earth = d % 5;
+    g += `<line x1="${x}" y1="${top}" x2="${x}" y2="${H - 2}" stroke="#c9c9c9" stroke-width="2"/>`;
+    g += beadEl(x, heaven ? top + bh + bh / 2 : top + bh / 2, heaven);
+    for (let j = 0; j < 4; j++) {
+      const active = j < earth;
+      g += beadEl(x, (active ? earthTop + j * bh : earthTop + (j + 1) * bh) + bh / 2, active);
+    }
+  }
+  g += `<line x1="0" y1="${barY}" x2="${W}" y2="${barY}" stroke="#333" stroke-width="3"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="soro-fig">${g}</svg>`;
+}
+function changedCols(prevV, curV, cols) {
+  const a = String(Math.abs(prevV)).padStart(cols, "0").slice(-cols);
+  const b = String(Math.abs(curV)).padStart(cols, "0").slice(-cols);
+  const s = new Set();
+  for (let i = 0; i < cols; i++) if (a[i] !== b[i]) s.add(i);
+  return s;
+}
 function mitoriStepsHTML(nums) {
-  return solveSteps(nums).map((t) => `<div class="term"><div class="term-head">${t.label}</div>` + t.moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${t.running.toLocaleString()}</div></div>`).join("");
+  const terms = solveSteps(nums);
+  const finalVal = terms.length ? terms[terms.length - 1].running : 0;
+  const cols = Math.max(3, String(Math.abs(finalVal)).length);
+  let prev = 0;
+  const body = terms.map((t) => {
+    const changed = changedCols(prev, t.running, cols);
+    prev = t.running;
+    return `<div class="term"><div class="term-head">${t.label}</div>` +
+      t.moves.map((m) => `<div class="move">${m}</div>`).join("") +
+      `<div class="soro-wrap">${sorobanSVG(t.running, cols, changed)}<span class="soro-val">= ${t.running.toLocaleString()}</span></div></div>`;
+  }).join("");
+  return `<div class="soro-legend">🟠 入っている玉　🟡 この手で動いた位（ここが違えばそこで間違い）</div>` + body;
 }
 function kakeStepsHTML(a, b, ans) {
   const bs = String(b).split("").reverse();
