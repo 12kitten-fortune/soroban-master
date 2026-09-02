@@ -6,6 +6,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 // onQuizChange が初期化時（makeSoroban生成時）に参照するため、先に宣言してTDZを回避
 let session = null, playTimer = null;
+// 効果音のON/OFF（localStorageに保存）
+const SOUND_KEY = "soroban_sound";
+let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -159,6 +162,7 @@ function fmtMin(sec) { const h = Math.floor(sec / 3600), m = Math.round((sec % 3
 let audioCtx;
 function ensureAudio() { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
 function tone(freq, t0, dur, type = "sine", vol = 0.15) {
+  if (!soundOn) return;
   const o = audioCtx.createOscillator(), g = audioCtx.createGain();
   o.type = type; o.frequency.value = freq;
   g.gain.setValueAtTime(vol, t0);
@@ -166,6 +170,7 @@ function tone(freq, t0, dur, type = "sine", vol = 0.15) {
   o.connect(g).connect(audioCtx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
 }
 function clickSnd() { // 珠が弾く「パチ」
+  if (!soundOn) return;
   try {
     const c = ensureAudio(), t = c.currentTime;
     const o = c.createOscillator(), g = c.createGain();
@@ -253,6 +258,14 @@ $$(".nav").forEach((n) => n.addEventListener("click", () => {
 $("#examInfoBtn").addEventListener("click", () => showView("lesson"));
 $("#startBtn").addEventListener("click", () => startSession(subject));
 $("#quitBtn").addEventListener("click", quitSession);
+// 効果音のON/OFF
+function renderSound() { $("#soundToggle").textContent = soundOn ? "🔊 音あり" : "🔇 音なし"; }
+$("#soundToggle").addEventListener("click", () => {
+  soundOn = !soundOn;
+  localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
+  renderSound();
+  if (soundOn) clickSnd(); // ONにしたら確認音
+});
 
 /* ---------- グリッド ---------- */
 function gradeColor(g) { if (g.band === "dan") return "g-dan"; return g.kyu <= 10 ? "g-kyu-a" : "g-kyu-b"; }
@@ -510,14 +523,14 @@ function runStep() {
 }
 function startQuizSection(step) {
   const grade = routineState.grade, cf = SUBJECT[step.subj];
-  // 本日の練習は全セクションで動かせるそろばんを使い、採点は最後にまとめて（mode:end）
-  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: "soroban", timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
+  // 採点は最後にまとめて（mode:end）。暗算は入力式（そろばんを出さない）、かけ/わり/みとりはそろばん
+  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: cf.answer, timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
   $("#playMark").classList.add("hidden");
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
-  $("#playSorobanWrap").classList.remove("hidden");
-  $("#playInputWrap").classList.add("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(step.subj) ? "" : "none";
   const total = routineState.steps.filter((s) => s.rest == null).length;
@@ -692,3 +705,4 @@ document.addEventListener("keydown", (e) => {
 renderGrid();
 updateInfo();
 renderProfile();
+renderSound();
