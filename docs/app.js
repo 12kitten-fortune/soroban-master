@@ -100,8 +100,13 @@ function difficulty(g, subj) {
 /* ============================================================ ジェネレータ */
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
 function genMitori({ digits, terms }) {
+  const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（連盟サンプルに準拠してやさしめに）
   const allowSub = terms >= 5; const nums = []; let total = 0;
-  for (let i = 0; i < terms; i++) { const v = randDigits(digits); if (i > 0 && allowSub && Math.random() < 0.35 && total > v) { nums.push(-v); total -= v; } else { nums.push(v); total += v; } }
+  for (let i = 0; i < terms; i++) {
+    const v = randDigits(lo + Math.floor(Math.random() * (D - lo + 1)));
+    if (i > 0 && allowSub && Math.random() < 0.35 && total > v) { nums.push(-v); total -= v; }
+    else { nums.push(v); total += v; }
+  }
   return { nums, answer: total };
 }
 function genFlashNums({ digits, terms }) { const nums = []; let t = 0; for (let i = 0; i < terms; i++) { const v = randDigits(digits); nums.push(v); t += v; } return { nums, answer: t }; }
