@@ -14,6 +14,7 @@
         <nav class="side-nav">
           <button class="nav" data-view="grades">🏠 ホーム</button>
           <button class="nav active" data-view="grades">📘 級・段を選ぶ</button>
+          <button class="nav" data-view="today">🔥 本日の練習</button>
           <div class="nav-sec">学習する</div>
           <button class="nav subj-nav" data-subj="kake">✏️ かけ算</button>
           <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
@@ -83,9 +84,15 @@
               <span id="playTimer">⏱ 0:00.0</span>
               <span id="playProgress">0 / 0</span>
             </div>
-            <div class="problem-wrap">
+            <div class="problem-wrap" id="playProblemWrap">
               <div id="playProblem" class="problem"></div>
               <div id="playMark" class="mark hidden"></div>
+            </div>
+            <div id="playRest" class="rest hidden">
+              <div class="rest-title">☕ 休憩</div>
+              <div id="restTimer" class="rest-timer">1:00</div>
+              <div id="restNext" class="sub"></div>
+              <button id="restSkip" class="ghost">スキップ ▶</button>
             </div>
             <div id="playSorobanWrap">
               <div class="sub">そろばんで答えを作ろう（マウス／数字キー：五玉と一玉が同時に動く。中央の赤い点＝一の位）</div>
@@ -119,8 +126,33 @@
           </div>
         </div>
 
+        <!-- 本日の練習 -->
+        <div id="view-today" class="view hidden">
+          <div class="card">
+            <h3>🔥 本日の練習メニュー</h3>
+            <p class="sub">自分の級・段を選んで「スタート」。次の流れで進みます（休憩は自動カウントダウン、スキップ可）。</p>
+            <ol class="menu-list">
+              <li>暗算 15問（3分）→ 休憩1分　×3セット</li>
+              <li>休憩2分</li>
+              <li>かけ算 15問 → 休憩1分</li>
+              <li>わり算 15問 → 休憩1分</li>
+              <li>みとり算 10問 → 🎉 成績発表</li>
+            </ol>
+            <p class="sub">※選んだ級にかけ算/わり算が無い場合、その種目は自動でスキップします。</p>
+            <div class="row2">
+              <label>階級<select id="todayGrade"></select></label>
+            </div>
+            <button id="todayStart">▶ 本日の練習をはじめる</button>
+          </div>
+        </div>
+
         <!-- 記録 -->
         <div id="view-records" class="view hidden">
+          <div class="card">
+            <h3>📊 成績の推移（本日の練習）</h3>
+            <div id="routineGraph"></div>
+            <div id="routineList"></div>
+          </div>
           <div class="card">
             <h3>今月のがんばり</h3>
             <div id="recEffort" class="sub"></div>

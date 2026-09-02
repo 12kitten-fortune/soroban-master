@@ -39,12 +39,12 @@ const FLASH_DAN = {
   7: { digits: 3, terms: 15, sec: 8 }, 8: { digits: 3, terms: 15, sec: 6 }, 9: { digits: 3, terms: 15, sec: 4 },
   10: { digits: 3, terms: 15, sec: 3 },
 };
-// フラッシュ暗算 11〜20級（練習級・加盟教室の目安。総秒数）
+// フラッシュ暗算 11〜20級（練習級。すべて1桁＝10級(2桁)より易しい入門ラダー）
 const FLASH_KYU_LOW = {
-  20: { digits: 1, terms: 2, sec: 7 }, 19: { digits: 1, terms: 3, sec: 7 }, 18: { digits: 1, terms: 4, sec: 8 },
-  17: { digits: 1, terms: 5, sec: 9 }, 16: { digits: 1, terms: 6, sec: 9 }, 15: { digits: 1, terms: 7, sec: 10 },
-  14: { digits: 1, terms: 8, sec: 11 }, 13: { digits: 1, terms: 10, sec: 12 }, 12: { digits: 1, terms: 12, sec: 12 },
-  11: { digits: 2, terms: 10, sec: 12 },
+  20: { digits: 1, terms: 2, sec: 8 }, 19: { digits: 1, terms: 2, sec: 6 }, 18: { digits: 1, terms: 3, sec: 7 },
+  17: { digits: 1, terms: 3, sec: 6 }, 16: { digits: 1, terms: 4, sec: 6 }, 15: { digits: 1, terms: 4, sec: 5 },
+  14: { digits: 1, terms: 5, sec: 6 }, 13: { digits: 1, terms: 5, sec: 5 }, 12: { digits: 1, terms: 6, sec: 5 },
+  11: { digits: 1, terms: 6, sec: 4 },
 };
 const SUBJECT = {
   mitori: { name: "みとり算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
@@ -226,12 +226,13 @@ const sorobanQuiz = makeSoroban($("#soroban2"), onQuizChange);
 $("#clearSoroban2").addEventListener("click", () => sorobanQuiz.clear());
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { grades: "級・段を選ぶ", play: "れんしゅう", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
+const TITLES = { grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
 function showView(v) {
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
   if (v === "records") renderRecords();
   if (v === "settings") renderSettings();
+  if (v === "today") renderToday();
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
 $$(".nav").forEach((n) => n.addEventListener("click", () => {
@@ -291,17 +292,42 @@ function renderProfile() {
   const bp = bestPerSubject();
   $("#bestList").innerHTML = ["mitori", "kake", "wari", "anzan"].map((s) => `<div class="brow"><span>${SUBJECT[s].name}</span><b>${bp[s] != null ? fmtClock(bp[s]) : "—"}</b></div>`).join("");
 }
+function routineGraphSVG(hist) {
+  if (!hist.length) return '<p class="sub">「本日の練習」を完了すると、正答率の推移グラフがここに出ます。</p>';
+  const data = hist.slice(-20), n = data.length, W = 560, H = 180, pad = 28;
+  const x = (i) => pad + (n === 1 ? (W - 2 * pad) / 2 : (i * (W - 2 * pad)) / (n - 1));
+  const y = (v) => H - pad - (v / 100) * (H - 2 * pad);
+  const grid = [0, 25, 50, 75, 100].map((v) => `<line x1="${pad}" y1="${y(v)}" x2="${W - pad}" y2="${y(v)}" stroke="#eee"/><text x="4" y="${y(v) + 3}" font-size="9" fill="#999">${v}</text>`).join("");
+  const pts = data.map((d, i) => `${x(i).toFixed(1)},${y(d.acc).toFixed(1)}`).join(" ");
+  const dots = data.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.acc).toFixed(1)}" r="3.5" fill="#c0392b"><title>${d.date} ${d.grade} ${d.acc}%</title></circle>`).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class="graph">${grid}<polyline points="${pts}" fill="none" stroke="#c0392b" stroke-width="2"/>${dots}</svg><p class="sub">正答率(%)の推移・直近${n}回</p>`;
+}
 function renderRecords() {
   const ms = monthStats();
   $("#recEffort").textContent = `学習日数 ${ms.days}日　／　合計 ${fmtMin(ms.sec)}`;
-  const t = allTimes();
-  const subs = ["mitori", "kake", "wari", "anzan"];
+  const hist = JSON.parse(localStorage.getItem(ROUTINE) || "[]");
+  $("#routineGraph").innerHTML = routineGraphSVG(hist);
+  const hrows = hist.slice(-15).reverse().map((h) => `<tr><td>${h.date}</td><td>${h.grade}</td><td>${h.acc}%</td><td>${h.totalCorrect}/${h.totalN}</td><td>${fmtClock(h.timeSec)}</td></tr>`).join("");
+  $("#routineList").innerHTML = hrows
+    ? `<table class="rec-table"><tr><th>日付</th><th>級・段</th><th>正答率</th><th>正解</th><th>時間</th></tr>${hrows}</table>`
+    : "";
+  const t = allTimes(), subs = ["mitori", "kake", "wari", "anzan"];
   const rows = GRADES.filter((g) => subs.some((s) => t[`${g.key}_${s}`] != null))
     .map((g) => `<tr><td>${g.key}</td>${subs.map((s) => `<td>${t[`${g.key}_${s}`] != null ? fmtClock(t[`${g.key}_${s}`]) : "—"}</td>`).join("")}</tr>`).join("");
   $("#recordsTable").innerHTML = rows
     ? `<table class="rec-table"><tr><th>級・段</th><th>みとり</th><th>かけ</th><th>わり</th><th>あんざん</th></tr>${rows}</table>`
-    : `<p class="sub">まだ記録がありません。練習を完走するとタイムが記録されます。</p>`;
+    : `<p class="sub">まだ種目別の記録がありません。練習を完走するとタイムが記録されます。</p>`;
 }
+function renderToday() {
+  const sel = $("#todayGrade");
+  if (!sel.dataset.filled) {
+    sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join("");
+    sel.dataset.filled = "1";
+  }
+  const rk = JSON.parse(localStorage.getItem(RANK) || "null");
+  sel.value = rk ? rk.idx : gradeIdx;
+}
+$("#todayStart").addEventListener("click", () => startRoutine(GRADES[+$("#todayGrade").value]));
 const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
 function renderSettings() {
   const p = profile();
@@ -327,6 +353,8 @@ function startSession(subj) {
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null };
   $("#playMark").classList.add("hidden");
   showView("play");
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
   $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
@@ -388,6 +416,7 @@ function advance() { session.idx++; if (session.idx >= session.N) finishSession(
 function finishSession() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (!session) return;
+  if (session.routine) return finishRoutineSection();
   const el = (performance.now() - session.start) / 1000;
   const completed = session.idx >= session.N, cf = session.cf;
   let msg = "";
@@ -413,7 +442,124 @@ function finishSession() {
   $("#againBtn").onclick = () => startSession(subj);
   $("#homeBtn").onclick = () => { showView("grades"); setActiveNav(document.querySelector('.nav[data-view="grades"]')); updateInfo(); };
 }
-function quitSession() { if (playTimer) { clearInterval(playTimer); playTimer = null; } session = null; showView("grades"); setActiveNav(document.querySelector('.nav[data-view="grades"]')); updateInfo(); }
+function quitSession() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  if (restTimer) { clearInterval(restTimer); restTimer = null; }
+  session = null; routineState = null;
+  const back = routineActive ? "today" : "grades";
+  routineActive = false;
+  showView(back); setActiveNav(document.querySelector(`.nav[data-view="${back}"]`)); updateInfo();
+}
+
+/* ============================================================ 本日の練習（ルーティン） */
+const ROUTINE = "soroban_routine";
+let routineState = null, restTimer = null, routineActive = false;
+const ROUTINE_TEMPLATE = [
+  { subj: "anzan", N: 15, timed: true, label: "暗算 ①（3分）" },
+  { rest: 60, next: "暗算 ②" },
+  { subj: "anzan", N: 15, timed: true, label: "暗算 ②（3分）" },
+  { rest: 60, next: "暗算 ③" },
+  { subj: "anzan", N: 15, timed: true, label: "暗算 ③（3分）" },
+  { rest: 120, next: "かけ算" },
+  { subj: "kake", N: 15, timed: false, label: "かけ算 15問" },
+  { rest: 60, next: "わり算" },
+  { subj: "wari", N: 15, timed: false, label: "わり算 15問" },
+  { rest: 60, next: "みとり算" },
+  { subj: "mitori", N: 10, timed: false, label: "みとり算 10問" },
+];
+function buildSteps(grade) {
+  const kept = ROUTINE_TEMPLATE.filter((s) => s.rest != null || difficulty(grade, s.subj));
+  const out = [];
+  for (let i = 0; i < kept.length; i++) {
+    const s = kept[i];
+    if (s.rest != null) { const nx = kept[i + 1]; if (out.length === 0 || !nx || nx.rest != null) continue; }
+    out.push(s);
+  }
+  return out;
+}
+function startRoutine(grade) {
+  const steps = buildSteps(grade);
+  if (!steps.length) { alert("この級では本日の練習を実施できません"); return; }
+  routineState = { grade, steps, stepIdx: 0, sections: [] };
+  routineActive = true;
+  runStep();
+}
+function runStep() {
+  if (!routineState) return;
+  const step = routineState.steps[routineState.stepIdx];
+  if (!step) return finishRoutine();
+  if (step.rest != null) showRest(step); else startQuizSection(step);
+}
+function startQuizSection(step) {
+  const grade = routineState.grade, cf = SUBJECT[step.subj];
+  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, timed: !!step.timed, mode: "each", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
+  $("#playMark").classList.add("hidden");
+  showView("play");
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#showSteps").style.display = step.subj === "mitori" ? "" : "none";
+  const total = routineState.steps.filter((s) => s.rest == null).length;
+  const done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
+  $("#playGrade").textContent = `本日の練習 ${done + 1}/${total}：${step.label}`;
+  $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
+  playTimer = setInterval(tickPlay, 150);
+  nextPlayProblem();
+}
+function finishRoutineSection() {
+  const el = (performance.now() - session.start) / 1000;
+  routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el });
+  correctSnd();
+  const s = session; session = null;
+  $("#playProblem").textContent = "セクション終了！";
+  $("#playResult").className = "result ok";
+  $("#playResult").innerHTML = `${s.label}：正解 <b>${s.correct} / ${s.N}</b>　タイム ${fmtClock(el)}<br><button id="nextStepBtn">次へ ▶</button>`;
+  $("#nextStepBtn").onclick = () => { routineState.stepIdx++; runStep(); };
+}
+function showRest(step) {
+  session = null;
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  showView("play");
+  $("#playProblemWrap").classList.add("hidden");
+  $("#playSorobanWrap").classList.add("hidden");
+  $("#playInputWrap").classList.add("hidden");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#playResult").textContent = ""; $("#playGrade").textContent = "本日の練習：休憩"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  $("#playRest").classList.remove("hidden");
+  $("#restNext").textContent = step.next ? `つぎは：${step.next}` : "";
+  let left = step.rest;
+  const render = () => ($("#restTimer").textContent = fmtClock(left));
+  render();
+  restTimer = setInterval(() => { left--; render(); if (left <= 0) endRest(); }, 1000);
+}
+function endRest() {
+  if (restTimer) { clearInterval(restTimer); restTimer = null; }
+  $("#playRest").classList.add("hidden");
+  routineState.stepIdx++; runStep();
+}
+function finishRoutine() {
+  const rs = routineState; routineState = null; routineActive = false;
+  const totalCorrect = rs.sections.reduce((a, s) => a + s.correct, 0);
+  const totalN = rs.sections.reduce((a, s) => a + s.N, 0);
+  const totalTime = rs.sections.reduce((a, s) => a + s.sec, 0);
+  const acc = totalN ? Math.round((totalCorrect / totalN) * 100) : 0;
+  const hist = JSON.parse(localStorage.getItem(ROUTINE) || "[]");
+  hist.push({ date: today(), grade: rs.grade.key, totalCorrect, totalN, acc, timeSec: Math.round(totalTime), sections: rs.sections.map((s) => ({ label: s.label, correct: s.correct, N: s.N, sec: Math.round(s.sec) })) });
+  localStorage.setItem(ROUTINE, JSON.stringify(hist.slice(-200)));
+  logStudy(totalTime); touchStreak(); renderProfile(); fanfareSnd();
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
+  $("#playProblem").textContent = "🎉 本日の練習 完了！";
+  $("#playGrade").textContent = `成績発表（${rs.grade.key}）`; $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
+  const rows = rs.sections.map((s) => `<div class="brow"><span>${s.label}</span><b>${s.correct}/${s.N}　${fmtClock(s.sec)}</b></div>`).join("");
+  $("#playResult").className = "result ok";
+  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div><br><button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
+  $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
+}
 
 /* ---------- 解き方（みとり算） ---------- */
 const PLACE = ["一の位", "十の位", "百の位", "千の位", "万の位", "十万の位", "百万の位"];
@@ -448,6 +594,7 @@ let flashExam = { on: false, idx: 0, N: 20, correct: 0 };
 function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
   showView("play");
+  $("#playRest").classList.add("hidden"); $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
   $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
