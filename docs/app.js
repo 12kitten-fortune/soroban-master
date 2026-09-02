@@ -707,6 +707,11 @@ function startFlash(grade) {
   flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
 }
 $("#flashStart").addEventListener("click", () => { flashExam.on = $("#flashExamMode").checked; runFlash(); });
+// 数字1個ごとの音（1個目・2個目…とドレミで上がっていく＝リズムが分かる）
+const FLASH_SCALE = [523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319];
+function flashBeep(i) { if (!soundOn) return; try { const c = ensureAudio(); tone(FLASH_SCALE[i % FLASH_SCALE.length], c.currentTime, 0.1, "triangle", 0.18); } catch {} }
+function flashTick(freq) { if (!soundOn) return; try { const c = ensureAudio(); tone(freq, c.currentTime, 0.09, "square", 0.14); } catch {} }
+function flashReadySnd() { if (!soundOn) return; try { const c = ensureAudio(), t = c.currentTime; tone(392, t, 0.14, "sine", 0.18); tone(330, t + 0.1, 0.22, "sine", 0.18); } catch {} } // 「＝？」の合図（下降）
 async function runFlash() {
   if (flashBusy || !flashSpec) return; flashBusy = true;
   $("#flashStart").disabled = true; $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
@@ -714,9 +719,14 @@ async function runFlash() {
   const p = genFlashNums(flashSpec); flashAnswer = p.answer;
   const interval = Math.round((flashSpec.sec / flashSpec.terms) * 1000);
   const disp = $("#flashDisplay");
-  for (const n of [3, 2, 1]) { disp.textContent = n; await sleep(450); }
-  for (const v of p.nums) { disp.textContent = ""; await sleep(90); disp.textContent = v.toLocaleString(); await sleep(interval); }
-  disp.textContent = "= ?"; $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
+  for (const n of [3, 2, 1]) { disp.textContent = n; flashTick(440); await sleep(450); }
+  for (let i = 0; i < p.nums.length; i++) {
+    disp.textContent = ""; await sleep(90);
+    disp.textContent = p.nums[i].toLocaleString(); flashBeep(i); // 数字が出た瞬間に音
+    await sleep(interval);
+  }
+  disp.textContent = "= ?"; flashReadySnd();
+  $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   $("#flashStart").disabled = false; flashBusy = false;
 }
 $("#flashForm").addEventListener("submit", (e) => {
