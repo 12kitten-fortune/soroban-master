@@ -3,6 +3,7 @@ const $$ = (s) => document.querySelectorAll(s);
 const COLS = 23, ONES_COL = 11, BH = 28;
 const isUnitPoint = (c) => (c - ONES_COL) % 3 === 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleepUntil = (t) => new Promise((r) => setTimeout(r, Math.max(0, t - performance.now()))); // 絶対時刻まで待つ（ドリフト防止）
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 // onQuizChange が初期化時（makeSoroban生成時）に参照するため、先に宣言してTDZを回避
 let session = null, playTimer = null;
@@ -34,12 +35,12 @@ const ANZAN_STD = {
   6: { digits: 2, terms: 3 }, 5: { digits: 2, terms: 4 }, 4: { digits: 2, terms: 5 }, 3: { digits: 2, terms: 6 },
   2: { digits: 2, terms: 8 }, 1: { digits: 3, terms: 5 },
 };
-// フラッシュ暗算 10〜1級（全珠連。10/7/5/3/1級は指定値、他は補間。すべて2桁）
+// フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。低い級はやさしく・秒数ゆったり）
 const FLASH_STD = {
-  10: { digits: 2, terms: 2, sec: 4 }, 9: { digits: 2, terms: 3, sec: 5 }, 8: { digits: 2, terms: 4, sec: 7 },
-  7: { digits: 2, terms: 5, sec: 8 }, 6: { digits: 2, terms: 6, sec: 9 }, 5: { digits: 2, terms: 7, sec: 10 },
-  4: { digits: 2, terms: 8, sec: 11 }, 3: { digits: 2, terms: 10, sec: 12 }, 2: { digits: 2, terms: 12, sec: 13 },
-  1: { digits: 2, terms: 15, sec: 13 },
+  10: { digits: 1, terms: 3, sec: 5 }, 9: { digits: 1, terms: 4, sec: 5 }, 8: { digits: 1, terms: 5, sec: 6 },
+  7: { digits: 1, terms: 7, sec: 7 }, 6: { digits: 2, terms: 3, sec: 5 }, 5: { digits: 2, terms: 4, sec: 6 },
+  4: { digits: 2, terms: 5, sec: 7 }, 3: { digits: 2, terms: 7, sec: 8 }, 2: { digits: 2, terms: 10, sec: 9 },
+  1: { digits: 3, terms: 5, sec: 7 },
 };
 // フラッシュ暗算 段位（全珠連基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
 const FLASH_DAN = {
@@ -719,12 +720,18 @@ async function runFlash() {
   const p = genFlashNums(flashSpec); flashAnswer = p.answer;
   const interval = Math.round((flashSpec.sec / flashSpec.terms) * 1000);
   const disp = $("#flashDisplay");
-  for (const n of [3, 2, 1]) { disp.textContent = n; flashTick(440); await sleep(450); }
+  for (const n of [3, 2, 1]) { disp.textContent = n; flashTick(440); await sleep(500); }
+  // 絶対時刻に合わせて等間隔に表示（最初だけ速い/最後が遅い、を解消）
+  const slot = interval;
+  const gap = Math.min(70, Math.floor(slot * 0.2)); // 数字と数字の間の空白
+  const t0 = performance.now();
   for (let i = 0; i < p.nums.length; i++) {
-    disp.textContent = ""; await sleep(90);
+    await sleepUntil(t0 + i * slot);
     disp.textContent = p.nums[i].toLocaleString(); flashBeep(i); // 数字が出た瞬間に音
-    await sleep(interval);
+    await sleepUntil(t0 + (i + 1) * slot - gap);
+    disp.textContent = "";
   }
+  await sleepUntil(t0 + p.nums.length * slot);
   disp.textContent = "= ?"; flashReadySnd();
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   $("#flashStart").disabled = false; flashBusy = false;
