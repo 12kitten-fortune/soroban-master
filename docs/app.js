@@ -1,6 +1,6 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
-const COLS = 23, ONES_COL = 11, BH = 28;
+const COLS = 23, ONES_COL = 11, BH = 20;
 const isUnitPoint = (c) => (c - ONES_COL) % 3 === 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sleepUntil = (t) => new Promise((r) => setTimeout(r, Math.max(0, t - performance.now()))); // 絶対時刻まで待つ（ドリフト防止）
@@ -721,17 +721,18 @@ async function runFlash() {
   const interval = Math.round((flashSpec.sec / flashSpec.terms) * 1000);
   const disp = $("#flashDisplay");
   for (const n of [3, 2, 1]) { disp.textContent = n; flashTick(440); await sleep(500); }
-  // 絶対時刻に合わせて等間隔に表示（最初だけ速い/最後が遅い、を解消）
+  disp.textContent = ""; await sleep(400); // 「用意」の間（最初が急に出ないように）
+  // 各数字の表示開始を t0 + i*slot に固定＝スピードを一定に（先頭・末尾のブレを解消）
   const slot = interval;
-  const gap = Math.min(70, Math.floor(slot * 0.2)); // 数字と数字の間の空白
-  const t0 = performance.now();
-  for (let i = 0; i < p.nums.length; i++) {
+  const blink = Math.min(90, Math.floor(slot * 0.18)); // 切り替わりが分かる一瞬の空白
+  const N = p.nums.length, t0 = performance.now();
+  for (let i = 0; i < N; i++) {
     await sleepUntil(t0 + i * slot);
-    disp.textContent = p.nums[i].toLocaleString(); flashBeep(i); // 数字が出た瞬間に音
-    await sleepUntil(t0 + (i + 1) * slot - gap);
     disp.textContent = "";
+    await sleepUntil(t0 + i * slot + blink);
+    disp.textContent = p.nums[i].toLocaleString(); flashBeep(i); // 数字が出た瞬間に音
   }
-  await sleepUntil(t0 + p.nums.length * slot);
+  await sleepUntil(t0 + N * slot); // 最後の数字も同じ長さ見せてから
   disp.textContent = "= ?"; flashReadySnd();
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   $("#flashStart").disabled = false; flashBusy = false;
