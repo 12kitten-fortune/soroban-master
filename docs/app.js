@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-3"; // 最新反映の確認用
+const BUILD = "2026-09-03-4"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -710,6 +710,7 @@ function startFlash(grade) {
   $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
+  $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
   $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashForm").classList.add("hidden");
   flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
 }
@@ -747,40 +748,43 @@ async function runFlash() {
   // すべての時刻をこの1点から計算（＝ドリフトしない）
   const slot = flashPaceMs(flashGrade) / 1000; // 秒
   const show = slot - Math.min(0.12, slot * 0.22);
-  const lead = 0.25, cdStep = 0.5;
-  const cdStart = ctx.currentTime + lead;
-  const start = cdStart + cdStep * 3 + 0.4;
+  const step = 0.6;                       // 信号 赤・黄 の各時間
+  const cdStart = ctx.currentTime + 0.2;
+  const start = cdStart + 2 * step;       // 青になったら数字スタート
   const end = start + N * slot;
+  const sigBox = $("#flashSignal"), lamps = sigBox.querySelectorAll(".lamp");
+  sigBox.classList.remove("hidden");
 
   // 音は全部まとめて絶対時刻で予約（後からズレない）
-  for (let k = 0; k < 3; k++) flashScheduleTone(ctx, cdStart + k * cdStep, 440, 0.09, "square", 0.14);
+  flashScheduleTone(ctx, cdStart, 300, 0.1, "sine", 0.14);          // 赤
+  flashScheduleTone(ctx, cdStart + step, 440, 0.1, "sine", 0.14);   // 黄
+  flashScheduleTone(ctx, start, 680, 0.14, "sine", 0.16);          // 青＝スタート
   for (let i = 0; i < N; i++) flashScheduleTone(ctx, start + i * slot, FLASH_SCALE[i % FLASH_SCALE.length], 0.1, "triangle", 0.18);
   flashScheduleTone(ctx, end, 392, 0.14, "sine", 0.18);
   flashScheduleTone(ctx, end + 0.1, 330, 0.22, "sine", 0.18);
 
   // 画面は毎フレーム「今どの状態か」を audioCtx.currentTime から計算して描く（自己補正）
   const onsets = [];
-  let lastText = null, shownIdx = -1, aborted = false;
+  let lastText = null, lastSig = null, shownIdx = -1, aborted = false;
   const onHide = () => { if (document.hidden) aborted = true; };
   document.addEventListener("visibilitychange", onHide);
   await new Promise((resolve) => {
     const draw = () => {
       if (aborted) return resolve();
       const t = ctx.currentTime;
-      let text = "", numIdx = -1, cd = false;
-      if (t < start) {
-        // カウントダウンは「数字」を出さない（問題の口数と混同しないように）
-        const k = Math.floor((t - cdStart) / cdStep);
-        text = (k >= 0 && k < 3) ? "よーい" + "・".repeat(k + 1) : "";
-        cd = true;
-      } else if (t < end) {
+      let text = "", numIdx = -1, sig = "";
+      if (t < cdStart + step) sig = "red";
+      else if (t < start) sig = "yellow";
+      else if (t < end) {
+        sig = "green";
         const i = Math.floor((t - start) / slot);
         const phase = (t - start) - i * slot;
         if (phase < show) { text = nums[i].toLocaleString(); numIdx = i; }
       } else {
-        disp.classList.remove("cd"); disp.textContent = "= ?"; return resolve();
+        lamps.forEach((l) => l.classList.remove("on")); sigBox.classList.add("hidden");
+        disp.textContent = "= ?"; return resolve();
       }
-      disp.classList.toggle("cd", cd);
+      if (sig !== lastSig) { lamps.forEach((l) => l.classList.toggle("on", l.dataset.c === sig)); lastSig = sig; }
       if (text !== lastText) {
         disp.textContent = text;
         if (numIdx >= 0) { onsets.push(performance.now()); if (numIdx > shownIdx) { shownIdx = numIdx; dots[numIdx] && dots[numIdx].classList.add("on"); } }
@@ -791,13 +795,13 @@ async function runFlash() {
     requestAnimationFrame(draw);
   });
   document.removeEventListener("visibilitychange", onHide);
-  $("#flashDots").innerHTML = "";
+  $("#flashDots").innerHTML = ""; sigBox.classList.add("hidden");
 
-  // 実測の間隔を表示（本当に均等か・最新かを目で確認できる）
+  // 実測の間隔を別欄に表示（「何桁何口」の欄は消さない）
   if (onsets.length >= 2) {
     const g = onsets.slice(1).map((t, i) => t - onsets[i]);
     const mn = Math.min(...g), mx = Math.max(...g), avg = g.reduce((a, b) => a + b, 0) / g.length;
-    $("#flashInfo").textContent = `実測間隔：平均${(avg / 1000).toFixed(2)}秒（最短${(mn / 1000).toFixed(2)}〜最長${(mx / 1000).toFixed(2)}秒）／ build ${BUILD}`;
+    $("#flashMeasure").textContent = `実測間隔：平均${(avg / 1000).toFixed(2)}秒（最短${(mn / 1000).toFixed(2)}〜最長${(mx / 1000).toFixed(2)}秒）／ build ${BUILD}`;
   }
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   $("#flashStart").disabled = false; flashBusy = false;

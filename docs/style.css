@@ -98,8 +98,12 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .flash-dots { display: flex; gap: 7px; justify-content: center; min-height: 14px; margin-bottom: 8px; }
 .flash-dots .dot { width: 11px; height: 11px; border-radius: 50%; background: #ddd6c6; transition: background .1s; }
 .flash-dots .dot.on { background: var(--bead-hi); }
-/* カウントダウン「よーい…」は問題の数字と別スタイル（混同防止） */
-.flash-display.cd { color: #b0a68c; font-size: 34px; font-weight: 600; letter-spacing: 2px; }
+/* スタート信号（赤→黄→青）。数字を出さないので問題の数字と混同しない */
+.signal { display: flex; gap: 14px; justify-content: center; margin-bottom: 8px; min-height: 40px; align-items: center; }
+.signal .lamp { width: 34px; height: 34px; border-radius: 50%; background: #2a2a2a; opacity: .3; transition: opacity .1s, box-shadow .1s; }
+.signal .lamp.on[data-c="red"] { background: #e74c3c; opacity: 1; box-shadow: 0 0 14px #e74c3c; }
+.signal .lamp.on[data-c="yellow"] { background: #f1c40f; opacity: 1; box-shadow: 0 0 14px #f1c40f; }
+.signal .lamp.on[data-c="green"] { background: #2ecc71; opacity: 1; box-shadow: 0 0 14px #2ecc71; }
 .value-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
 .soroban-value { font-size: 24px; font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; word-break: break-all; }
 
