@@ -95,6 +95,9 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .result.ok { color: var(--ok); } .result.ng { color: var(--accent); }
 .result button { margin: 8px 4px 0; }
 .flash-display { font-size: 72px; font-weight: 800; height: 140px; display: flex; align-items: center; justify-content: center; color: var(--frame); font-variant-numeric: tabular-nums; }
+.flash-display.ok { color: #2e7d5b; animation: flashpop .35s ease; }
+.flash-display.ng { color: var(--accent); animation: flashpop .35s ease; }
+@keyframes flashpop { from { transform: scale(.4); } to { transform: scale(1); } }
 .flash-dots { display: flex; gap: 7px; justify-content: center; min-height: 14px; margin-bottom: 8px; }
 .flash-dots .dot { width: 11px; height: 11px; border-radius: 50%; background: #ddd6c6; transition: background .1s; }
 .flash-dots .dot.on { background: var(--bead-hi); }

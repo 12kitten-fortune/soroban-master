@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-4"; // 最新反映の確認用
+const BUILD = "2026-09-03-5"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -711,7 +711,7 @@ function startFlash(grade) {
   $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
-  $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashForm").classList.add("hidden");
+  $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display"; $("#flashForm").classList.add("hidden");
   flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
 }
 $("#flashStart").addEventListener("click", () => { flashExam.on = $("#flashExamMode").checked; runFlash(); });
@@ -742,6 +742,7 @@ async function runFlash() {
   const p = genFlashNums(flashSpec); flashAnswer = p.answer;
   const nums = p.nums, N = nums.length;
   const disp = $("#flashDisplay");
+  disp.className = "flash-display"; // 前回の○×の色をリセット
   $("#flashDots").innerHTML = Array.from({ length: N }, () => `<span class="dot"></span>`).join("");
   const dots = $("#flashDots").querySelectorAll(".dot");
 
@@ -809,11 +810,15 @@ async function runFlash() {
 $("#flashForm").addEventListener("submit", (e) => {
   e.preventDefault(); if (flashAnswer === null) return;
   const ok = parseInt($("#flashInput").value, 10) === flashAnswer; const res = $("#playResult"); $("#flashForm").classList.add("hidden");
+  // 上の「= ?」を消して、大きく○×＋音（達成感）
+  $("#flashDisplay").textContent = ok ? "⭕" : "❌";
+  $("#flashDisplay").className = "flash-display " + (ok ? "ok" : "ng");
+  ok ? correctSnd() : wrongSnd();
   if (flashExam.on) {
     if (ok) flashExam.correct++; flashExam.idx++;
-    if (flashExam.idx < flashExam.N) { res.textContent = ok ? "⭕" : `❌（${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); setTimeout(runFlash, 800); }
-    else { const score = flashExam.correct * 10, pass = score >= 140; let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`; if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; } renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = ""; }
-  } else { res.textContent = ok ? "⭕ 正解！すごい！" : `❌ おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
+    if (flashExam.idx < flashExam.N) { res.textContent = ok ? "正解！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); setTimeout(runFlash, 900); }
+    else { const score = flashExam.correct * 10, pass = score >= 140; let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`; if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; fanfareSnd(); } renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = ""; }
+  } else { res.textContent = ok ? "正解！すごい！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
 });
 
 /* ---------- キーボード ---------- */
