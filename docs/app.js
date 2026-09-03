@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-7"; // 最新反映の確認用
+const BUILD = "2026-09-03-9"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -235,9 +235,9 @@ function nextGoalHint() {
 
 /* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
 const SESSIONS = "soroban_sessions";
-function logSession(subj, N, correct, sumSec) {
+function logSession(subj, N, correct, sumSec, pauses) {
   const l = JSON.parse(localStorage.getItem(SESSIONS) || "[]");
-  l.push({ d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0 });
+  l.push({ d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 });
   localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-1500)));
 }
 const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
@@ -339,7 +339,19 @@ function showView(v) {
   if (v === "parent") renderParent();
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
+// 画面を離れるときは進行中のものをすべて破棄する（採点・GOLD付与・記録保存はしない）
+function abandonActivity() {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  if (restTimer) { clearInterval(restTimer); restTimer = null; }
+  if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
+  session = null;                              // 練習・検定：セッションを破棄（採点しない）
+  routineState = null; routineActive = false;  // 本日の練習：中断（時間経過で練習画面に戻さない）
+  battle = null;                               // たいせん：不戦敗（GOLDなし）
+  $("#playRest").classList.add("hidden");
+  hidePauseUI();
+}
 $$(".nav").forEach((n) => n.addEventListener("click", () => {
+  abandonActivity(); // 画面切り替え前に、走っているタイマーを止めて破棄する
   setActiveNav(n);
   if (n.dataset.subj) { subject = n.dataset.subj; showView("grades"); updateInfo(); }
   else showView(n.dataset.view);
@@ -559,8 +571,9 @@ function startSession(subj) {
   if (subj === "flash") return startFlash(grade);
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
   const cf = SUBJECT[subj];
-  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: cf.answer, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null };
+  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: cf.answer, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   $("#playMark").classList.add("hidden");
+  $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
@@ -573,12 +586,43 @@ function startSession(subj) {
   playTimer = setInterval(tickPlay, 150);
   nextPlayProblem();
 }
+// 一時停止していた時間を差し引いた「実際の経過時間」（停止中は止めた時点で固定）
+const playElapsed = () => ((session.paused ? session.pauseAt : performance.now()) - session.start - (session.pausedMs || 0)) / 1000;
 function tickPlay() {
-  if (!session) return;
-  const el = (performance.now() - session.start) / 1000;
+  if (!session || session.paused) return; // 一時停止中はタイマーを進めない
+  const el = playElapsed();
   if (session.timed) { const rem = session.cf.limit - el; $("#playTimer").textContent = "⏱ " + fmtClock(rem); if (rem <= 0) finishSession(); }
   else $("#playTimer").textContent = "⏱ " + fmtClock(el);
 }
+/* ---------- 一時停止 / さいかい ---------- */
+function setPauseUI(on) {
+  $("#playPause").classList.toggle("hidden", !on);
+  $("#pauseBtn").textContent = on ? "▶ さいかい" : "⏸ 一時停止";
+}
+function hidePauseUI() { $("#pauseBtn").classList.add("hidden"); $("#playPause").classList.add("hidden"); }
+function pausePlay() {
+  if (!session || session.paused) return;
+  session.paused = true; session.pauseAt = performance.now(); session.pauseCount = (session.pauseCount || 0) + 1;
+  // 一時停止中に問題を考えられないよう、問題と解答欄を隠す
+  $("#playProblemWrap").classList.add("hidden");
+  $("#playSorobanWrap").classList.add("hidden");
+  $("#playInputWrap").classList.add("hidden");
+  setPauseUI(true);
+}
+function resumePlay() {
+  if (!session || !session.paused) return;
+  const d = performance.now() - session.pauseAt;
+  session.pausedMs = (session.pausedMs || 0) + d;
+  if (session.qStart) session.qStart += d; // 1問ごとの回答時間にも停止分を含めない
+  session.paused = false;
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
+  setPauseUI(false);
+  if (session.answerBy === "input") $("#playInput").focus();
+}
+$("#pauseBtn").addEventListener("click", () => (session && session.paused ? resumePlay() : pausePlay()));
+$("#resumeBtn").addEventListener("click", resumePlay);
 function nextPlayProblem() {
   session.cur = genProblemFor(session.grade, session.subj);
   stepCtx = { subj: session.subj, cur: session.cur }; // 解き方用（完了後も参照できるよう保持）
@@ -607,7 +651,7 @@ function currentSorobanAnswer() {
 }
 // 答え合わせ（◎／×表示、採点方式に応じて進行）
 function submitAnswer(val) {
-  if (!session || session.locking) return;
+  if (!session || session.locking || session.paused) return;
   const ok = val === session.cur.answer;
   if (ok) session.correct++;
   const qt = session.qStart ? (performance.now() - session.qStart) / 1000 : null;
@@ -636,7 +680,8 @@ function finishSession() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (!session) return;
   if (session.routine) return finishRoutineSection();
-  const el = (performance.now() - session.start) / 1000;
+  hidePauseUI();
+  const el = playElapsed();
   const completed = session.idx >= session.N, cf = session.cf;
   let msg = "";
   if (session.mode === "end" && session.results.length) {
@@ -647,12 +692,13 @@ function finishSession() {
   touchStreak(); // streak更新（GOLD連続ボーナスの前に）
   if (completed) {
     const r = saveTime(session.grade.key, session.subj, el); bestUpdated = r.improved;
-    logStudy(el); logSession(session.subj, session.N, session.correct, el);
+    logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount);
     msg += `<br>⏱ 自己ベスト：${fmtClock(bestTime(session.grade.key, session.subj))}`;
     if (bestUpdated) msg += `　<b class="hl">✨自己ベスト更新！</b>`;
     else if (r.prev != null && el > r.prev) msg += `　<span class="sub">あと ${(el - r.prev).toFixed(1)}秒で自己ベスト！</span>`;
     const ts = session.results.map((x) => x.t).filter((x) => x != null);
     if (ts.length) { const avg = ts.reduce((a, b) => a + b, 0) / ts.length, fast = Math.min(...ts); msg += `<br>平均回答 <b>${avg.toFixed(1)}秒</b> ／ 最速 ${fast.toFixed(1)}秒`; }
+    if (session.pauseCount) msg += `<br><span class="sub">⏸ 一時停止 ${session.pauseCount}回（タイムには含めていません）</span>`;
   }
   if (session.timed) {
     const score = session.correct * cf.per, pass = score >= cf.pass;
@@ -685,6 +731,7 @@ function quitSession() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (restTimer) { clearInterval(restTimer); restTimer = null; }
   session = null; routineState = null;
+  hidePauseUI();
   const back = routineActive ? "today" : "grades";
   routineActive = false;
   showView(back); setActiveNav(document.querySelector(`.nav[data-view="${back}"]`)); updateInfo();
@@ -732,8 +779,9 @@ function runStep() {
 function startQuizSection(step) {
   const grade = routineState.grade, cf = SUBJECT[step.subj];
   // 採点は最後にまとめて（mode:end）。暗算は入力式（そろばんを出さない）、かけ/わり/みとりはそろばん
-  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: cf.answer, timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label };
+  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: cf.answer, timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   $("#playMark").classList.add("hidden");
+  $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
@@ -749,9 +797,9 @@ function startQuizSection(step) {
   nextPlayProblem();
 }
 function finishRoutineSection() {
-  const el = (performance.now() - session.start) / 1000;
+  const el = playElapsed();
   routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el, items: session.results });
-  logSession(session.subj, session.N, session.correct, el);
+  logSession(session.subj, session.N, session.correct, el, session.pauseCount);
   const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true });
   routineState.gold = (routineState.gold || 0) + g;
   correctSnd();
@@ -762,6 +810,7 @@ function finishRoutineSection() {
 function showRest(step) {
   session = null;
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  hidePauseUI();
   showView("play");
   $("#playProblemWrap").classList.add("hidden");
   $("#playSorobanWrap").classList.add("hidden");
@@ -782,6 +831,8 @@ function endRest() {
   $("#playRest").classList.add("hidden");
   routineState.stepIdx++; runStep();
 }
+// 休憩の「スキップ ▶」で、待たずに次のセットへ
+$("#restSkip").addEventListener("click", () => { if (routineState) endRest(); });
 function finishRoutine() {
   const rs = routineState; routineState = null; routineActive = false;
   const totalCorrect = rs.sections.reduce((a, s) => a + s.correct, 0);
@@ -912,6 +963,7 @@ let flashAnswer = null, flashBusy = false, flashSpec = null, flashGrade = null;
 let flashExam = { on: false, idx: 0, N: 20, correct: 0 };
 function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
+  hidePauseUI();
   showView("play");
   $("#playRest").classList.add("hidden"); $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
@@ -1118,6 +1170,7 @@ document.addEventListener("keydown", (e) => {
     else if (e.key === "ArrowDown" || e.key === "ArrowLeft") { moveGrade(-1); e.preventDefault(); }
     else if (e.key === "Enter") { startSession(subject); e.preventDefault(); }
   } else if (!$("#view-play").classList.contains("hidden")) {
+    if (session && session.paused) return; // 一時停止中はキー操作を受け付けない
     if (session && session.answerBy === "soroban") {
       if (e.key === "Enter") { submitAnswer(currentSorobanAnswer()); e.preventDefault(); }
       else sorobanQuiz.handleKey(e);

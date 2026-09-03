@@ -121,17 +121,23 @@
               <button id="quitBtn" class="ghost">← もどる</button>
               <span id="playGrade"></span>
               <span id="playTimer">⏱ 0:00.0</span>
+              <button id="pauseBtn" class="pill hidden">⏸ 一時停止</button>
               <span id="playProgress">0 / 0</span>
             </div>
             <div class="problem-wrap" id="playProblemWrap">
               <div id="playProblem" class="problem"></div>
               <div id="playMark" class="mark hidden"></div>
             </div>
+            <div id="playPause" class="pause-box hidden">
+              <div class="pause-title">⏸ 一時停止中</div>
+              <p class="sub">タイマーは止まっています。問題は「さいかい」を押すと出ます。</p>
+              <button id="resumeBtn">▶ さいかい</button>
+            </div>
             <div id="playRest" class="rest hidden">
-              <div class="rest-title">☕ 休憩（自動で次へ）</div>
+              <div class="rest-title">☕ 休憩</div>
               <div id="restTimer" class="rest-timer">1:00</div>
               <div id="restNext" class="sub"></div>
-              <button id="restSkip" class="ghost">スキップ ▶</button>
+              <button id="restSkip" class="skip-btn">▶ 休憩をスキップして次へ</button>
               <div id="restResult" class="rest-result"></div>
             </div>
             <div id="playSorobanWrap">

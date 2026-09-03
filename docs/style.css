@@ -301,3 +301,10 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   .hero-mascot { width: 76px; }
   .fighter img { width: 72px; }
 }
+
+/* ============================================================ 一時停止 / 休憩スキップ */
+#pauseBtn { cursor: pointer; font-weight: 700; }
+.pause-box { text-align: center; padding: 44px 20px; }
+.pause-title { font-size: 32px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+#resumeBtn { font-size: 20px; font-weight: 800; padding: 14px 44px; border-radius: 12px; background: var(--ok); margin-top: 14px; }
+.skip-btn { background: var(--ok); color: #fff; font-size: 16px; font-weight: 700; padding: 12px 26px; border-radius: 10px; margin-top: 10px; }
