@@ -98,6 +98,8 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .flash-dots { display: flex; gap: 7px; justify-content: center; min-height: 14px; margin-bottom: 8px; }
 .flash-dots .dot { width: 11px; height: 11px; border-radius: 50%; background: #ddd6c6; transition: background .1s; }
 .flash-dots .dot.on { background: var(--bead-hi); }
+/* カウントダウン「よーい…」は問題の数字と別スタイル（混同防止） */
+.flash-display.cd { color: #b0a68c; font-size: 34px; font-weight: 600; letter-spacing: 2px; }
 .value-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
 .soroban-value { font-size: 24px; font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; word-break: break-all; }
 

@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-2"; // 最新反映の確認用
+const BUILD = "2026-09-03-3"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -767,17 +767,20 @@ async function runFlash() {
     const draw = () => {
       if (aborted) return resolve();
       const t = ctx.currentTime;
-      let text = "", numIdx = -1;
+      let text = "", numIdx = -1, cd = false;
       if (t < start) {
+        // カウントダウンは「数字」を出さない（問題の口数と混同しないように）
         const k = Math.floor((t - cdStart) / cdStep);
-        text = (k >= 0 && k < 3) ? String(3 - k) : "";
+        text = (k >= 0 && k < 3) ? "よーい" + "・".repeat(k + 1) : "";
+        cd = true;
       } else if (t < end) {
         const i = Math.floor((t - start) / slot);
         const phase = (t - start) - i * slot;
         if (phase < show) { text = nums[i].toLocaleString(); numIdx = i; }
       } else {
-        disp.textContent = "= ?"; return resolve();
+        disp.classList.remove("cd"); disp.textContent = "= ?"; return resolve();
       }
+      disp.classList.toggle("cd", cd);
       if (text !== lastText) {
         disp.textContent = text;
         if (numIdx >= 0) { onsets.push(performance.now()); if (numIdx > shownIdx) { shownIdx = numIdx; dots[numIdx] && dots[numIdx].classList.add("on"); } }
