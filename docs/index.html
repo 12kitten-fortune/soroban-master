@@ -3,25 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>そろばん道場</title>
+    <title>そろばんキングダム｜SOROBAN KINGDOM</title>
+    <meta name="description" content="そろばんで学んで、王国を育てる。子どものためのそろばん学習アプリ。" />
+    <meta name="theme-color" content="#16305c" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon.svg" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="app">
       <!-- サイドバー -->
       <aside class="sidebar">
-        <div class="brand">🧮 そろばん道場<small>全国珠算連盟準拠</small></div>
+        <div class="brand">👑 そろばんキングダム<small>SOROBAN KINGDOM</small></div>
         <nav class="side-nav">
-          <button class="nav" data-view="grades">🏠 ホーム</button>
-          <button class="nav active" data-view="grades">📘 級・段を選ぶ</button>
+          <button class="nav active" data-view="home">🏠 ホーム</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
+          <button class="nav" data-view="kingdom">🏰 王国</button>
+          <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
           <div class="nav-sec">学習する</div>
+          <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
           <button class="nav subj-nav" data-subj="kake">✏️ かけ算</button>
           <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
-          <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
           <button class="nav subj-nav" data-subj="flash">⚡ フラッシュ暗算</button>
           <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
+          <div class="nav-sec">きろく</div>
           <button class="nav" data-view="records">📊 記録を見る</button>
+          <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
           <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
         </nav>
       </aside>
@@ -31,14 +39,41 @@
         <div class="topbar">
           <h2 id="pageTitle">級・段を選ぶ</h2>
           <div class="topbar-right">
+            <span id="goldPill" class="pill gold">👑 0 G</span>
             <button id="soundToggle" class="pill">🔊 音あり</button>
             <button id="examInfoBtn" class="pill">🎓 検定内容について</button>
             <div class="avatar-mini"><span id="avatarMini">🧒</span><div><b id="nameMini">そろ太くん</b><br><small id="rankMini">未取得</small></div></div>
           </div>
         </div>
 
+        <!-- ホーム -->
+        <div id="view-home" class="view">
+          <div class="home-grid">
+            <div class="card home-hero">
+              <div class="hero-top">
+                <div class="hero-avatar" id="homeAvatar">🧒</div>
+                <div><b id="homeName">そろ太くん</b><br><span class="rank-badge" id="homeRank">未取得</span></div>
+              </div>
+              <div class="today-box">
+                <div class="today-title">今日の練習</div>
+                <div class="today-menu" id="homeMenu"></div>
+                <button id="homeStartBtn" class="big-cta">▶ 今日の練習を始める</button>
+                <div id="homeStatus" class="today-status"></div>
+              </div>
+            </div>
+            <aside class="home-side">
+              <div class="card stat-tile"><span>👑 GOLD</span><b id="homeGold">0</b></div>
+              <div class="card stat-tile"><span>🏰 王国レベル</span><b id="homeKingdomLv">1</b></div>
+              <div class="card stat-tile"><span>🔥 連続学習</span><b id="homeStreak">0日</b></div>
+              <div class="card stat-tile"><span>📅 今月の学習</span><b id="homeMonth">0日</b></div>
+              <button id="homeToKingdom" class="wide-btn">🏰 王国を見る</button>
+              <button id="homeToRecords" class="wide-btn ghost">📊 成績を見る</button>
+            </aside>
+          </div>
+        </div>
+
         <!-- 級・段を選ぶ -->
-        <div id="view-grades" class="view">
+        <div id="view-grades" class="view hidden">
           <div class="grades-layout">
             <div class="grades-main card">
               <div class="chips" id="subjectChips">
@@ -172,6 +207,32 @@
           </div>
         </div>
 
+        <!-- 王国 -->
+        <div id="view-kingdom" class="view hidden">
+          <div class="card kingdom-head">
+            <div class="kd-title">🏰 わたしの王国　<span class="kd-lv">王国Lv.<span id="kdLevel">1</span></span></div>
+            <div class="gold-badge">👑 <span id="kdGold">0</span> GOLD</div>
+          </div>
+          <div class="card"><div id="kingdomBoard" class="kingdom-board"></div></div>
+          <div class="card">
+            <h3>🏗️ 王国を育てる</h3>
+            <p class="sub">そろばんを練習してGOLDを貯めると、王国が発展します。（GOLDは学習でだけ手に入ります）</p>
+            <div id="shopList" class="shop-list"></div>
+            <div id="shopMsg" class="shop-msg sub"></div>
+          </div>
+        </div>
+
+        <!-- 保護者 -->
+        <div id="view-parent" class="view hidden">
+          <div class="card">
+            <h3>👨‍👩‍👧 保護者の方へ</h3>
+            <p class="sub">お子さまの学習状況です。王国が育つのは「そろばんを練習した成果」です。</p>
+            <div id="parentSummary" class="parent-summary"></div>
+          </div>
+          <div class="card"><h3>今週の学習量（問題数）</h3><div id="parentWeek"></div></div>
+          <div class="card"><h3>得意・苦手（種目別 正答率・直近30日）</h3><div id="parentSubjects"></div></div>
+        </div>
+
         <!-- 設定 -->
         <div id="view-settings" class="view hidden">
           <div class="card">
@@ -198,5 +259,10 @@
     </div>
 
     <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+      }
+    </script>
   </body>
 </html>

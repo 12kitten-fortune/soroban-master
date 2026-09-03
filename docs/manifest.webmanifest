@@ -1,0 +1,15 @@
+{
+  "name": "そろばんキングダム",
+  "short_name": "そろキングダム",
+  "description": "そろばんで学んで、王国を育てる。子どものためのそろばん学習アプリ。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16305c",
+  "theme_color": "#16305c",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#16305c"/>
+  <!-- 王冠 -->
+  <path d="M256 96l40 56 56-40-16 92H176l-16-92 56 40z" fill="#d4af37" stroke="#b8912a" stroke-width="4" stroke-linejoin="round"/>
+  <rect x="176" y="196" width="160" height="26" rx="6" fill="#d4af37"/>
+  <!-- そろばん枠 -->
+  <rect x="128" y="256" width="256" height="176" rx="16" fill="#f7f2e7" stroke="#8a5a2b" stroke-width="10"/>
+  <line x1="128" y1="320" x2="384" y2="320" stroke="#8a5a2b" stroke-width="12"/>
+  <!-- 桁の棒 -->
+  <g stroke="#c9b48c" stroke-width="6">
+    <line x1="176" y1="266" x2="176" y2="422"/>
+    <line x1="224" y1="266" x2="224" y2="422"/>
+    <line x1="272" y1="266" x2="272" y2="422"/>
+    <line x1="320" y1="266" x2="320" y2="422"/>
+  </g>
+  <!-- 珠 -->
+  <g fill="#16305c">
+    <ellipse cx="176" cy="300" rx="20" ry="12"/>
+    <ellipse cx="224" cy="360" rx="20" ry="12"/>
+    <ellipse cx="272" cy="300" rx="20" ry="12"/>
+    <ellipse cx="320" cy="392" rx="20" ry="12"/>
+    <ellipse cx="224" cy="392" rx="20" ry="12"/>
+    <ellipse cx="320" cy="360" rx="20" ry="12"/>
+  </g>
+</svg>

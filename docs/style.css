@@ -2,8 +2,9 @@
   --frame: #1c1c1c; --frame-dark: #000;
   --bead: #7a3b16; --bead-hi: #d1782f;
   --accent: #c0392b; --ok: #2e7d5b; --gold: #d99a2b;
-  --bg: #f3efe7; --card: #ffffff; --line: #e6ddc9;
-  --side: #3b3226; --side-hi: #4d4130;
+  --bg: #f6f2e9; --card: #ffffff; --line: #e6ddc9;
+  --navy: #16305c; --navy-hi: #24487a; --royal-gold: #d4af37;
+  --side: #16305c; --side-hi: #24487a;
   --bh: 20px; --cw: 30px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -173,9 +174,79 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .qrow .qm.ok { color: #e0322b; }
 .qrow .qm.ng { color: var(--accent); }
 
+/* ============================================================ キングダム層 */
+.brand { color: #fff; }
+.brand small { color: var(--royal-gold); opacity: .9; letter-spacing: 1px; }
+.pill.gold { background: linear-gradient(180deg,#fbf1cf,#f0d98a); border-color: #e0c463; color: #6b5416; font-weight: 800; }
+
+/* ホーム */
+.home-grid { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start; }
+.home-hero { background: linear-gradient(160deg,#1b3a6b,#16305c); color: #fff; border: none; }
+.hero-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.hero-avatar { font-size: 46px; background: rgba(255,255,255,.12); border-radius: 16px; width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; }
+.hero-top b { font-size: 20px; }
+.today-box { background: var(--card); color: #2b2b2b; border-radius: 14px; padding: 18px; }
+.today-title { font-size: 15px; font-weight: 800; color: var(--navy); letter-spacing: 2px; border-bottom: 2px solid var(--royal-gold); display: inline-block; padding-bottom: 4px; margin-bottom: 12px; }
+.today-menu { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.menu-row { display: flex; justify-content: space-between; font-size: 16px; padding: 6px 4px; border-bottom: 1px dashed #eadfca; }
+.menu-row b { color: var(--navy); }
+.big-cta { width: 100%; background: linear-gradient(180deg,#e7b93c,#d4af37); color: #16305c; font-size: 20px; font-weight: 800; padding: 16px; border-radius: 12px; box-shadow: 0 4px 0 #b8912a; }
+.big-cta:hover { filter: brightness(1.03); }
+.today-status { text-align: center; margin-top: 12px; font-size: 15px; }
+.home-side { display: flex; flex-direction: column; gap: 10px; }
+.stat-tile { display: flex; align-items: center; justify-content: space-between; margin: 0; padding: 14px 16px; }
+.stat-tile span { font-size: 14px; color: #6b5f4c; }
+.stat-tile b { font-size: 22px; color: var(--navy); }
+.wide-btn { width: 100%; padding: 12px; border-radius: 10px; font-size: 15px; background: var(--navy); }
+.wide-btn.ghost { background: transparent; color: var(--navy); border: 1px solid var(--navy); }
+
+/* 王国 */
+.kingdom-head { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(160deg,#1b3a6b,#16305c); color: #fff; border: none; }
+.kd-title { font-size: 20px; font-weight: 800; }
+.kd-lv { font-size: 14px; background: rgba(255,255,255,.15); padding: 3px 10px; border-radius: 12px; }
+.gold-badge { background: linear-gradient(180deg,#fbf1cf,#f0d98a); color: #6b5416; font-weight: 800; padding: 8px 16px; border-radius: 20px; font-size: 16px; }
+.kingdom-board { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; background: linear-gradient(180deg,#bfe3ff 0%,#bfe3ff 42%,#9ed67a 42%,#7cc457 100%); border-radius: 14px; padding: 26px 16px; min-height: 200px; align-items: flex-end; }
+.ktile { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ktile .ki { font-size: 46px; line-height: 1; filter: drop-shadow(0 3px 2px rgba(0,0,0,.2)); }
+.ktile.grass { font-size: 30px; }
+.ktile .kl { font-size: 11px; font-weight: 700; color: #2b4a1f; background: rgba(255,255,255,.7); padding: 1px 6px; border-radius: 8px; }
+.shop-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(230px,1fr)); gap: 10px; margin-top: 8px; }
+.shop-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.si-ic { font-size: 30px; }
+.si-main { flex: 1; display: flex; flex-direction: column; }
+.si-main b { font-size: 15px; }
+.shop-item .buy { background: linear-gradient(180deg,#e7b93c,#d4af37); color: #16305c; font-weight: 800; border-radius: 10px; }
+.shop-item button:disabled { background: #d9d2c2; color: #7a7060; }
+.shop-msg { margin-top: 10px; min-height: 20px; color: var(--navy); font-weight: 700; }
+
+/* 結果画面の GOLD 演出 */
+.gold-earn { margin: 12px auto; max-width: 420px; background: linear-gradient(180deg,#fdf6de,#f6e6b0); border: 1px solid #e6cf83; border-radius: 14px; padding: 12px 16px; color: #6b5416; }
+.gold-earn > b { font-size: 24px; color: #a9791a; }
+.gold-lines { font-size: 12px; margin: 4px 0; opacity: .85; }
+.gold-earn .goal { font-size: 14px; font-weight: 800; color: var(--navy); margin-top: 4px; }
+.result .hl { color: #d4820f; }
+
+/* 保護者画面 */
+.parent-summary .pgrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 8px; }
+.pcell { background: #f7f3ea; border-radius: 10px; padding: 12px; text-align: center; }
+.pcell span { display: block; font-size: 12px; color: #6b5f4c; margin-bottom: 4px; }
+.pcell b { font-size: 22px; color: var(--navy); }
+.pbars { display: flex; align-items: flex-end; gap: 8px; height: 130px; padding: 8px 4px; }
+.pbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; }
+.pbar { width: 70%; max-width: 40px; background: linear-gradient(180deg,#3a72c4,#16305c); border-radius: 5px 5px 0 0; min-height: 3px; }
+.pbar-n { font-size: 12px; font-weight: 700; color: var(--navy); }
+.pbar-l { font-size: 12px; color: #8a7560; }
+.psub { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 14px; }
+.psub > span { width: 76px; }
+.psub-bar { flex: 1; background: #eee5d2; border-radius: 8px; height: 14px; overflow: hidden; }
+.psub-bar > div { height: 100%; background: linear-gradient(90deg,#d4af37,#e7b93c); }
+.psub > b { width: 44px; text-align: right; color: var(--navy); }
+
 @media (max-width: 820px) {
   .app { flex-direction: column; }
   .sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
   .side-nav { flex-direction: row; flex-wrap: wrap; }
   .grades-layout { grid-template-columns: 1fr; }
+  .home-grid { grid-template-columns: 1fr; }
+  .parent-summary .pgrid { grid-template-columns: repeat(2,1fr); }
 }

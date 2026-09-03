@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-5"; // 最新反映の確認用
+const BUILD = "2026-09-03-6"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -158,7 +158,7 @@ function certify(gradeKey) {
   renderProfile();
 }
 const rankText = () => { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.key : "未取得"; };
-function saveTime(gradeKey, subj, sec) { const t = JSON.parse(localStorage.getItem(TIMES) || "{}"); const k = `${gradeKey}_${subj}`; if (t[k] == null || sec < t[k]) { t[k] = sec; localStorage.setItem(TIMES, JSON.stringify(t)); } }
+function saveTime(gradeKey, subj, sec) { const t = JSON.parse(localStorage.getItem(TIMES) || "{}"); const k = `${gradeKey}_${subj}`; const prev = t[k]; const improved = prev == null || sec < prev; if (improved) { t[k] = sec; localStorage.setItem(TIMES, JSON.stringify(t)); } return { improved, prev }; }
 const allTimes = () => JSON.parse(localStorage.getItem(TIMES) || "{}");
 const bestTime = (gradeKey, subj) => allTimes()[`${gradeKey}_${subj}`];
 function bestPerSubject() { const t = allTimes(), r = {}; for (const [k, sec] of Object.entries(t)) { const subj = k.split("_")[1]; if (r[subj] == null || sec < r[subj]) r[subj] = sec; } return r; }
@@ -169,6 +169,79 @@ function last7() { const l = JSON.parse(localStorage.getItem(LOG) || "[]"); cons
 const profile = () => JSON.parse(localStorage.getItem(PROFILE) || '{"name":"そろ太くん","avatar":"🧒"}');
 const saveProfile = (p) => localStorage.setItem(PROFILE, JSON.stringify(p));
 function fmtMin(sec) { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? `${h}時間${m}分` : `${m}分`; }
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+
+/* ============================================================ GOLD・王国（キングダム層） */
+// GOLDは「学習の成果」としてのみ入手（王国では消費のみ）＝ゲームだけで稼げない設計
+const KINGDOM = "soroban_kingdom";
+const BUILD_DEFS = {
+  land:    { name: "土地",        icon: "🟩", base: 100, grow: 60, max: 12, lvl: true, desc: "王国を広げる" },
+  house:   { name: "家",          icon: "🏠", base: 60,  grow: 70, max: 5,  lvl: true, desc: "アップグレードで大きく" },
+  road:    { name: "道",          icon: "🛣️", base: 80,  max: 1, desc: "王国をつなぐ" },
+  bridge:  { name: "橋",          icon: "🌉", base: 150, max: 1, desc: "川をわたる" },
+  school:  { name: "学校",        icon: "🏫", base: 300, max: 1, desc: "みんなが学ぶ" },
+  library: { name: "図書館",      icon: "📚", base: 500, max: 1, desc: "知恵をたくわえる" },
+  dojo:    { name: "そろばん道場", icon: "⛩️", base: 800, max: 1, desc: "王国のシンボル" },
+};
+const BUILD_ORDER = ["land", "house", "road", "bridge", "school", "library", "dojo"];
+function loadKingdom() {
+  const d = JSON.parse(localStorage.getItem(KINGDOM) || "null");
+  if (!d) return { gold: 0, land: 1, b: { house: 1, road: 0, bridge: 0, school: 0, library: 0, dojo: 0 } };
+  d.b = Object.assign({ house: 1, road: 0, bridge: 0, school: 0, library: 0, dojo: 0 }, d.b || {});
+  if (d.gold == null) d.gold = 0; if (d.land == null) d.land = 1;
+  return d;
+}
+const saveKingdom = (k) => localStorage.setItem(KINGDOM, JSON.stringify(k));
+const getGold = () => loadKingdom().gold;
+function addGold(n) { const k = loadKingdom(); k.gold = Math.max(0, Math.round((k.gold || 0) + n)); saveKingdom(k); renderGoldPill(); return k.gold; }
+function ownedOf(key, k) { k = k || loadKingdom(); if (key === "land") return k.land; if (BUILD_DEFS[key].lvl) return k.b[key] || 0; return k.b[key] ? 1 : 0; }
+function priceOf(key, k) { k = k || loadKingdom(); const d = BUILD_DEFS[key]; if (key === "land") return d.base + (k.land - 1) * d.grow; if (d.lvl) return d.base + Math.max(0, (k.b[key] - 1)) * d.grow; return d.base; }
+const maxedOf = (key) => ownedOf(key) >= BUILD_DEFS[key].max;
+function kingdomLevel(k) { k = k || loadKingdom(); const b = k.b || {}; return 1 + (k.land - 1) + Math.max(0, (b.house || 1) - 1) + (b.road || 0) + (b.bridge || 0) + (b.school || 0) + (b.library || 0) + (b.dojo || 0); }
+function buyBuild(key) {
+  const k = loadKingdom(), d = BUILD_DEFS[key];
+  if (maxedOf(key)) return { ok: false, why: "max" };
+  const p = priceOf(key, k); if (k.gold < p) return { ok: false, why: "gold", need: p - k.gold };
+  k.gold -= p;
+  if (key === "land") k.land++; else if (d.lvl) k.b[key] = (k.b[key] || 0) + 1; else k.b[key] = 1;
+  saveKingdom(k); return { ok: true, spent: p };
+}
+// 学習成果に応じたGOLD（正解・正答率・自己ベスト・完走）
+function goldForSection({ correct, N, bestUpdated, completed }) {
+  let g = correct * 2; const lines = [`正解 ${correct}問 ＋${correct * 2}`];
+  const acc = N ? correct / N : 0;
+  if (acc >= 0.9) { g += 20; lines.push("高正答率(90%↑) ＋20"); }
+  else if (acc >= 0.7) { g += 10; lines.push("正答率(70%↑) ＋10"); }
+  if (bestUpdated) { g += 30; lines.push("⏱ 自己ベスト更新 ＋30"); }
+  if (completed) { g += 10; lines.push("完走 ＋10"); }
+  return { g, lines };
+}
+// 1日1回の連続学習ボーナス（その日の最初の学習で付与）
+function dailyBonusOnce() {
+  const s = loadStat(), t = today();
+  if (s.goldDate === t) return null;
+  s.goldDate = t; saveStat(s);
+  const streak = Math.max(1, s.streak || 1);
+  return { amt: 5 * Math.min(10, streak), label: `連続学習${streak}日ボーナス` };
+}
+// 次に買える建物までの目標（モチベーション表示）
+function nextGoalHint() {
+  const k = loadKingdom(); let best = null;
+  for (const key of BUILD_ORDER) { if (maxedOf(key)) continue; const p = priceOf(key, k); if (best == null || p < best.p) best = { p, name: BUILD_DEFS[key].name }; }
+  if (!best) return "王国はすべて完成！すごい！";
+  const need = best.p - k.gold;
+  return need > 0 ? `あと ${need} GOLD で「${best.name}」が買えるよ！` : `「${best.name}」が買えるよ！🏰 王国を見よう`;
+}
+
+/* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
+const SESSIONS = "soroban_sessions";
+function logSession(subj, N, correct, sumSec) {
+  const l = JSON.parse(localStorage.getItem(SESSIONS) || "[]");
+  l.push({ d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0 });
+  localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-1500)));
+}
+const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
+function sessionsBetween(from, to) { return allSessions().filter((e) => e.d >= from && e.d <= to); }
 
 /* ============================================================ そろばん部品 */
 let audioCtx;
@@ -253,13 +326,16 @@ const sorobanQuiz = makeSoroban($("#soroban2"), onQuizChange);
 $("#clearSoroban2").addEventListener("click", () => sorobanQuiz.clear());
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
 function showView(v) {
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
+  if (v === "home") renderHome();
   if (v === "records") renderRecords();
   if (v === "settings") renderSettings();
   if (v === "today") renderToday();
+  if (v === "kingdom") renderKingdom();
+  if (v === "parent") renderParent();
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
 $$(".nav").forEach((n) => n.addEventListener("click", () => {
@@ -326,6 +402,97 @@ function renderProfile() {
   $("#effortChart").innerHTML = w.map((x, i) => `<div class="bar${i === 6 ? " today" : ""}" style="height:${Math.max(2, (x.sec / max) * 46)}px" title="${x.d}: ${fmtMin(x.sec)}"></div>`).join("");
   const bp = bestPerSubject();
   $("#bestList").innerHTML = ["mitori", "kake", "wari", "anzan"].map((s) => `<div class="brow"><span>${SUBJECT[s].name}</span><b>${bp[s] != null ? fmtClock(bp[s]) : "—"}</b></div>`).join("");
+  renderGoldPill();
+}
+
+/* ---------- ホーム / 王国 / 保護者 の描画 ---------- */
+function renderGoldPill() { const el = $("#goldPill"); if (el) el.textContent = `👑 ${getGold().toLocaleString()} G`; }
+function homeGrade() { const rk = JSON.parse(localStorage.getItem(RANK) || "null"); return rk ? GRADES[rk.idx] : currentGrade(); }
+function routineMenuSummary(grade) {
+  const steps = buildSteps(grade), cnt = {};
+  steps.forEach((s) => { if (s.subj) cnt[s.subj] = (cnt[s.subj] || 0) + s.N; });
+  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => `<div class="menu-row"><span>${SUBJECT[s].name}</span><b>${cnt[s]}問</b></div>`).join("");
+}
+function renderHome() {
+  const p = profile(), k = loadKingdom(), s = loadStat(), ms = monthStats(), g = homeGrade();
+  $("#homeAvatar").textContent = p.avatar; $("#homeName").textContent = p.name; $("#homeRank").textContent = rankText();
+  $("#homeMenu").innerHTML = routineMenuSummary(g) || '<div class="sub">この級では暗算・見取りを練習します</div>';
+  $("#homeGold").textContent = k.gold.toLocaleString();
+  $("#homeKingdomLv").textContent = kingdomLevel(k);
+  $("#homeStreak").textContent = `${s.streak || 0}日`;
+  $("#homeMonth").textContent = `${ms.days}日`;
+  const doneToday = JSON.parse(localStorage.getItem(ROUTINE) || "[]").some((h) => h.date === today());
+  $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
+  renderGoldPill();
+}
+function kingdomBoardHTML(k) {
+  const tiles = [];
+  for (let i = 0; i < k.land; i++) tiles.push('<div class="ktile grass">🌱</div>');
+  tiles.push(`<div class="ktile bld"><span class="ki">🏠</span><span class="kl">家 Lv.${k.b.house}</span></div>`);
+  [["road", "🛣️", "道"], ["bridge", "🌉", "橋"], ["school", "🏫", "学校"], ["library", "📚", "図書館"], ["dojo", "⛩️", "道場"]]
+    .forEach(([key, ic, nm]) => { if (k.b[key]) tiles.push(`<div class="ktile bld"><span class="ki">${ic}</span><span class="kl">${nm}</span></div>`); });
+  return tiles.join("");
+}
+function renderShop() {
+  const k = loadKingdom();
+  $("#shopList").innerHTML = BUILD_ORDER.map((key) => {
+    const d = BUILD_DEFS[key], own = ownedOf(key, k), max = maxedOf(key), p = priceOf(key, k), afford = k.gold >= p;
+    const ownTxt = (d.lvl || key === "land") ? `Lv.${own}/${d.max}` : (own ? "建設ずみ" : "未建設");
+    const btn = max ? "<button disabled>MAX</button>" : `<button class="buy" data-key="${key}"${afford ? "" : " disabled"}>${p} G</button>`;
+    return `<div class="shop-item"><span class="si-ic">${d.icon}</span><div class="si-main"><b>${d.name}</b><span class="sub">${d.desc}・${ownTxt}</span></div>${btn}</div>`;
+  }).join("");
+  $$("#shopList .buy").forEach((b) => b.addEventListener("click", () => {
+    const r = buyBuild(b.dataset.key);
+    if (r.ok) { fanfareSnd(); $("#shopMsg").textContent = `「${BUILD_DEFS[b.dataset.key].name}」を建てました！🎉`; renderKingdom(); }
+    else if (r.why === "gold") $("#shopMsg").textContent = `GOLDが ${r.need} たりません。そろばんを練習しよう！`;
+  }));
+}
+function renderKingdom() {
+  const k = loadKingdom();
+  $("#kdLevel").textContent = kingdomLevel(k);
+  $("#kdGold").textContent = k.gold.toLocaleString();
+  $("#kingdomBoard").innerHTML = kingdomBoardHTML(k);
+  $("#shopMsg").textContent = "";
+  renderShop(); renderGoldPill();
+}
+function accBySubject(sessions) {
+  const m = {};
+  sessions.forEach((e) => { const s = (m[e.subj] = m[e.subj] || { N: 0, correct: 0 }); s.N += e.N; s.correct += e.correct; });
+  return m;
+}
+function renderParent() {
+  const s = loadStat(), rk = rankText();
+  const to = today(), from = daysAgo(6), pfrom = daysAgo(13), pto = daysAgo(7);
+  const thisWeek = sessionsBetween(from, to), lastWeek = sessionsBetween(pfrom, pto);
+  const sum = (a, f) => a.reduce((x, e) => x + f(e), 0);
+  const tN = sum(thisWeek, (e) => e.N), tC = sum(thisWeek, (e) => e.correct), lN = sum(lastWeek, (e) => e.N);
+  const acc = tN ? Math.round((tC / tN) * 100) : 0;
+  const timed = thisWeek.filter((e) => e.avg > 0);
+  const avgT = timed.length ? sum(timed, (e) => e.avg * e.N) / sum(timed, (e) => e.N) : 0;
+  const days = new Set(thisWeek.map((e) => e.d)).size;
+  const diff = tN - lN, diffTxt = lN ? (diff >= 0 ? `先週より +${diff}問 📈` : `先週より ${diff}問`) : "先週の記録はまだありません";
+  $("#parentSummary").innerHTML =
+    '<div class="pgrid">' +
+    `<div class="pcell"><span>現在の級</span><b>${rk}</b></div>` +
+    `<div class="pcell"><span>連続学習</span><b>${s.streak || 0}日</b></div>` +
+    `<div class="pcell"><span>今週の学習日数</span><b>${days}日</b></div>` +
+    `<div class="pcell"><span>今週の問題数</span><b>${tN}問</b></div>` +
+    `<div class="pcell"><span>今週の正答率</span><b>${acc}%</b></div>` +
+    `<div class="pcell"><span>平均回答時間</span><b>${avgT ? avgT.toFixed(1) + "秒" : "—"}</b></div>` +
+    `</div><div class="sub">${diffTxt}</div>`;
+  const bars = [], wk = ["日", "月", "火", "水", "木", "金", "土"];
+  for (let i = 6; i >= 0; i--) { const d = daysAgo(i); bars.push({ d, n: sum(sessionsBetween(d, d), (e) => e.N) }); }
+  const maxN = Math.max(10, ...bars.map((b) => b.n));
+  $("#parentWeek").innerHTML = '<div class="pbars">' + bars.map((b) => {
+    const lbl = wk[new Date(b.d + "T00:00:00").getDay()];
+    return `<div class="pbar-col"><span class="pbar-n">${b.n}</span><div class="pbar" style="height:${Math.max(3, (b.n / maxN) * 90)}px"></div><span class="pbar-l">${lbl}</span></div>`;
+  }).join("") + "</div>";
+  const m = accBySubject(sessionsBetween(daysAgo(29), to));
+  const rows = ["mitori", "kake", "wari", "anzan", "flash"].filter((x) => m[x]).map((x) => ({ x, a: Math.round((m[x].correct / m[x].N) * 100), N: m[x].N }));
+  if (!rows.length) { $("#parentSubjects").innerHTML = '<p class="sub">練習を重ねると、得意・苦手が分かります。</p>'; return; }
+  const best = rows.slice().sort((a, b) => b.a - a.a)[0], worst = rows.slice().sort((a, b) => a.a - b.a)[0];
+  $("#parentSubjects").innerHTML = rows.map((r) => `<div class="psub"><span>${SUBJECT[r.x].name}</span><div class="psub-bar"><div style="width:${r.a}%"></div></div><b>${r.a}%</b></div>`).join("") +
+    `<div class="sub">得意：<b>${SUBJECT[best.x].name}</b>（${best.a}%）／ これから：<b>${SUBJECT[worst.x].name}</b>（${worst.a}%）</div>`;
 }
 function routineGraphSVG(hist) {
   if (!hist.length) return '<p class="sub">「本日の練習」を完了すると、正答率の推移グラフがここに出ます。</p>';
@@ -413,6 +580,7 @@ function nextPlayProblem() {
   const prog = session.mode === "end" ? `回答 ${Math.min(session.idx + 1, session.N)} / ${session.N}` : `${Math.min(session.idx + 1, session.N)} / ${session.N}　正解 ${session.correct}`;
   $("#playProgress").textContent = prog;
   $("#steps").classList.add("hidden");
+  session.qStart = performance.now(); // 1問ごとの回答時間を計測
   if (session.answerBy === "soroban") sorobanQuiz.clear();
   else { $("#playInput").value = ""; $("#playInput").focus(); }
 }
@@ -435,7 +603,8 @@ function submitAnswer(val) {
   if (!session || session.locking) return;
   const ok = val === session.cur.answer;
   if (ok) session.correct++;
-  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer });
+  const qt = session.qStart ? (performance.now() - session.qStart) / 1000 : null;
+  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer, t: qt });
   if (session.mode === "end") {
     neutralSnd(); // 検定方式：正誤を明かさず最後にまとめて採点
     advance();
@@ -467,22 +636,38 @@ function finishSession() {
     msg += `<div class="marks">` + session.results.map((r) => `<span class="mk ${r.ok ? "ok" : "ng"}">${r.ok ? "◎" : "×"}</span>`).join("") + `</div>`;
   }
   msg += `タイム <b>${fmtClock(el)}</b>　正解 ${session.correct} / ${session.N}`;
-  let cls = "ok";
-  if (completed) { saveTime(session.grade.key, session.subj, el); logStudy(el); msg += `<br>⏱ 自己ベスト：${fmtClock(bestTime(session.grade.key, session.subj))}`; }
+  let cls = "ok", bestUpdated = false;
+  touchStreak(); // streak更新（GOLD連続ボーナスの前に）
+  if (completed) {
+    const r = saveTime(session.grade.key, session.subj, el); bestUpdated = r.improved;
+    logStudy(el); logSession(session.subj, session.N, session.correct, el);
+    msg += `<br>⏱ 自己ベスト：${fmtClock(bestTime(session.grade.key, session.subj))}`;
+    if (bestUpdated) msg += `　<b class="hl">✨自己ベスト更新！</b>`;
+    else if (r.prev != null && el > r.prev) msg += `　<span class="sub">あと ${(el - r.prev).toFixed(1)}秒で自己ベスト！</span>`;
+    const ts = session.results.map((x) => x.t).filter((x) => x != null);
+    if (ts.length) { const avg = ts.reduce((a, b) => a + b, 0) / ts.length, fast = Math.min(...ts); msg += `<br>平均回答 <b>${avg.toFixed(1)}秒</b> ／ 最速 ${fast.toFixed(1)}秒`; }
+  }
   if (session.timed) {
     const score = session.correct * cf.per, pass = score >= cf.pass;
     msg += `<br>${pass ? "🎉 合格！" : "不合格"}（${score} / ${cf.per * session.N}点・合格${cf.pass}）`;
     cls = pass ? "ok" : "ng";
     if (pass) { certify(session.grade.key); msg += `<br>🎓 ${session.grade.key} 認定！`; }
   }
-  touchStreak(); renderProfile();
+  if (completed) { // GOLDは学習の成果としてのみ付与
+    const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed });
+    let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+    addGold(earned);
+    msg += `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  }
+  renderProfile();
   if (session.timed) { (session.correct * cf.per >= cf.pass) ? fanfareSnd() : wrongSnd(); }
   else if (completed) fanfareSnd();
-  msg += `<br><button id="againBtn">もう一度</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
+  msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🏰 王国を見る</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
   $("#playProblem").textContent = "おつかれさま！";
   const subj = session.subj; session = null;
   $("#againBtn").onclick = () => startSession(subj);
+  const tk = $("#toKingdomBtn"); if (tk) tk.onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); };
   $("#homeBtn").onclick = () => { showView("grades"); setActiveNav(document.querySelector('.nav[data-view="grades"]')); updateInfo(); };
 }
 function quitSession() {
@@ -523,7 +708,7 @@ function buildSteps(grade) {
 function startRoutine(grade) {
   const steps = buildSteps(grade);
   if (!steps.length) { alert("この級では本日の練習を実施できません"); return; }
-  routineState = { grade, steps, stepIdx: 0, sections: [] };
+  routineState = { grade, steps, stepIdx: 0, sections: [], gold: 0 };
   routineActive = true;
   runStep();
 }
@@ -555,6 +740,9 @@ function startQuizSection(step) {
 function finishRoutineSection() {
   const el = (performance.now() - session.start) / 1000;
   routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el, items: session.results });
+  logSession(session.subj, session.N, session.correct, el);
+  const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true });
+  routineState.gold = (routineState.gold || 0) + g;
   correctSnd();
   session = null;
   routineState.stepIdx++;
@@ -592,7 +780,13 @@ function finishRoutine() {
   const hist = JSON.parse(localStorage.getItem(ROUTINE) || "[]");
   hist.push({ date: today(), grade: rs.grade.key, totalCorrect, totalN, acc, timeSec: Math.round(totalTime), sections: rs.sections.map((s) => ({ label: s.label, correct: s.correct, N: s.N, sec: Math.round(s.sec) })) });
   localStorage.setItem(ROUTINE, JSON.stringify(hist.slice(-200)));
-  logStudy(totalTime); touchStreak(); renderProfile(); fanfareSnd();
+  logStudy(totalTime); touchStreak();
+  const sectionsGold = rs.gold || 0, completeBonus = 100;
+  const goldLines = [`練習でためた ＋${sectionsGold}`, `本日の練習 完了 ＋${completeBonus}`];
+  let earned = sectionsGold + completeBonus;
+  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+  addGold(earned);
+  renderProfile(); fanfareSnd();
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
@@ -602,7 +796,9 @@ function finishRoutine() {
   const last = rs.sections[rs.sections.length - 1];
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${detail}<br><button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  const goldBlock = `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🏰 王国を見る</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#toKingdomBtn2").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
 }
@@ -817,7 +1013,17 @@ $("#flashForm").addEventListener("submit", (e) => {
   if (flashExam.on) {
     if (ok) flashExam.correct++; flashExam.idx++;
     if (flashExam.idx < flashExam.N) { res.textContent = ok ? "正解！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); setTimeout(runFlash, 900); }
-    else { const score = flashExam.correct * 10, pass = score >= 140; let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`; if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; fanfareSnd(); } renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = ""; }
+    else {
+      const score = flashExam.correct * 10, pass = score >= 140;
+      let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
+      if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; fanfareSnd(); }
+      logSession("flash", 20, flashExam.correct, 0);
+      const { g } = goldForSection({ correct: flashExam.correct, N: 20, bestUpdated: false, completed: true });
+      let earned = g + (pass ? 50 : 0); const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
+      addGold(earned);
+      msg += `<div class="gold-earn">👑 ＋${earned} GOLD<div class="goal">${nextGoalHint()}</div></div>`;
+      renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = "";
+    }
   } else { res.textContent = ok ? "正解！すごい！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
 });
 
@@ -837,8 +1043,16 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/* ---------- ホーム操作 ---------- */
+$("#homeStartBtn").addEventListener("click", () => startRoutine(homeGrade()));
+$("#homeToKingdom").addEventListener("click", () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); });
+$("#homeToRecords").addEventListener("click", () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); });
+
 /* ---------- 初期化 ---------- */
 renderGrid();
 updateInfo();
 renderProfile();
 renderSound();
+renderGoldPill();
+showView("home");
+setActiveNav(document.querySelector('.nav[data-view="home"]'));
