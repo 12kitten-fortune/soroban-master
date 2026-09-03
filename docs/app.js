@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-6"; // 最新反映の確認用
+const BUILD = "2026-09-03-7"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -326,7 +326,7 @@ const sorobanQuiz = makeSoroban($("#soroban2"), onQuizChange);
 $("#clearSoroban2").addEventListener("click", () => sorobanQuiz.clear());
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", battle: "たいせん", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
 function showView(v) {
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
@@ -335,6 +335,7 @@ function showView(v) {
   if (v === "settings") renderSettings();
   if (v === "today") renderToday();
   if (v === "kingdom") renderKingdom();
+  if (v === "battle") renderBattle();
   if (v === "parent") renderParent();
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
@@ -425,13 +426,19 @@ function renderHome() {
   $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
   renderGoldPill();
 }
+const imgTile = (src, label) => `<div class="ktile bld"><img class="kimg" src="assets/${src}" alt="${label}" /><span class="kl">${label}</span></div>`;
+const emojiTile = (ic, label) => `<div class="ktile bld"><span class="ki">${ic}</span><span class="kl">${label}</span></div>`;
 function kingdomBoardHTML(k) {
-  const tiles = [];
-  for (let i = 0; i < k.land; i++) tiles.push('<div class="ktile grass">🌱</div>');
-  tiles.push(`<div class="ktile bld"><span class="ki">🏠</span><span class="kl">家 Lv.${k.b.house}</span></div>`);
-  [["road", "🛣️", "道"], ["bridge", "🌉", "橋"], ["school", "🏫", "学校"], ["library", "📚", "図書館"], ["dojo", "⛩️", "道場"]]
-    .forEach(([key, ic, nm]) => { if (k.b[key]) tiles.push(`<div class="ktile bld"><span class="ki">${ic}</span><span class="kl">${nm}</span></div>`); });
-  return tiles.join("");
+  const t = [];
+  t.push(imgTile("castle.png", "王城"));
+  t.push(imgTile(k.b.house >= 3 ? "house_brown.png" : "house_green.png", `家 Lv.${k.b.house}`));
+  if (k.b.road) t.push(emojiTile("🛣️", "道"));
+  if (k.b.bridge) t.push(emojiTile("🌉", "橋"));
+  if (k.b.school) t.push(imgTile("school.png", "学校"));
+  if (k.b.library) t.push(emojiTile("📚", "図書館"));
+  if (k.b.dojo) t.push(imgTile("dojo.png", "そろばん道場"));
+  for (let i = 0; i < Math.max(0, k.land - 1); i++) t.push('<div class="ktile grass">🌳</div>');
+  return t.join("");
 }
 function renderShop() {
   const k = loadKingdom();
@@ -663,6 +670,10 @@ function finishSession() {
   if (session.timed) { (session.correct * cf.per >= cf.pass) ? fanfareSnd() : wrongSnd(); }
   else if (completed) fanfareSnd();
   msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🏰 王国を見る</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
+  const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
+  const face = passed ? "king_celebrate.png" : "king_wave.png";
+  const badge = bestUpdated ? "badge_best.png" : (session.timed && passed ? "badge_perfect.png" : "");
+  msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<img class="rh-badge" src="assets/${badge}" alt="" />` : ""}</div>` + msg;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
   $("#playProblem").textContent = "おつかれさま！";
   const subj = session.subj; session = null;
@@ -797,7 +808,8 @@ function finishRoutine() {
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
   const goldBlock = `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
-  $("#playResult").innerHTML = `<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🏰 王国を見る</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><img class="rh-badge" src="assets/${acc >= 90 ? "badge_perfect.png" : "badge_complete.png"}" alt="" /></div>`;
+  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🏰 王国を見る</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
   $("#toKingdomBtn2").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
@@ -1026,6 +1038,76 @@ $("#flashForm").addEventListener("submit", (e) => {
     }
   } else { res.textContent = ok ? "正解！すごい！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
 });
+
+/* ============================================================ たいせん（CPU対戦ゲーム／レオ王） */
+let battle = null, battleTimer = null;
+// CPUが1問解く間隔(ms)。級が下（やさしい）ほど遅く＝子どもでも勝てる。段位ほど速い
+function cpuPace(g) { if (g.band === "dan") return Math.max(2000, 3400 - g.dan * 130); return clamp(6200 - (20 - g.kyu) * 120, 3000, 6200); }
+function renderBattle() {
+  const sel = $("#battleGrade");
+  if (!sel.dataset.filled) { sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join(""); sel.dataset.filled = "1"; }
+  const rk = JSON.parse(localStorage.getItem(RANK) || "null"); sel.value = rk ? rk.idx : gradeIdx;
+  $("#battleSetup").classList.remove("hidden"); $("#battleArena").classList.add("hidden"); $("#battleResult").classList.add("hidden");
+  if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null;
+}
+function battleSubjOf() { return difficulty(battle.grade, battle.subj) ? battle.subj : "anzan"; }
+function battleProblem() {
+  const p = genProblemFor(battle.grade, battleSubjOf()) || genProblemFor(battle.grade, "anzan");
+  battle.cur = p; $("#battleProblem").textContent = p.display;
+  $("#battleInput").value = ""; $("#battleInput").focus();
+}
+function startBattle() {
+  const grade = GRADES[+$("#battleGrade").value], subj = $("#battleSubj").value, dur = +$("#battleTime").value;
+  const cpuMs = cpuPace(grade), now = performance.now();
+  battle = { grade, subj, dur, you: 0, cpu: 0, atts: 0, cpuMs, cur: null, endAt: now + dur * 1000, cpuNext: now + cpuMs * (0.7 + Math.random() * 0.6), running: true };
+  $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
+  $("#youScore").textContent = "0"; $("#cpuScore").textContent = "0"; $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
+  battleProblem();
+  battleTimer = setInterval(tickBattle, 100);
+}
+function tickBattle() {
+  if (!battle || !battle.running) return;
+  const now = performance.now(), rem = Math.max(0, battle.endAt - now);
+  $("#battleTimer").textContent = fmtClock(rem / 1000);
+  while (battle.cpuNext <= now && rem > 0) {
+    if (Math.random() < 0.9) { battle.cpu++; $("#cpuScore").textContent = battle.cpu; }
+    battle.cpuNext += battle.cpuMs * (0.75 + Math.random() * 0.5);
+  }
+  if (rem <= 0) finishBattle();
+}
+function battleFx(text, ok) { const fx = $("#battleFx"); fx.textContent = text; fx.className = "battle-fx " + (ok ? "ok" : "ng"); }
+function battleAnswer(val) {
+  if (!battle || !battle.running) return;
+  battle.atts++;
+  if (val === battle.cur.answer) { battle.you++; $("#youScore").textContent = battle.you; battleFx("せいかい！ ＋1", true); clickSnd(); }
+  else battleFx("ざんねん…", false);
+  battleProblem();
+}
+function finishBattle() {
+  battle.running = false; if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
+  const win = battle.you > battle.cpu, draw = battle.you === battle.cpu;
+  logSession(battleSubjOf(), battle.atts, battle.you, battle.dur);
+  let earned = battle.you * 2 + (win ? 30 : draw ? 10 : 0);
+  const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
+  if (battle.you > 0) { touchStreak(); addGold(earned); }
+  win ? fanfareSnd() : (draw ? neutralSnd() : wrongSnd());
+  const badge = win ? "badge_win.png" : "badge_complete.png";
+  const face = win ? "king_celebrate.png" : draw ? "king_wave.png" : "king_run.png";
+  const verdict = win ? "🎉 あなたの勝ち！" : draw ? "引き分け！" : "つぎはがんばろう！";
+  $("#battleArena").classList.add("hidden");
+  const rbox = $("#battleResult"); rbox.classList.remove("hidden");
+  rbox.innerHTML =
+    `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><img class="bv-badge" src="assets/${badge}" alt="" /><h3>${verdict}</h3></div></div>` +
+    `<div class="battle-score-final">あなた <b>${battle.you}</b> － <b>${battle.cpu}</b> CPU</div>` +
+    (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">正解すると GOLD がもらえるよ！</p>') +
+    `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🏰 王国を見る</button>`;
+  renderProfile();
+  $("#battleAgain").onclick = () => renderBattle();
+  $("#battleToKingdom").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); };
+}
+$("#battleStart").addEventListener("click", startBattle);
+$("#battleForm").addEventListener("submit", (e) => { e.preventDefault(); battleAnswer(parseInt($("#battleInput").value, 10)); });
+$("#battleQuit").addEventListener("click", () => { if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null; renderBattle(); });
 
 /* ---------- キーボード ---------- */
 document.addEventListener("keydown", (e) => {

@@ -15,11 +15,12 @@
     <div class="app">
       <!-- サイドバー -->
       <aside class="sidebar">
-        <div class="brand">👑 そろばんキングダム<small>SOROBAN KINGDOM</small></div>
+        <div class="brand"><img class="brand-logo" src="assets/logo.png" alt="そろばんキングダム" /></div>
         <nav class="side-nav">
           <button class="nav active" data-view="home">🏠 ホーム</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
           <button class="nav" data-view="kingdom">🏰 王国</button>
+          <button class="nav" data-view="battle">⚔️ たいせん</button>
           <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
           <div class="nav-sec">学習する</div>
           <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
@@ -52,7 +53,9 @@
             <div class="card home-hero">
               <div class="hero-top">
                 <div class="hero-avatar" id="homeAvatar">🧒</div>
-                <div><b id="homeName">そろ太くん</b><br><span class="rank-badge" id="homeRank">未取得</span></div>
+                <div class="hero-id"><b id="homeName">そろ太くん</b><br><span class="rank-badge" id="homeRank">未取得</span></div>
+                <div class="hero-speech" id="homeSpeech">きょうもいっしょにがんばろう！</div>
+                <img class="hero-mascot" src="assets/king.png" alt="レオ王" />
               </div>
               <div class="today-box">
                 <div class="today-title">今日の練習</div>
@@ -220,6 +223,43 @@
             <div id="shopList" class="shop-list"></div>
             <div id="shopMsg" class="shop-msg sub"></div>
           </div>
+        </div>
+
+        <!-- たいせん（CPU対戦ゲーム） -->
+        <div id="view-battle" class="view hidden">
+          <div class="card battle-setup" id="battleSetup">
+            <h3>⚔️ レオ王のたいせん</h3>
+            <p class="sub">レオ王をそうさして、CPUより多く正解しよう！ 正解でGOLDもゲット。</p>
+            <div class="battle-opts">
+              <label>級・段<select id="battleGrade"></select></label>
+              <label>しゅもく<select id="battleSubj">
+                <option value="anzan">あんざん</option>
+                <option value="kake">かけ算</option>
+                <option value="wari">わり算</option>
+                <option value="mitori">みとり算</option>
+              </select></label>
+              <label>じかん<select id="battleTime">
+                <option value="60">1分</option>
+                <option value="120">2分</option>
+                <option value="180" selected>3分</option>
+              </select></label>
+            </div>
+            <button id="battleStart" class="big-cta">▶ たいせん スタート</button>
+          </div>
+
+          <div class="card battle-arena hidden" id="battleArena">
+            <div class="battle-hud">
+              <div class="fighter you"><img src="assets/king.png" alt="あなた" /><div class="fname">あなた</div><div class="fscore" id="youScore">0</div></div>
+              <div class="battle-center"><div class="battle-timer" id="battleTimer">3:00</div><div class="vs">VS</div></div>
+              <div class="fighter cpu"><img src="assets/king_staff.png" alt="CPU" /><div class="fname">CPUレオ</div><div class="fscore" id="cpuScore">0</div></div>
+            </div>
+            <div class="battle-problem" id="battleProblem"></div>
+            <form id="battleForm" class="answer-row"><input id="battleInput" type="number" inputmode="numeric" placeholder="こたえ" autocomplete="off" /><button type="submit">こたえる</button></form>
+            <div id="battleFx" class="battle-fx"></div>
+            <button id="battleQuit" class="ghost">やめる</button>
+          </div>
+
+          <div class="card battle-result hidden" id="battleResult"></div>
         </div>
 
         <!-- 保護者 -->
