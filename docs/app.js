@@ -56,6 +56,11 @@ const FLASH_KYU_LOW = {
   14: { digits: 1, terms: 5, sec: 6 }, 13: { digits: 1, terms: 5, sec: 5 }, 12: { digits: 1, terms: 6, sec: 5 },
   11: { digits: 1, terms: 6, sec: 4 },
 };
+// 1個あたりの表示時間(ms)。級で滑らかに変化＝全体のテンポを一定にする（秒÷口のバラつきを解消）
+function flashPaceMs(g) {
+  if (g.band === "dan") return Math.max(300, 620 - g.dan * 32); // 初段≈588 … 十段≈300（速い）
+  return Math.round(650 + (g.kyu - 1) / 19 * 400); // 1級≈650 … 20級≈1050（易しいほどゆっくり）
+}
 const SUBJECT = {
   mitori: { name: "みとり算", answer: "soroban", N: 10, per: 10, pass: 70, limit: 420 },
   kake: { name: "かけ算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
@@ -290,7 +295,7 @@ function moveGrade(d) { gradeIdx = clamp(gradeIdx + d, 0, GRADES.length - 1); re
 function specText(g, subj) {
   const d = difficulty(g, subj);
   if (!d) return "（この級にはありません）";
-  if (subj === "flash") return `${d.digits}桁 ${d.terms}口 / 1問 ${d.sec.toFixed(1)}秒`;
+  if (subj === "flash") return `${d.digits}桁 ${d.terms}口 / 約${(d.terms * flashPaceMs(g) / 1000).toFixed(1)}秒（1個 ${(flashPaceMs(g) / 1000).toFixed(1)}秒）`;
   if (subj === "kake") return `${d.a}桁 × ${d.b}桁`;
   if (subj === "wari") return `${d.D}桁 ÷ ${d.dv}桁`;
   return `${d.digits}桁 ${d.terms}口`;
@@ -703,7 +708,7 @@ function startFlash(grade) {
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
   $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
-  $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1問 ${flashSpec.sec.toFixed(1)}秒`;
+  $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
   $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashForm").classList.add("hidden");
   flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
 }
@@ -718,9 +723,8 @@ async function runFlash() {
   $("#flashStart").disabled = true; $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashProgress").textContent = flashExam.on ? `検定 ${flashExam.idx + 1} / ${flashExam.N}　正解 ${flashExam.correct}` : "";
   const p = genFlashNums(flashSpec); flashAnswer = p.answer;
-  const interval = Math.round((flashSpec.sec / flashSpec.terms) * 1000);
   const disp = $("#flashDisplay");
-  const N = p.nums.length, slot = interval;
+  const N = p.nums.length, slot = flashPaceMs(flashGrade); // 級で一定の1個あたり表示時間
   const blankMs = Math.min(120, Math.round(slot * 0.22)), showMs = slot - blankMs; // 各数字：表示showMs＋空白blankMs（合計slotで一定）
   // 進捗ドット（あと何個かが見える＝終わったと勘違いしない・口数も分かる）
   $("#flashDots").innerHTML = Array.from({ length: N }, () => `<span class="dot"></span>`).join("");
