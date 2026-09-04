@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-11"; // 最新反映の確認用
+const BUILD = "2026-09-04-12"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -756,8 +756,9 @@ function finishSession() {
   msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🏰 王国を見る</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
   const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
   const face = passed ? "king_celebrate.png" : "king_wave.png";
-  const badge = bestUpdated ? "badge_best.png" : (session.timed && passed ? "badge_perfect.png" : "");
-  msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<img class="rh-badge" src="assets/${badge}" alt="" />` : ""}</div>` + msg;
+  const badge = bestUpdated ? '<span class="badge-chip best">⏱ 自己ベスト更新！</span>'
+    : (session.timed && passed ? '<span class="badge-chip perfect">🎓 ごうかく！</span>' : "");
+  msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<span class="rh-badge">${badge}</span>` : ""}</div>` + msg;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
   $("#playProblem").textContent = "おつかれさま！";
   const subj = session.subj; session = null;
@@ -899,7 +900,8 @@ function finishRoutine() {
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
   const goldBlock = `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
-  const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><img class="rh-badge" src="assets/${acc >= 90 ? "badge_perfect.png" : "badge_complete.png"}" alt="" /></div>`;
+  const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
+  const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
   $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🏰 王国を見る</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
   $("#toKingdomBtn2").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="kingdom"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
@@ -1240,7 +1242,7 @@ function finishBattle(reason) {
   const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
   if (battle.you > 0) { touchStreak(); addGold(earned); }
   (kills > 0 && !isOut) ? fanfareSnd() : neutralSnd();
-  const badge = (kills > 0 && !isOut) ? "badge_win.png" : "badge_complete.png";
+  const badge = (kills > 0 && !isOut) ? '<span class="badge-chip win">WIN！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   const face = (kills > 0 && !isOut) ? "king_celebrate.png" : "king_wave.png";
   const verdict = isOut
     ? `💫 アウト！ ${kills}ぴき たおしたよ`
@@ -1249,7 +1251,7 @@ function finishBattle(reason) {
   $("#battleArena").classList.add("hidden");
   const rbox = $("#battleResult"); rbox.classList.remove("hidden");
   rbox.innerHTML =
-    `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><img class="bv-badge" src="assets/${badge}" alt="" /><h3>${verdict}</h3></div></div>` +
+    `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><span class="bv-badge">${badge}</span><h3>${verdict}</h3></div></div>` +
     `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問　♥のこり ${Math.max(0, battle.life)}</span></div>` + outNote +
     (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="gold-lines">${kills}ぴき × ${GOLD_PER_KILL} GOLD</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🏰 王国を見る</button>`;
