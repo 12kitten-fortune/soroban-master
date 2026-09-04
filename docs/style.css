@@ -336,3 +336,12 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .battle-fx.kill { color: var(--royal-gold); font-size: 20px; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .battle-fx.miss { color: #6b5f4c; }  /* 不正解は責めない色にする（赤にしない） */
 .bs-sub { display: block; font-size: 14px; color: #8a7560; font-weight: normal; margin-top: 2px; }
+
+/* ============================================================ 自分のHP / あんざんのコツ */
+.myhp { font-size: 20px; color: #d9534f; letter-spacing: 2px; line-height: 1.2; }
+.myhp.danger { animation: hpBlink .7s infinite; }
+@keyframes hpBlink { 50% { opacity: .3; } }
+.anzan-tip { background: #fffaf0; border: 2px solid var(--royal-gold); border-radius: 14px; padding: 14px 18px; margin: 12px auto; max-width: 620px; line-height: 1.9; font-size: 15px; }
+.anzan-tip > b { display: block; font-size: 17px; color: var(--navy); margin-bottom: 6px; }
+.anzan-tip p { margin: 8px 0; }
+.anzan-tip b { color: #c0392b; }

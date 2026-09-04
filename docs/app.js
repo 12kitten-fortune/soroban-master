@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-6"; // 最新反映の確認用
+const BUILD = "2026-09-04-7"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -603,6 +603,7 @@ function startSession(subj) {
   $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
   $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
+  $("#anzanTip").classList.toggle("hidden", subj !== "anzan"); // あんざんのときだけコツを出す
   $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(subj) ? "" : "none";
   $("#playGrade").textContent = `${grade.key}／${cf.name}` + (session.timed ? "（検定）" : "（記録）");
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
@@ -811,6 +812,7 @@ function startQuizSection(step) {
   $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
   $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
+  $("#anzanTip").classList.toggle("hidden", step.subj !== "anzan");
   $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(step.subj) ? "" : "none";
   const total = routineState.steps.filter((s) => s.rest == null).length;
   const done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
@@ -834,6 +836,7 @@ function showRest(step) {
   session = null;
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   hidePauseUI();
+  $("#anzanTip").classList.add("hidden"); // 休憩中は消す
   showView("play");
   $("#playProblemWrap").classList.add("hidden");
   $("#playSorobanWrap").classList.add("hidden");
@@ -990,6 +993,7 @@ function startFlash(grade) {
   showView("play");
   $("#playRest").classList.add("hidden"); $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
+  $("#anzanTip").classList.remove("hidden"); // フラッシュ暗算でもコツを出す
   $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
@@ -1118,6 +1122,7 @@ $("#flashForm").addEventListener("submit", (e) => {
 let battle = null, battleTimer = null;
 // 敵のHPは級によらず一定（難易度は出題される問題そのもので調整済み）
 const ENEMY_HP = 3;
+const PLAYER_HP = 4; // まちがえると♥が1つへる。0になったらアウト
 // 1匹たおすごとに次の敵へ（6体を順番にくり返す）
 const ENEMIES = [
   { file: "enemy_slime.png", name: "スライムおう" },
@@ -1143,7 +1148,7 @@ function battleProblem() {
 }
 function startBattle() {
   const grade = GRADES[+$("#battleGrade").value], subj = $("#battleSubj").value, dur = +$("#battleTime").value;
-  battle = { grade, subj, dur, you: 0, atts: 0, kills: 0, hp: ENEMY_HP, cur: null, endAt: performance.now() + dur * 1000, running: true };
+  battle = { grade, subj, dur, you: 0, atts: 0, kills: 0, hp: ENEMY_HP, life: PLAYER_HP, cur: null, endAt: performance.now() + dur * 1000, running: true };
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
   $("#enemyImg").className = "";
@@ -1171,6 +1176,9 @@ function renderEnemy() {
   const fill = $("#enemyHp");
   fill.style.width = (battle.hp / ENEMY_HP) * 100 + "%";
   fill.className = "hpfill" + (battle.hp === 1 ? " low" : "");
+  const my = $("#myHp");
+  my.textContent = "♥".repeat(battle.life) + "♡".repeat(PLAYER_HP - battle.life);
+  my.className = "myhp" + (battle.life === 1 ? " danger" : "");
 }
 function battleFx(text, kind) { const fx = $("#battleFx"); fx.textContent = text; fx.className = "battle-fx " + kind; }
 // 敵の画像に一瞬アニメを付ける（当たった／たおれた）
@@ -1195,27 +1203,33 @@ function battleAnswer(val) {
     }
     renderEnemy();
   } else {
-    battleFx("こうげきが はずれた！ つぎだ！", "miss"); // 責めない言い方にする
+    battle.life--;                                   // まちがえたら自分もダメージ
+    renderEnemy();
+    if (battle.life <= 0) { battleFx("♥がなくなった！", "miss"); wrongSnd(); return finishBattle("out"); }
+    battleFx(`はずれた！ ♥ のこり ${battle.life}`, "miss"); // 責めない言い方にする
     neutralSnd();
   }
   battleProblem();
 }
-function finishBattle() {
+function finishBattle(reason) {
   battle.running = false; if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
-  const kills = battle.kills;
+  const kills = battle.kills, isOut = reason === "out";
   logSession(battleSubjOf(), battle.atts, battle.you, battle.dur); // 学習記録の仕組みは従来どおり
   let earned = kills * GOLD_PER_KILL;
   const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
   if (battle.you > 0) { touchStreak(); addGold(earned); }
-  kills > 0 ? fanfareSnd() : neutralSnd();
-  const badge = kills > 0 ? "badge_win.png" : "badge_complete.png";
-  const face = kills > 0 ? "king_celebrate.png" : "king_wave.png";
-  const verdict = kills > 0 ? `🎉 ${kills}ぴき たおした！` : "つぎは1ぴき たおそう！";
+  (kills > 0 && !isOut) ? fanfareSnd() : neutralSnd();
+  const badge = (kills > 0 && !isOut) ? "badge_win.png" : "badge_complete.png";
+  const face = (kills > 0 && !isOut) ? "king_celebrate.png" : "king_wave.png";
+  const verdict = isOut
+    ? `💫 アウト！ ${kills}ぴき たおしたよ`
+    : (kills > 0 ? `🎉 ${kills}ぴき たおした！` : "つぎは1ぴき たおそう！");
+  const outNote = isOut ? '<p class="sub">4回まちがえたので おしまい。ゆっくり たしかめて こたえると ♥ がへらないよ。</p>' : "";
   $("#battleArena").classList.add("hidden");
   const rbox = $("#battleResult"); rbox.classList.remove("hidden");
   rbox.innerHTML =
     `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><img class="bv-badge" src="assets/${badge}" alt="" /><h3>${verdict}</h3></div></div>` +
-    `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問</span></div>` +
+    `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問　♥のこり ${Math.max(0, battle.life)}</span></div>` + outNote +
     (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="gold-lines">${kills}ぴき × ${GOLD_PER_KILL} GOLD</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🏰 王国を見る</button>`;
   renderProfile();

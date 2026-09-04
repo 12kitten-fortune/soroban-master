@@ -153,6 +153,15 @@
               </div>
               <div id="steps" class="steps hidden"></div>
             </div>
+            <div id="anzanTip" class="anzan-tip hidden">
+              <b>💡 あんざんの やりかた</b>
+              <p>あたまの 中に そろばんを おいて、その 玉を うごかして こたえを 出そう。</p>
+              <p>ゆびで かぞえたり、ひっ算を おもいうかべる やりかたでも、いまは こたえられる。<br />
+                でも 上の級に なると 数が 大きくなって、その やりかたでは <b>まにあわなくなる</b>んだ。<br />
+                そのままだと あんざんが 身につかないまま、上で 勝てなくなってしまうよ。</p>
+              <p><b>「見えない そろばん」</b>で できるように なると、どんどん 速くなる！<br />
+                さいしょは おそくても いいから、玉を おもいうかべて やってみよう。</p>
+            </div>
             <form id="playInputWrap" class="answer-row hidden">
               <input id="playInput" type="number" inputmode="numeric" placeholder="答え" autocomplete="off" />
               <button type="submit">こたえる</button>
@@ -235,7 +244,7 @@
         <div id="view-battle" class="view hidden">
           <div class="card battle-setup" id="battleSetup">
             <h3>⚔️ レオ王のたいせん</h3>
-            <p class="sub">正解すると てき に こうげき！ HPを3けずると たおせるよ。<br>たおすたびに GOLD がもらえる。まちがえても へっちゃら（へることは ないよ）。</p>
+            <p class="sub">正解すると てき に こうげき！ HPを3けずると たおせるよ。たおすたびに GOLD がもらえる。<br><b>まちがえると じぶんの ♥ が1つへる。4回まちがえると アウト！</b></p>
             <div class="battle-opts">
               <label>級・段<select id="battleGrade"></select></label>
               <label>しゅもく<select id="battleSubj">
@@ -258,6 +267,7 @@
               <div class="fighter you">
                 <img src="assets/king.png" alt="あなた" />
                 <div class="fname">あなた</div>
+                <div class="myhp" id="myHp">♥♥♥♥</div>
                 <div class="kill-count">たおした数 <b id="killCount">0</b></div>
               </div>
               <div class="battle-center">
