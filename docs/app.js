@@ -10,12 +10,12 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-4"; // 最新反映の確認用
+const BUILD = "2026-09-04-5"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
-// 珠算：日本計算技能連盟の公式サンプル問題(PDF)から抽出した実測値。
-// ★=サンプルで確認、△=サンプルが無く前後から補間（7級・10級のみ）
+// 珠算：日本計算技能連盟の公式サンプル問題から抽出した実測値（★＝全級サンプルで確認済み）。
+// 13〜10級のみとりが同じ2桁5口なのは公式サンプルどおり（級の差はかけ算・わり算で付く）。
 const SOROBAN_STD = {
   1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } }, // 全て★
   2: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 4 }, wari: { D: 7, dv: 3, qd: 4 } }, // 全て★（みとりは3級と同じ5桁10口。差は乗除算で付く）
@@ -23,10 +23,10 @@ const SOROBAN_STD = {
   4: { mitori: { digits: 4, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 2, qd: 3 } }, // 全て★
   5: { mitori: { digits: 4, terms: 10 }, kake: { a: 3, b: 3 }, wari: { D: 4, dv: 2, qd: 2 } }, // 全て★
   6: { mitori: { digits: 3, terms: 10 }, kake: { a: 3, b: 2 }, wari: { D: 4, dv: 1, qd: 3 } }, // 全て★
-  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 3, b: 1 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て△（サンプル無し）
+  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 2, b: 2 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て★
   8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },                    // ★
   9: { mitori: { digits: 2, terms: 8 }, kake: { a: 2, b: 1 }, wari: null },                    // ★
-  10: { mitori: { digits: 2, terms: 6 }, kake: null, wari: null },                             // △
+  10: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★（B・C問題。A問題は1桁7口）
   11: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
   12: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
   13: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
