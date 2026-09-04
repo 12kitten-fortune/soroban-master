@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-9"; // 最新反映の確認用
+const BUILD = "2026-09-04-10"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -26,13 +26,15 @@ const SOROBAN_STD = {
   7: { mitori: { digits: 2, terms: 10 }, kake: { a: 2, b: 2 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て★
   8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },                    // ★
   9: { mitori: { digits: 2, terms: 8 }, kake: { a: 2, b: 1 }, wari: null },                    // ★
-  // 10〜15級は1枚の中で口数が混在する（1〜5番=5口、6〜10番=6口）ので terms〜termsMax で振る
-  10: { mitori: { digits: 2, terms: 5, termsMax: 7 }, kake: null, wari: null },                // ★（A=1桁7口・B/C=2桁5口）
-  11: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                // ★
-  12: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                // ★
-  13: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                // ★
-  14: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                // ★（A=1桁・B=2桁なので桁は混在）
-  15: { mitori: { digits: 1, terms: 5, termsMax: 6 }, kake: null, wari: null },                // ★
+  // 10〜15級は「桁と口数の組み合わせ」がサンプルで決まっている。桁と口数を別々に振ると
+  // サンプルに無い組み合わせ（例：10級の2桁7口）が出てしまうため、必ず variants で対にする。
+  // 1枚の中で1〜5番=5口・6〜10番=6口と変わる級は termsMax で表す。
+  10: { mitori: { variants: [{ digits: 1, terms: 7 }, { digits: 2, terms: 5 }] }, kake: null, wari: null },        // ★A=1桁7口／B・C=2桁5口
+  11: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも2桁
+  12: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも2桁
+  13: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★2桁
+  14: { mitori: { variants: [{ digits: 1, terms: 5, termsMax: 6 }, { digits: 2, terms: 5, termsMax: 6 }] }, kake: null, wari: null }, // ★A=1桁／B=2桁
+  15: { mitori: { digits: 1, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも1桁
 };
 // 暗算（みとり暗算）：同じく公式サンプルの実測値。低い級はサンプルどおり ひき算を含めない
 const ANZAN_STD = {
@@ -125,14 +127,21 @@ function difficulty(g, subj) {
 
 /* ============================================================ ジェネレータ */
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
-function genMitori({ digits, terms, termsMax, sub }) {
+// variants がある級は「桁と口数の組み合わせ」を丸ごと1つ選ぶ（桁と口数を別々に振らない）
+const pickVariant = (s) => (s && s.variants ? s.variants[Math.floor(Math.random() * s.variants.length)] : s);
+function genMitori(spec) {
+  const { digits, terms, termsMax, sub } = pickVariant(spec);
   const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（連盟サンプルに準拠してやさしめに）
   // 公式サンプルは1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
   const T = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
   // sub:false の級（暗算7〜10級など）はサンプルどおり ひき算を出さない
   const allowSub = sub !== false && T >= 3; const nums = []; let total = 0;
+  // 公式サンプルは必ずその級の桁数の数が入っているので、1つは必ずD桁にする
+  // （これが無いと「4桁10口」のはずが偶然すべて3桁以下になり、級より易しい問題が出てしまう）
+  const forceIdx = Math.floor(Math.random() * T);
   for (let i = 0; i < T; i++) {
-    const v = randDigits(lo + Math.floor(Math.random() * (D - lo + 1)));
+    const dg = i === forceIdx ? D : lo + Math.floor(Math.random() * (D - lo + 1));
+    const v = randDigits(dg);
     if (i > 0 && allowSub && Math.random() < 0.35 && total > v) { nums.push(-v); total -= v; }
     else { nums.push(v); total += v; }
   }
@@ -410,8 +419,8 @@ function specText(g, subj) {
   if (subj === "flash") return `${d.digits}桁 ${d.terms}口 / 約${(d.terms * flashPaceMs(g) / 1000).toFixed(1)}秒（1個 ${(flashPaceMs(g) / 1000).toFixed(1)}秒）`;
   if (subj === "kake") return `${d.a}桁 × ${d.b}桁`;
   if (subj === "wari") return `${d.D}桁 ÷ ${d.dv}桁`;
-  const kuchi = d.termsMax && d.termsMax > d.terms ? `${d.terms}〜${d.termsMax}口` : `${d.terms}口`;
-  return `${d.digits}桁 ${kuchi}`;
+  const one = (v) => `${v.digits}桁 ${v.termsMax && v.termsMax > v.terms ? `${v.terms}〜${v.termsMax}` : v.terms}口`;
+  return d.variants ? d.variants.map(one).join(" ／ ") : one(d);
 }
 function updateInfo() {
   const g = currentGrade();
