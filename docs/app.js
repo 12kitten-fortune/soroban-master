@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-14"; // 最新反映の確認用
+const BUILD = "2026-09-04-15"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -50,10 +50,19 @@ const ANZAN_STD = {
   1: { digits: 3, terms: 5, sub: true },   //★
 };
 // 11〜20級は公式に無い当アプリ独自の入門ラダー
+// 11〜20級は公式に無い当アプリ独自の入門ラダー。
+// そろばんの学習順（5の友 → くり上がりなし → 10の友 → くり上がり）に合わせて
+// 「答えがいくつになるか」を決め打ちで出題する。
 const ANZAN_LOW = {
-  20: { digits: 1, terms: 2, sub: false }, 19: { digits: 1, terms: 2, sub: false }, 18: { digits: 1, terms: 2, sub: false },
-  17: { digits: 1, terms: 2, sub: false }, 16: { digits: 1, terms: 2, sub: false }, 15: { digits: 1, terms: 3, sub: false },
-  14: { digits: 1, terms: 3, sub: false }, 13: { digits: 1, terms: 3, sub: false }, 12: { digits: 1, terms: 3, sub: false },
+  20: { digits: 1, terms: 2, sub: false, sumExact: 5, label: "たして5" },
+  19: { digits: 1, terms: 2, sub: false, sumMax: 9, label: "こたえが9まで（くり上がりなし）" },
+  18: { digits: 1, terms: 2, sub: false, sumExact: 10, label: "たして10" },
+  17: { digits: 1, terms: 2, sub: false, sumMin: 11, sumMax: 18, label: "くり上がり" },
+  16: { digits: 1, terms: 3, sub: false, sumMax: 9, label: "3口・くり上がりなし" },
+  15: { digits: 1, terms: 3, sub: false, sumMax: 18, label: "3口" },
+  14: { digits: 1, terms: 3, sub: false },
+  13: { digits: 1, terms: 3, sub: false },
+  12: { digits: 1, terms: 3, sub: false },
   11: { digits: 1, terms: 3, sub: false },
 };
 // フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。1個あたり約0.8秒で一定）
@@ -110,8 +119,7 @@ function difficulty(g, subj) {
       if (subj === "flash") return k <= 10 ? FLASH_STD[k] : FLASH_KYU_LOW[k];
     } else {
       // 16〜20級：導入（見取・暗算・フラッシュのみ）
-      if (subj === "anzan") return ANZAN_LOW[k];
-      if (subj === "mitori") return { digits: 1, terms: 2 };
+      if (subj === "anzan" || subj === "mitori") return ANZAN_LOW[k]; // 入門帯は みとり も同じラダー
       if (subj === "flash") return FLASH_KYU_LOW[k];
       return null;
     }
@@ -129,8 +137,31 @@ function difficulty(g, subj) {
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
 // variants がある級は「桁と口数の組み合わせ」を丸ごと1つ選ぶ（桁と口数を別々に振らない）
 const pickVariant = (s) => (s && s.variants ? s.variants[Math.floor(Math.random() * s.variants.length)] : s);
+// 入門級用：答えがいくつになるかを決めて、そこから各項を作る（例：たして5＝1+4, 2+3…）
+function genBySum(sp) {
+  const T = sp.terms, MAX = 9;
+  const lo = sp.sumExact != null ? sp.sumExact : (sp.sumMin != null ? sp.sumMin : T);
+  const hi = sp.sumExact != null ? sp.sumExact : (sp.sumMax != null ? sp.sumMax : T * MAX);
+  for (let tries = 0; tries < 300; tries++) {
+    const S = lo + Math.floor(Math.random() * (hi - lo + 1));
+    if (S < T || S > T * MAX) continue;             // 各項1〜9では作れない合計
+    const cuts = [];
+    for (let i = 1; i < S; i++) cuts.push(i);        // Sを T個に分ける切れ目の候補
+    for (let i = cuts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cuts[i], cuts[j]] = [cuts[j], cuts[i]]; }
+    const sel = cuts.slice(0, T - 1).sort((a, b) => a - b);
+    const nums = []; let prev = 0;
+    for (const c of sel) { nums.push(c - prev); prev = c; }
+    nums.push(S - prev);
+    if (nums.length === T && nums.every((v) => v >= 1 && v <= MAX)) return { nums, answer: S };
+  }
+  return null;
+}
 function genMitori(spec) {
-  const { digits, terms, termsMax, sub } = pickVariant(spec);
+  const v = pickVariant(spec);
+  if (v.sumExact != null || v.sumMin != null || v.sumMax != null) {   // 入門級：合計を決めて作る
+    const r = genBySum(v); if (r) return r;
+  }
+  const { digits, terms, termsMax, sub } = v;
   const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（連盟サンプルに準拠してやさしめに）
   // 公式サンプルは1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
   const T = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
@@ -443,6 +474,7 @@ function specText(g, subj) {
   if (subj === "kake") return `${d.a}桁 × ${d.b}桁`;
   if (subj === "wari") return `${d.D}桁 ÷ ${d.dv}桁`;
   const one = (v) => `${v.digits}桁 ${v.termsMax && v.termsMax > v.terms ? `${v.terms}〜${v.termsMax}` : v.terms}口`;
+  if (d.label) return `${one(d)}　<b>${d.label}</b>`; // 入門級は「たして5」などの狙いを出す
   return d.variants ? d.variants.map(one).join(" ／ ") : one(d);
 }
 function updateInfo() {
