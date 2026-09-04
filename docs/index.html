@@ -235,7 +235,7 @@
         <div id="view-battle" class="view hidden">
           <div class="card battle-setup" id="battleSetup">
             <h3>⚔️ レオ王のたいせん</h3>
-            <p class="sub">レオ王をそうさして、CPUより多く正解しよう！ 正解でGOLDもゲット。</p>
+            <p class="sub">正解すると てき に こうげき！ HPを3けずると たおせるよ。<br>たおすたびに GOLD がもらえる。まちがえても へっちゃら（へることは ないよ）。</p>
             <div class="battle-opts">
               <label>級・段<select id="battleGrade"></select></label>
               <label>しゅもく<select id="battleSubj">
@@ -255,9 +255,21 @@
 
           <div class="card battle-arena hidden" id="battleArena">
             <div class="battle-hud">
-              <div class="fighter you"><img src="assets/king.png" alt="あなた" /><div class="fname">あなた</div><div class="fscore" id="youScore">0</div></div>
-              <div class="battle-center"><div class="battle-timer" id="battleTimer">3:00</div><div class="vs">VS</div></div>
-              <div class="fighter cpu"><img src="assets/king_staff.png" alt="CPU" /><div class="fname">CPUレオ</div><div class="fscore" id="cpuScore">0</div></div>
+              <div class="fighter you">
+                <img src="assets/king.png" alt="あなた" />
+                <div class="fname">あなた</div>
+                <div class="kill-count">たおした数 <b id="killCount">0</b></div>
+              </div>
+              <div class="battle-center">
+                <div class="battle-timer" id="battleTimer">3:00</div>
+                <div class="vs">たたかう！</div>
+              </div>
+              <div class="fighter cpu">
+                <img id="enemyImg" src="assets/king_staff.png" alt="てき" />
+                <div class="fname" id="enemyName">てき 1ばんめ</div>
+                <div class="hpbar"><div class="hpfill" id="enemyHp"></div></div>
+                <div class="hptext" id="enemyHpText">HP 3 / 3</div>
+              </div>
             </div>
             <div class="battle-problem" id="battleProblem"></div>
             <form id="battleForm" class="answer-row"><input id="battleInput" type="number" inputmode="numeric" placeholder="こたえ" autocomplete="off" /><button type="submit">こたえる</button></form>

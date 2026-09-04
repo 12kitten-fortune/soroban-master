@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-03-9"; // 最新反映の確認用
+const BUILD = "2026-09-04-1"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1093,8 +1093,9 @@ $("#flashForm").addEventListener("submit", (e) => {
 
 /* ============================================================ たいせん（CPU対戦ゲーム／レオ王） */
 let battle = null, battleTimer = null;
-// CPUが1問解く間隔(ms)。級が下（やさしい）ほど遅く＝子どもでも勝てる。段位ほど速い
-function cpuPace(g) { if (g.band === "dan") return Math.max(2000, 3400 - g.dan * 130); return clamp(6200 - (20 - g.kyu) * 120, 3000, 6200); }
+// 敵のHPは級によらず一定（難易度は出題される問題そのもので調整済み）
+const ENEMY_HP = 3;
+const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
   const sel = $("#battleGrade");
   if (!sel.dataset.filled) { sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join(""); sel.dataset.filled = "1"; }
@@ -1110,48 +1111,72 @@ function battleProblem() {
 }
 function startBattle() {
   const grade = GRADES[+$("#battleGrade").value], subj = $("#battleSubj").value, dur = +$("#battleTime").value;
-  const cpuMs = cpuPace(grade), now = performance.now();
-  battle = { grade, subj, dur, you: 0, cpu: 0, atts: 0, cpuMs, cur: null, endAt: now + dur * 1000, cpuNext: now + cpuMs * (0.7 + Math.random() * 0.6), running: true };
+  battle = { grade, subj, dur, you: 0, atts: 0, kills: 0, hp: ENEMY_HP, cur: null, endAt: performance.now() + dur * 1000, running: true };
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
-  $("#youScore").textContent = "0"; $("#cpuScore").textContent = "0"; $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
+  $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
+  $("#enemyImg").className = "";
+  renderEnemy();
   battleProblem();
   battleTimer = setInterval(tickBattle, 100);
 }
 function tickBattle() {
   if (!battle || !battle.running) return;
-  const now = performance.now(), rem = Math.max(0, battle.endAt - now);
+  const rem = Math.max(0, battle.endAt - performance.now());
   $("#battleTimer").textContent = fmtClock(rem / 1000);
-  while (battle.cpuNext <= now && rem > 0) {
-    if (Math.random() < 0.9) { battle.cpu++; $("#cpuScore").textContent = battle.cpu; }
-    battle.cpuNext += battle.cpuMs * (0.75 + Math.random() * 0.5);
-  }
   if (rem <= 0) finishBattle();
 }
-function battleFx(text, ok) { const fx = $("#battleFx"); fx.textContent = text; fx.className = "battle-fx " + (ok ? "ok" : "ng"); }
+// 敵のHPバーと、たおした数の表示
+function renderEnemy() {
+  $("#killCount").textContent = battle.kills;
+  $("#enemyName").textContent = `てき ${battle.kills + 1}ばんめ`;
+  $("#enemyHpText").textContent = `HP ${battle.hp} / ${ENEMY_HP}`;
+  const fill = $("#enemyHp");
+  fill.style.width = (battle.hp / ENEMY_HP) * 100 + "%";
+  fill.className = "hpfill" + (battle.hp === 1 ? " low" : "");
+}
+function battleFx(text, kind) { const fx = $("#battleFx"); fx.textContent = text; fx.className = "battle-fx " + kind; }
+// 敵の画像に一瞬アニメを付ける（当たった／たおれた）
+function enemyAnim(cls, ms) {
+  const img = $("#enemyImg"); img.className = cls;
+  setTimeout(() => { if (img.className === cls) img.className = ""; }, ms);
+}
 function battleAnswer(val) {
   if (!battle || !battle.running) return;
   battle.atts++;
-  if (val === battle.cur.answer) { battle.you++; $("#youScore").textContent = battle.you; battleFx("せいかい！ ＋1", true); clickSnd(); }
-  else battleFx("ざんねん…", false);
+  if (val === battle.cur.answer) {
+    battle.you++; battle.hp--;
+    if (battle.hp <= 0) {                       // たおした → 次の敵へ
+      battle.kills++; battle.hp = ENEMY_HP;
+      battleFx(`たおした！ ＋${GOLD_PER_KILL} GOLD`, "kill");
+      enemyAnim("down", 700); correctSnd();
+    } else {                                    // こうげき命中
+      battleFx("こうげき！ HP−1", "ok");
+      enemyAnim("hit", 300); clickSnd();
+    }
+    renderEnemy();
+  } else {
+    battleFx("こうげきが はずれた！ つぎだ！", "miss"); // 責めない言い方にする
+    neutralSnd();
+  }
   battleProblem();
 }
 function finishBattle() {
   battle.running = false; if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
-  const win = battle.you > battle.cpu, draw = battle.you === battle.cpu;
-  logSession(battleSubjOf(), battle.atts, battle.you, battle.dur);
-  let earned = battle.you * 2 + (win ? 30 : draw ? 10 : 0);
+  const kills = battle.kills;
+  logSession(battleSubjOf(), battle.atts, battle.you, battle.dur); // 学習記録の仕組みは従来どおり
+  let earned = kills * GOLD_PER_KILL;
   const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
   if (battle.you > 0) { touchStreak(); addGold(earned); }
-  win ? fanfareSnd() : (draw ? neutralSnd() : wrongSnd());
-  const badge = win ? "badge_win.png" : "badge_complete.png";
-  const face = win ? "king_celebrate.png" : draw ? "king_wave.png" : "king_run.png";
-  const verdict = win ? "🎉 あなたの勝ち！" : draw ? "引き分け！" : "つぎはがんばろう！";
+  kills > 0 ? fanfareSnd() : neutralSnd();
+  const badge = kills > 0 ? "badge_win.png" : "badge_complete.png";
+  const face = kills > 0 ? "king_celebrate.png" : "king_wave.png";
+  const verdict = kills > 0 ? `🎉 ${kills}ぴき たおした！` : "つぎは1ぴき たおそう！";
   $("#battleArena").classList.add("hidden");
   const rbox = $("#battleResult"); rbox.classList.remove("hidden");
   rbox.innerHTML =
     `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><img class="bv-badge" src="assets/${badge}" alt="" /><h3>${verdict}</h3></div></div>` +
-    `<div class="battle-score-final">あなた <b>${battle.you}</b> － <b>${battle.cpu}</b> CPU</div>` +
-    (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">正解すると GOLD がもらえるよ！</p>') +
+    `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問</span></div>` +
+    (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="gold-lines">${kills}ぴき × ${GOLD_PER_KILL} GOLD</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🏰 王国を見る</button>`;
   renderProfile();
   $("#battleAgain").onclick = () => renderBattle();
