@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-1"; // 最新反映の確認用
+const BUILD = "2026-09-04-2"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1095,6 +1095,15 @@ $("#flashForm").addEventListener("submit", (e) => {
 let battle = null, battleTimer = null;
 // 敵のHPは級によらず一定（難易度は出題される問題そのもので調整済み）
 const ENEMY_HP = 3;
+// 1匹たおすごとに次の敵へ（6体を順番にくり返す）
+const ENEMIES = [
+  { file: "enemy_slime.png", name: "スライムおう" },
+  { file: "enemy_bat.png", name: "こうもり" },
+  { file: "enemy_rock.png", name: "いわゴーレム" },
+  { file: "enemy_tree.png", name: "モリのぬし" },
+  { file: "enemy_wizard.png", name: "まほうつかい" },
+  { file: "enemy_mimic.png", name: "ミミック" },
+];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
   const sel = $("#battleGrade");
@@ -1115,7 +1124,7 @@ function startBattle() {
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
   $("#enemyImg").className = "";
-  renderEnemy();
+  setEnemyIdentity(); renderEnemy();
   battleProblem();
   battleTimer = setInterval(tickBattle, 100);
 }
@@ -1125,10 +1134,16 @@ function tickBattle() {
   $("#battleTimer").textContent = fmtClock(rem / 1000);
   if (rem <= 0) finishBattle();
 }
+// いま出ている敵（たおした数ぶん進む）
+const currentEnemy = () => ENEMIES[battle.kills % ENEMIES.length];
+function setEnemyIdentity() {
+  const e = currentEnemy();
+  $("#enemyImg").src = "assets/" + e.file;
+  $("#enemyName").textContent = e.name;
+}
 // 敵のHPバーと、たおした数の表示
 function renderEnemy() {
   $("#killCount").textContent = battle.kills;
-  $("#enemyName").textContent = `てき ${battle.kills + 1}ばんめ`;
   $("#enemyHpText").textContent = `HP ${battle.hp} / ${ENEMY_HP}`;
   const fill = $("#enemyHp");
   fill.style.width = (battle.hp / ENEMY_HP) * 100 + "%";
@@ -1145,10 +1160,12 @@ function battleAnswer(val) {
   battle.atts++;
   if (val === battle.cur.answer) {
     battle.you++; battle.hp--;
-    if (battle.hp <= 0) {                       // たおした → 次の敵へ
+    if (battle.hp <= 0) {                       // たおした → たおれてから次の敵が登場
       battle.kills++; battle.hp = ENEMY_HP;
       battleFx(`たおした！ ＋${GOLD_PER_KILL} GOLD`, "kill");
-      enemyAnim("down", 700); correctSnd();
+      correctSnd();
+      const img = $("#enemyImg"); img.className = "down";
+      setTimeout(() => { if (!battle || !battle.running) return; img.className = "appear"; setEnemyIdentity(); }, 650);
     } else {                                    // こうげき命中
       battleFx("こうげき！ HP−1", "ok");
       enemyAnim("hit", 300); clickSnd();

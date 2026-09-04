@@ -265,7 +265,7 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .battle-hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .fighter { flex: 1; text-align: center; }
 .fighter img { width: 92px; height: auto; filter: drop-shadow(0 4px 4px rgba(0,0,0,.28)); }
-.fighter.cpu img { transform: scaleX(-1); }
+.fighter.cpu img { transform: none; } /* 敵は専用イラストなので反転しない */
 .fname { font-weight: 700; font-size: 13px; color: var(--navy); }
 .fscore { font-size: 34px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; }
 .fighter.cpu .fscore { color: var(--accent); }
@@ -316,17 +316,22 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .hpfill { height: 100%; width: 100%; background: linear-gradient(90deg, #5bc46a, #2e7d5b); transition: width .25s ease; }
 .hpfill.low { background: linear-gradient(90deg, #e8a33d, #d9534f); }
 .hptext { font-size: 12px; color: #6b5f4c; font-variant-numeric: tabular-nums; }
-/* 敵は左右反転して表示しているので、アニメでも scaleX(-1) を保つ */
 .fighter.cpu img.hit { animation: enemyHit .3s ease; }
 @keyframes enemyHit {
-  0%   { transform: scaleX(-1) translateX(0); }
-  30%  { transform: scaleX(-1) translateX(12px) rotate(7deg); filter: brightness(1.8); }
-  100% { transform: scaleX(-1) translateX(0); }
+  0%   { transform: translateX(0); }
+  30%  { transform: translateX(12px) rotate(7deg); filter: brightness(1.8); }
+  100% { transform: translateX(0); }
 }
 .fighter.cpu img.down { animation: enemyDown .7s ease forwards; }
 @keyframes enemyDown {
-  0%   { transform: scaleX(-1) rotate(0); opacity: 1; }
-  100% { transform: scaleX(-1) rotate(75deg) translateY(14px); opacity: .2; }
+  0%   { transform: rotate(0); opacity: 1; }
+  100% { transform: rotate(75deg) translateY(14px); opacity: .2; }
+}
+/* たおしたあと、次の敵が出てくる */
+.fighter.cpu img.appear { animation: enemyAppear .35s ease; }
+@keyframes enemyAppear {
+  0%   { transform: scale(.4); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 .battle-fx.kill { color: var(--royal-gold); font-size: 20px; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
 .battle-fx.miss { color: #6b5f4c; }  /* 不正解は責めない色にする（赤にしない） */
