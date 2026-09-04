@@ -411,3 +411,13 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .blk-chip::before { content: ""; position: absolute; left: 0; top: 6px; width: 15px; height: 18px; background: var(--l); clip-path: polygon(0 0, 100% 25%, 100% 100%, 0 75%); }
 .blk-chip::after { content: ""; position: absolute; right: 0; top: 6px; width: 15px; height: 18px; background: var(--r); clip-path: polygon(0 25%, 100% 0, 100% 75%, 0 100%); }
 .blk-chip { background: linear-gradient(var(--t), var(--t)) no-repeat center top / 30px 12px; }
+
+/* ============================================================ 時代ごとのブロック（文明の発展） */
+.era { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: #fffdf8; }
+.era.locked { background: #f2f0ea; opacity: .8; }
+.era-h { font-size: 13px; font-weight: 800; color: var(--navy); margin-bottom: 6px; display: flex; align-items: baseline; gap: 8px; }
+.era-h small { font-weight: 400; color: #8a7560; font-size: 11px; }
+.era.locked .era-h { color: #8a7560; }
+.era-b { display: flex; flex-wrap: wrap; gap: 8px; }
+.blk.lock { opacity: .45; filter: grayscale(.7); cursor: not-allowed; }
+.craft-palette { display: block; }

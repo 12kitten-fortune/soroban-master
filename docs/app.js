@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-23"; // 最新反映の確認用
+const BUILD = "2026-09-04-24"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1278,19 +1278,44 @@ const CRAFT_KEY = "soroban_craft";
 const CW_ = 48, CH_ = 48, CD_ = 10;              // 世界の広さ(48x48=2304マス)と積める高さ(10段)
 const CTW = 46, CTH = 23, CBH = 27;              // ひし形タイルの幅・高さ・ブロックの厚み
 const SEA = 2;                                   // 海の高さ
+const ERAS = [
+  { n: "原始時代", need: -1, cond: "さいしょから" },
+  { n: "古代", need: 5, cond: "15級に ごうかく" },
+  { n: "中世", need: 10, cond: "10級に ごうかく" },
+  { n: "近世", need: 14, cond: "6級に ごうかく" },
+  { n: "現代", need: 18, cond: "2級に ごうかく" },
+  { n: "未来", need: 21, cond: "二段に ごうかく" },
+];
+// 色も模様もすべてオリジナル。era＝その時代になると使えるようになる
 const BLOCKS = [
   null,
-  { n: "くさ", top: "#7ec95e", lf: "#54913c", rt: "#69ad4b", cost: 1, pat: "grass" },
-  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "sand" },
-  { n: "いし", top: "#bcbcc2", lf: "#83838a", rt: "#a0a0a7", cost: 2, pat: "stone" },
-  { n: "き", top: "#c9954f", lf: "#8c6432", rt: "#ab7c41", cost: 2, pat: "wood" },
-  { n: "すな", top: "#ecdca8", lf: "#b8a476", rt: "#d3c090", cost: 2, pat: "sand" },
-  { n: "みず", top: "#63b4ee", lf: "#3573ad", rt: "#4a93cf", cost: 3, pat: "water" },
-  { n: "はっぱ", top: "#57ab3e", lf: "#356d26", rt: "#448b32", cost: 3, pat: "grass" },
-  { n: "レンガ", top: "#c9604c", lf: "#8d3d2f", rt: "#ab4e3d", cost: 4, pat: "brick" },
-  { n: "こおり", top: "#c7ecff", lf: "#84b6d4", rt: "#a6d2ea", cost: 5, pat: "water" },
-  { n: "きん", top: "#f4dc8d", lf: "#b8912a", rt: "#d9b445", cost: 8, pat: "gold" },
+  { n: "くさ", top: "#7ec95e", lf: "#54913c", rt: "#69ad4b", cost: 1, pat: "grass", era: 0 },
+  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "sand", era: 0 },
+  { n: "いし", top: "#bcbcc2", lf: "#83838a", rt: "#a0a0a7", cost: 2, pat: "stone", era: 0 },
+  { n: "き", top: "#c9954f", lf: "#8c6432", rt: "#ab7c41", cost: 2, pat: "wood", era: 0 },
+  { n: "はっぱ", top: "#57ab3e", lf: "#356d26", rt: "#448b32", cost: 2, pat: "grass", era: 0 },
+  { n: "すな", top: "#ecdca8", lf: "#b8a476", rt: "#d3c090", cost: 2, pat: "sand", era: 0 },
+  { n: "みず", top: "#63b4ee", lf: "#3573ad", rt: "#4a93cf", cost: 3, pat: "water", era: 0 },
+  { n: "わら", top: "#e3c96f", lf: "#ab9445", rt: "#c8b057", cost: 4, pat: "wood", era: 1 },
+  { n: "レンガ", top: "#c9604c", lf: "#8d3d2f", rt: "#ab4e3d", cost: 5, pat: "brick", era: 1 },
+  { n: "いしレンガ", top: "#a8a8ae", lf: "#74747a", rt: "#8e8e95", cost: 5, pat: "brick", era: 1 },
+  { n: "いた", top: "#d8a86a", lf: "#a67c46", rt: "#bf9258", cost: 6, pat: "wood", era: 2 },
+  { n: "ガラス", top: "#d8f2ff", lf: "#9cc4d6", rt: "#bcdcea", cost: 7, pat: "water", era: 2 },
+  { n: "やねがわら", top: "#4a6fa5", lf: "#2f4a73", rt: "#3c5c8c", cost: 7, pat: "brick", era: 2 },
+  { n: "大理石", top: "#f2efe6", lf: "#c4c0b5", rt: "#dbd7cc", cost: 9, pat: "stone", era: 3 },
+  { n: "きん", top: "#f4dc8d", lf: "#b8912a", rt: "#d9b445", cost: 12, pat: "gold", era: 3 },
+  { n: "ランプ", top: "#ffdf9b", lf: "#c9a44a", rt: "#e6c069", cost: 12, pat: "gold", era: 3 },
+  { n: "コンクリート", top: "#c6c6c2", lf: "#8b8b88", rt: "#a9a9a5", cost: 15, pat: "stone", era: 4 },
+  { n: "てつ", top: "#b9c2cc", lf: "#7b8592", rt: "#9aa4b0", cost: 18, pat: "stone", era: 4 },
+  { n: "ネオン", top: "#ff8fdc", lf: "#a82e84", rt: "#d45bb0", cost: 20, pat: "gold", era: 4 },
+  { n: "クリスタル", top: "#c3b2ff", lf: "#7a63d1", rt: "#9e8bea", cost: 28, pat: "water", era: 5 },
+  { n: "ひかり", top: "#fff6c9", lf: "#ddcb72", rt: "#efe19b", cost: 32, pat: "gold", era: 5 },
+  { n: "にじいろ", top: "#ffb3d1", lf: "#5fbcd0", rt: "#ffd36b", cost: 40, pat: "gold", era: 5 },
 ];
+// いま使える時代（検定に合格した級で決まる）
+function myRankIdx() { try { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.idx : -1; } catch (e) { return -1; } }
+function eraOpen(e) { return myRankIdx() >= ERAS[e].need; }
+function myEra() { let m = 0; for (let e = 0; e < ERAS.length; e++) if (eraOpen(e)) m = e; return m; }
 let craft = null, craftSel = 1, craftBreak = false, craftHist = [], craftPick = null, craftHover = -1;
 let camS = 1, camX = 0, camY = 0, dragging = false, dragMoved = false, dragSX = 0, dragSY = 0;
 
@@ -1500,6 +1525,7 @@ function craftClick(ev) {
     const nz = tz + 1;
     if (nz >= CD_) return craftMsg("これいじょう つめないよ");
     const b = BLOCKS[craftSel], have = getGold();
+    if (!eraOpen(b.era)) return craftMsg("「" + b.n + "」は " + ERAS[b.era].cond + "すると つかえるよ");
     if (have < b.cost) return craftMsg("GOLDが " + (b.cost - have) + " たりない…そろばんで かせごう！");
     craft.cells[cIdx(p.x, p.y, nz)] = craftSel;
     craftHist.push({ t: "p", x: p.x, y: p.y, z: nz, id: craftSel }); craft.built = (craft.built || 0) + 1;
@@ -1514,17 +1540,27 @@ function craftCenterOnHero() {
   camY = cv.height / 2 - isoY(craft.hx, craft.hy, 4) * camS;
 }
 function renderCraftPalette() {
-  let html = "";
-  for (let i = 1; i < BLOCKS.length; i++) {
-    const b = BLOCKS[i];
-    html += '<button class="blk' + (i === craftSel ? " sel" : "") + '" data-b="' + i + '">' +
-      '<span class="blk-chip" style="--t:' + b.top + ';--l:' + b.lf + ';--r:' + b.rt + '"></span>' +
-      '<span class="blk-n">' + b.n + '</span><span class="blk-c">' + b.cost + 'G</span></button>';
-  }
   const el = $("#craftPalette"); if (!el) return;
+  let html = "";
+  for (let e = 0; e < ERAS.length; e++) {
+    const open = eraOpen(e);
+    html += '<div class="era' + (open ? "" : " locked") + '"><div class="era-h">' +
+      (open ? "" : "🔒 ") + ERAS[e].n + '<small>' + (open ? "つかえる" : ERAS[e].cond) + '</small></div><div class="era-b">';
+    for (let i = 1; i < BLOCKS.length; i++) {
+      const bk = BLOCKS[i]; if (bk.era !== e) continue;
+      html += '<button class="blk' + (i === craftSel ? " sel" : "") + (open ? "" : " lock") + '" data-b="' + i + '">' +
+        '<span class="blk-chip" style="--t:' + bk.top + ';--l:' + bk.lf + ';--r:' + bk.rt + '"></span>' +
+        '<span class="blk-n">' + bk.n + '</span><span class="blk-c">' + (open ? bk.cost + "G" : "🔒") + '</span></button>';
+    }
+    html += '</div></div>';
+  }
   el.innerHTML = html;
-  $$("#craftPalette .blk").forEach(function (b) {
-    b.addEventListener("click", function () { craftSel = +b.dataset.b; craftBreak = false; renderCraft(); });
+  $$("#craftPalette .blk").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const i = +btn.dataset.b, bk = BLOCKS[i];
+      if (!eraOpen(bk.era)) return craftMsg("「" + bk.n + "」は " + ERAS[bk.era].cond + "すると つかえるよ");
+      craftSel = i; craftBreak = false; renderCraft();
+    });
   });
 }
 function craftBuiltCount() { return (craft && craft.built) || 0; }  // 自分で置いた数（地形は数えない）
@@ -1532,6 +1568,7 @@ function renderCraft() {
   if (!craft) { craft = loadCraft(); craftCenterOnHero(); }
   $("#craftGold").textContent = getGold().toLocaleString();
   $("#craftCount").textContent = craftBuiltCount().toLocaleString();
+  const el2 = $("#craftEra"); if (el2) el2.textContent = ERAS[myEra()].n;
   $("#craftMode").textContent = craftBreak ? "⛏ こわす" : "🧱 おく";
   $("#craftMode").className = "pill" + (craftBreak ? " danger" : "");
   renderCraftPalette(); drawCraft(); renderGoldPill();
