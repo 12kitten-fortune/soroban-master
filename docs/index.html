@@ -19,7 +19,6 @@
         <nav class="side-nav">
           <button class="nav active" data-view="home">🏠 ホーム</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
-          <button class="nav" data-view="kingdom">🏰 王国</button>
           <button class="nav" data-view="battle">⚔️ たいせん</button>
           <button class="nav" data-view="craft">🧱 クラフト</button>
           <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
@@ -70,7 +69,7 @@
               <div class="card stat-tile"><span><img class="ico-crown" src="assets/crown.png" alt="" /> 王国レベル</span><b id="homeKingdomLv">1</b></div>
               <div class="card stat-tile"><span>🔥 連続学習</span><b id="homeStreak">0日</b></div>
               <div class="card stat-tile"><span>📅 今月の学習</span><b id="homeMonth">0日</b></div>
-              <button id="homeToKingdom" class="wide-btn">🏰 王国を見る</button>
+              <button id="homeToKingdom" class="wide-btn">🧱 クラフトへ</button>
               <button id="homeToRecords" class="wide-btn ghost">📊 成績を見る</button>
             </aside>
           </div>
@@ -231,36 +230,21 @@
           </div>
         </div>
 
-        <!-- 王国 -->
-        <div id="view-kingdom" class="view hidden">
-          <div class="card kingdom-head">
-            <div class="kd-title">🏰 わたしの王国　<span class="kd-lv">王国Lv.<span id="kdLevel">1</span></span></div>
-            <div class="gold-badge"><img class="ico-coin" src="assets/coin.png" alt="" /> <span id="kdGold">0</span> GOLD</div>
-          </div>
-          <div class="card"><div id="kingdomBoard" class="kingdom-board"></div></div>
-          <div class="card">
-            <h3>🏗️ 王国を育てる</h3>
-            <p class="sub">そろばんを練習してGOLDを貯めると、王国が発展します。（GOLDは学習でだけ手に入ります）</p>
-            <div id="shopList" class="shop-list"></div>
-            <div id="shopMsg" class="shop-msg sub"></div>
-          </div>
-        </div>
-
         <!-- クラフト（ブロックを積んで自分の世界を作る） -->
         <div id="view-craft" class="view hidden">
           <div class="card kingdom-head">
-            <div class="kd-title">🧱 クラフト王国　<span class="kd-lv">おいたブロック <span id="craftCount">0</span></span></div>
+            <div class="kd-title">🧱 クラフト王国　<span class="kd-lv">ブロック <span id="craftCount">0</span></span></div>
             <div class="gold-badge"><img class="ico-coin" src="assets/coin.png" alt="" /> <span id="craftGold">0</span> GOLD</div>
           </div>
           <div class="card">
             <div class="craft-tools">
               <button id="craftMode" class="pill">🧱 おく</button>
               <button id="craftUndo" class="pill">↩ ひとつ もどす</button>
-              <button id="craftReset" class="ghost">さらちに もどす</button>
+              <button id="craftIn" class="pill">🔍＋</button><button id="craftOut" class="pill">🔍－</button><button id="craftHome" class="pill">🧭 じぶんの所へ</button><button id="craftReset" class="ghost">世界を つくりなおす</button>
               <span id="craftMsg" class="craft-msg"></span>
             </div>
             <div class="craft-stage"><canvas id="craftCanvas" width="720" height="560"></canvas></div>
-            <p class="sub">マスを クリックすると ブロックを つめるよ。GOLDは そろばんの れんしゅうで たまる。</p>
+            <p class="sub">マスを クリックで ブロックを つむ。画面を ドラッグで 見わたす。GOLDは そろばんの れんしゅうで たまるよ。</p>
             <div id="craftPalette" class="craft-palette"></div>
           </div>
         </div>
