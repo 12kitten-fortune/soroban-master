@@ -342,8 +342,10 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .myhp.danger { animation: hpBlink .7s infinite; }
 @keyframes hpBlink { 50% { opacity: .3; } }
 /* ネコがしゃべっているセリフ（吹き出し） */
-.anzan-tip { display: flex; align-items: center; gap: 16px; margin: 14px auto; max-width: 700px; }
-.tip-cat { width: 122px; height: auto; flex-shrink: 0; filter: drop-shadow(0 3px 5px rgba(0,0,0,.22)); }
+.anzan-tip { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 16px auto; max-width: 1000px; }
+.tip-cat { width: 210px; height: auto; flex-shrink: 0; filter: drop-shadow(0 4px 7px rgba(0,0,0,.25)); }
+/* 右側で寝ているネコ。勉強くささを消すための飾り */
+.tip-cat2 { width: 200px; height: auto; flex-shrink: 0; align-self: flex-end; filter: drop-shadow(0 4px 7px rgba(0,0,0,.2)); }
 .tip-balloon { position: relative; flex: 1; background: #fffaf0; border: 2px solid var(--royal-gold); border-radius: 18px; padding: 14px 18px; line-height: 1.9; font-size: 15px; text-align: left; }
 /* 吹き出しのしっぽ（ネコの方を向く） */
 .tip-balloon::before { content: ""; position: absolute; left: -14px; top: 50%; transform: translateY(-50%); border: 11px solid transparent; border-right-color: var(--royal-gold); }
@@ -351,9 +353,11 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .tip-balloon > b { display: block; font-size: 17px; color: var(--navy); margin-bottom: 6px; }
 .tip-balloon p { margin: 8px 0; }
 .tip-balloon p b { color: #c0392b; }
+/* 画面が狭いときは、寝ているネコは隠して文章を読みやすくする */
+@media (max-width: 940px) { .tip-cat2 { display: none; } }
 @media (max-width: 620px) {
   .anzan-tip { flex-direction: column; gap: 6px; }
-  .tip-cat { width: 96px; }
+  .tip-cat { width: 150px; }
   .tip-balloon::before { left: 50%; top: -14px; transform: translateX(-50%); border-right-color: transparent; border-bottom-color: var(--royal-gold); }
   .tip-balloon::after { left: 50%; top: -11px; transform: translateX(-50%); border-right-color: transparent; border-bottom-color: #fffaf0; }
 }
