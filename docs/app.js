@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-15"; // 最新反映の確認用
+const BUILD = "2026-09-04-16"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -54,10 +54,10 @@ const ANZAN_STD = {
 // そろばんの学習順（5の友 → くり上がりなし → 10の友 → くり上がり）に合わせて
 // 「答えがいくつになるか」を決め打ちで出題する。
 const ANZAN_LOW = {
-  20: { digits: 1, terms: 2, sub: false, sumExact: 5, label: "たして5" },
+  20: { digits: 1, terms: 2, sub: false, sumMax: 5, label: "こたえが5まで" },
   19: { digits: 1, terms: 2, sub: false, sumMax: 9, label: "こたえが9まで（くり上がりなし）" },
-  18: { digits: 1, terms: 2, sub: false, sumExact: 10, label: "たして10" },
-  17: { digits: 1, terms: 2, sub: false, sumMin: 11, sumMax: 18, label: "くり上がり" },
+  18: { digits: 1, terms: 2, sub: false, sumMax: 10, label: "こたえが10まで（10の友）" },
+  17: { digits: 1, terms: 2, sub: false, sumMin: 11, sumMax: 18, label: "くり上がり（こたえ11〜18）" },
   16: { digits: 1, terms: 3, sub: false, sumMax: 9, label: "3口・くり上がりなし" },
   15: { digits: 1, terms: 3, sub: false, sumMax: 18, label: "3口" },
   14: { digits: 1, terms: 3, sub: false },
