@@ -286,6 +286,15 @@
               </div>
             </div>
             <div class="battle-problem" id="battleProblem"></div>
+            <div id="battleSorobanWrap" class="hidden">
+              <div class="sub">そろばんで こたえを 作って「こうげき！」を おそう（数字キーでも うごくよ）</div>
+              <div id="soroban3" class="soroban"></div>
+              <div class="value-row">
+                <span class="small">そろばん：</span><b id="soroban3Value" class="soroban-value">0</b>
+                <button id="clearSoroban3" class="ghost">0にする</button>
+              </div>
+              <div class="btn-row"><button id="battleAnswerBtn">⚔️ こうげき！</button></div>
+            </div>
             <form id="battleForm" class="answer-row"><input id="battleInput" type="number" inputmode="numeric" placeholder="こたえ" autocomplete="off" /><button type="submit">こたえる</button></form>
             <div id="battleFx" class="battle-fx"></div>
             <button id="battleQuit" class="ghost">やめる</button>

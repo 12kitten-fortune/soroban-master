@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-10"; // 最新反映の確認用
+const BUILD = "2026-09-04-11"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -355,6 +355,11 @@ function makeSoroban(root, onChange) {
 let sorobanParts = { intStr: "0", fracStr: "" };
 const sorobanQuiz = makeSoroban($("#soroban2"), onQuizChange);
 $("#clearSoroban2").addEventListener("click", () => sorobanQuiz.clear());
+// たいせん用のそろばん（みとり算・かけ算・わり算のとき使う）
+let battleParts = { intStr: "0", fracStr: "" };
+const sorobanBattle = makeSoroban($("#soroban3"), (p) => { $("#soroban3Value").textContent = p.disp; battleParts = p; });
+$("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
+const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
 const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", battle: "たいせん", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
@@ -1150,10 +1155,13 @@ function renderBattle() {
   if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null;
 }
 function battleSubjOf() { return difficulty(battle.grade, battle.subj) ? battle.subj : "anzan"; }
+// あんざん以外（みとり算・かけ算・わり算）は そろばんで答える
+const battleUsesSoroban = () => battleSubjOf() !== "anzan";
 function battleProblem() {
   const p = genProblemFor(battle.grade, battleSubjOf()) || genProblemFor(battle.grade, "anzan");
   battle.cur = p; $("#battleProblem").textContent = p.display;
-  $("#battleInput").value = ""; $("#battleInput").focus();
+  if (battleUsesSoroban()) sorobanBattle.clear();
+  else { $("#battleInput").value = ""; $("#battleInput").focus(); }
 }
 function startBattle() {
   const grade = GRADES[+$("#battleGrade").value], subj = $("#battleSubj").value, dur = +$("#battleTime").value;
@@ -1161,6 +1169,10 @@ function startBattle() {
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
   $("#enemyImg").className = "";
+  // みとり算・かけ算・わり算はそろばん、あんざんは入力欄
+  const useSoro = battleUsesSoroban();
+  $("#battleSorobanWrap").classList.toggle("hidden", !useSoro);
+  $("#battleForm").classList.toggle("hidden", useSoro);
   setEnemyIdentity(); renderEnemy();
   battleProblem();
   battleTimer = setInterval(tickBattle, 100);
@@ -1247,6 +1259,7 @@ function finishBattle(reason) {
 }
 $("#battleStart").addEventListener("click", startBattle);
 $("#battleForm").addEventListener("submit", (e) => { e.preventDefault(); battleAnswer(parseInt($("#battleInput").value, 10)); });
+$("#battleAnswerBtn").addEventListener("click", () => battleAnswer(currentBattleAnswer()));
 $("#battleQuit").addEventListener("click", () => { if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null; renderBattle(); });
 
 /* ---------- キーボード ---------- */
@@ -1262,6 +1275,12 @@ document.addEventListener("keydown", (e) => {
     if (session && session.answerBy === "soroban") {
       if (e.key === "Enter") { submitAnswer(currentSorobanAnswer()); e.preventDefault(); }
       else sorobanQuiz.handleKey(e);
+    }
+  } else if (!$("#view-battle").classList.contains("hidden")) {
+    // たいせん中も そろばんを数字キーで動かせる
+    if (battle && battle.running && battleUsesSoroban()) {
+      if (e.key === "Enter") { battleAnswer(currentBattleAnswer()); e.preventDefault(); }
+      else sorobanBattle.handleKey(e);
     }
   }
 });
