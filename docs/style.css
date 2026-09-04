@@ -384,3 +384,12 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   box-shadow: 0 4px 0 #2c5f96, 0 8px 16px rgba(0,0,0,.22);
 }
 @media (max-width: 620px) { .badge-chip { font-size: 17px; padding: 8px 18px; } .badge-chip.win { font-size: 21px; } }
+
+/* ============================================================ 報酬の絵（金貨・王冠） */
+.ico-coin, .ico-crown { height: 1.35em; width: auto; vertical-align: -0.28em; }
+.gold-earn .ico-coin { height: 46px; vertical-align: -12px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+.stat-tile .ico-coin, .stat-tile .ico-crown { height: 26px; vertical-align: -7px; }
+.gold-badge .ico-coin { height: 30px; vertical-align: -8px; }
+.pill.gold .ico-coin { height: 22px; vertical-align: -6px; }
+.gold-earn { animation: goldPop .45s ease; }
+@keyframes goldPop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }

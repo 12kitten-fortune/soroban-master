@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-17"; // 最新反映の確認用
+const BUILD = "2026-09-04-18"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -269,13 +269,21 @@ function buyBuild(key) {
   saveKingdom(k); return { ok: true, spent: p };
 }
 // 学習成果に応じたGOLD（正解・正答率・自己ベスト・完走）
-function goldForSection({ correct, N, bestUpdated, completed }) {
+// 級が上がるほど1問に時間がかかるので、報酬に級の倍率をかける（20級=1.0倍 … 十段=4.2倍）
+function gradeGoldMult(grade) {
+  if (!grade) return 1;
+  const i = GRADES.findIndex((x) => x.key === grade.key);
+  return i < 0 ? 1 : +(1 + i * 0.11).toFixed(2);
+}
+function goldForSection({ correct, N, bestUpdated, completed, grade }) {
   let g = correct * 2; const lines = [`正解 ${correct}問 ＋${correct * 2}`];
   const acc = N ? correct / N : 0;
   if (acc >= 0.9) { g += 20; lines.push("高正答率(90%↑) ＋20"); }
   else if (acc >= 0.7) { g += 10; lines.push("正答率(70%↑) ＋10"); }
   if (bestUpdated) { g += 30; lines.push("⏱ 自己ベスト更新 ＋30"); }
   if (completed) { g += 10; lines.push("完走 ＋10"); }
+  const m = gradeGoldMult(grade);
+  if (m > 1) { g = Math.round(g * m); lines.push(`${grade.key}ボーナス ×${m}`); }
   return { g, lines };
 }
 // 1日1回の連続学習ボーナス（その日の最初の学習で付与）
@@ -506,7 +514,7 @@ function renderProfile() {
 }
 
 /* ---------- ホーム / 王国 / 保護者 の描画 ---------- */
-function renderGoldPill() { const el = $("#goldPill"); if (el) el.textContent = `👑 ${getGold().toLocaleString()} G`; }
+function renderGoldPill() { const el = $("#goldPill"); if (el) el.innerHTML = `<img class="ico-coin" src="assets/coin.png" alt="" /> <b>${getGold().toLocaleString()}</b>`; }
 function homeGrade() { const rk = JSON.parse(localStorage.getItem(RANK) || "null"); return rk ? GRADES[rk.idx] : currentGrade(); }
 function routineMenuSummary(grade) {
   const steps = buildSteps(grade), cnt = {};
@@ -795,10 +803,10 @@ function finishSession() {
     if (pass) { certify(session.grade.key); msg += `<br>🎓 ${session.grade.key} 認定！`; }
   }
   if (completed) { // GOLDは学習の成果としてのみ付与
-    const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed });
+    const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed, grade: session.grade });
     let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
     addGold(earned);
-    msg += `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+    msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   }
   renderProfile();
   if (session.timed) { (session.correct * cf.per >= cf.pass) ? bigFanfareSnd() : wrongSnd(); }
@@ -891,7 +899,7 @@ function finishRoutineSection() {
   const el = playElapsed();
   routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el, items: session.results });
   logSession(session.subj, session.N, session.correct, el, session.pauseCount);
-  const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true });
+  const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true, grade: session.grade });
   routineState.gold = (routineState.gold || 0) + g;
   correctSnd();
   session = null;
@@ -950,7 +958,7 @@ function finishRoutine() {
   const last = rs.sections[rs.sections.length - 1];
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  const goldBlock = `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
   $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🏰 王国を見る</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
@@ -1176,10 +1184,10 @@ $("#flashForm").addEventListener("submit", (e) => {
       let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
       if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; bigFanfareSnd(); }
       logSession("flash", 20, flashExam.correct, 0);
-      const { g } = goldForSection({ correct: flashExam.correct, N: 20, bestUpdated: false, completed: true });
+      const { g } = goldForSection({ correct: flashExam.correct, N: 20, bestUpdated: false, completed: true, grade: flashGrade });
       let earned = g + (pass ? 50 : 0); const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
       addGold(earned);
-      msg += `<div class="gold-earn">👑 ＋${earned} GOLD<div class="goal">${nextGoalHint()}</div></div>`;
+      msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="goal">${nextGoalHint()}</div></div>`;
       renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = "";
     }
   } else { res.textContent = ok ? "正解！すごい！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
@@ -1267,7 +1275,7 @@ function battleAnswer(val) {
     battle.you++; battle.hp--;
     if (battle.hp <= 0) {                       // たおした → たおれてから次の敵が登場
       battle.kills++; battle.hp = ENEMY_HP;
-      battleFx(`たおした！ ＋${GOLD_PER_KILL} GOLD`, "kill");
+      battleFx(`たおした！ ＋${Math.round(GOLD_PER_KILL * gradeGoldMult(battle.grade))} GOLD`, "kill");
       correctSnd(); coinSnd(0.18); // 1匹たおす＝GOLD獲得なのでチャリーン
       const img = $("#enemyImg"); img.className = "down";
       setTimeout(() => { if (!battle || !battle.running) return; img.className = "appear"; setEnemyIdentity(); }, 650);
@@ -1289,7 +1297,9 @@ function finishBattle(reason) {
   battle.running = false; if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
   const kills = battle.kills, isOut = reason === "out";
   logSession(battleSubjOf(), battle.atts, battle.you, battle.dur); // 学習記録の仕組みは従来どおり
-  let earned = kills * GOLD_PER_KILL;
+  const gm = gradeGoldMult(battle.grade);          // たいせんも級で報酬が増える
+  const perKill = Math.round(GOLD_PER_KILL * gm);
+  let earned = kills * perKill;
   const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
   if (battle.you > 0) { touchStreak(); addGold(earned); }
   (kills > 0 && !isOut) ? bigFanfareSnd() : neutralSnd();
@@ -1305,7 +1315,7 @@ function finishBattle(reason) {
   rbox.innerHTML =
     `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><span class="bv-badge">${badge}</span><h3>${verdict}</h3></div></div>` +
     `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問　♥のこり ${Math.max(0, battle.life)}</span></div>` + outNote +
-    (battle.you > 0 ? `<div class="gold-earn">👑 ＋${earned} GOLD<div class="gold-lines">${kills}ぴき × ${GOLD_PER_KILL} GOLD</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
+    (battle.you > 0 ? `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${kills}ぴき × ${perKill} GOLD（${battle.grade.key} ×${gm}）</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🏰 王国を見る</button>`;
   renderProfile();
   $("#battleAgain").onclick = () => renderBattle();
