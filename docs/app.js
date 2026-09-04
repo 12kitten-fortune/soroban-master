@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-13"; // 最新反映の確認用
+const BUILD = "2026-09-04-14"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -302,6 +302,24 @@ function correctSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(8
 function wrongSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(196, t, 0.3, "square", 0.13); tone(184, t, 0.3, "square", 0.1); } catch {} } // ブブー
 function neutralSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(680, t, 0.08, "triangle", 0.1); } catch {} }
 function fanfareSnd() { try { const c = ensureAudio(), t = c.currentTime;[523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.1, 0.18, "sine", 0.17)); } catch {} }
+// GOLDをもらったとき「チャリーン♪」
+function coinSnd(delay = 0) {
+  try {
+    const c = ensureAudio(), t = c.currentTime + delay;
+    [1568, 2093, 2637].forEach((f, i) => tone(f, t + i * 0.045, 0.20, "triangle", 0.12));
+    tone(3136, t + 0.10, 0.34, "sine", 0.06); // きらめきの余韻
+  } catch {}
+}
+// 大きな達成のとき「タタタ ターン！」
+function bigFanfareSnd() {
+  try {
+    const c = ensureAudio(), t = c.currentTime;
+    [[523, 0], [523, 0.13], [523, 0.26], [659, 0.40], [784, 0.58]].forEach(([f, d]) => tone(f, t + d, 0.15, "triangle", 0.16));
+    tone(1047, t + 0.76, 0.55, "triangle", 0.18);
+    tone(784, t + 0.76, 0.55, "sine", 0.10);  // 和音でぶ厚く
+    tone(659, t + 0.76, 0.55, "sine", 0.08);
+  } catch {}
+}
 function makeSoroban(root, onChange) {
   const state = Array.from({ length: COLS }, () => ({ heaven: false, earth: 0 }));
   const refs = []; let typed = ""; root.innerHTML = "";
@@ -499,7 +517,7 @@ function renderShop() {
   }).join("");
   $$("#shopList .buy").forEach((b) => b.addEventListener("click", () => {
     const r = buyBuild(b.dataset.key);
-    if (r.ok) { fanfareSnd(); $("#shopMsg").textContent = `「${BUILD_DEFS[b.dataset.key].name}」を建てました！🎉`; renderKingdom(); }
+    if (r.ok) { coinSnd(); fanfareSnd(); $("#shopMsg").textContent = `「${BUILD_DEFS[b.dataset.key].name}」を建てました！🎉`; renderKingdom(); }
     else if (r.why === "gold") $("#shopMsg").textContent = `GOLDが ${r.need} たりません。そろばんを練習しよう！`;
   }));
 }
@@ -751,8 +769,9 @@ function finishSession() {
     msg += `<div class="gold-earn">👑 <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   }
   renderProfile();
-  if (session.timed) { (session.correct * cf.per >= cf.pass) ? fanfareSnd() : wrongSnd(); }
+  if (session.timed) { (session.correct * cf.per >= cf.pass) ? bigFanfareSnd() : wrongSnd(); }
   else if (completed) fanfareSnd();
+  if (completed) coinSnd(1.0); // GOLD獲得の「チャリーン」はファンファーレの後に
   msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🏰 王国を見る</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
   const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
   const face = passed ? "king_celebrate.png" : "king_wave.png";
@@ -889,7 +908,7 @@ function finishRoutine() {
   let earned = sectionsGold + completeBonus;
   const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
   addGold(earned);
-  renderProfile(); fanfareSnd();
+  renderProfile(); bigFanfareSnd(); coinSnd(1.4);
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
@@ -1123,7 +1142,7 @@ $("#flashForm").addEventListener("submit", (e) => {
     else {
       const score = flashExam.correct * 10, pass = score >= 140;
       let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
-      if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; fanfareSnd(); }
+      if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; bigFanfareSnd(); }
       logSession("flash", 20, flashExam.correct, 0);
       const { g } = goldForSection({ correct: flashExam.correct, N: 20, bestUpdated: false, completed: true });
       let earned = g + (pass ? 50 : 0); const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
@@ -1217,7 +1236,7 @@ function battleAnswer(val) {
     if (battle.hp <= 0) {                       // たおした → たおれてから次の敵が登場
       battle.kills++; battle.hp = ENEMY_HP;
       battleFx(`たおした！ ＋${GOLD_PER_KILL} GOLD`, "kill");
-      correctSnd();
+      correctSnd(); coinSnd(0.18); // 1匹たおす＝GOLD獲得なのでチャリーン
       const img = $("#enemyImg"); img.className = "down";
       setTimeout(() => { if (!battle || !battle.running) return; img.className = "appear"; setEnemyIdentity(); }, 650);
     } else {                                    // こうげき命中
@@ -1241,7 +1260,8 @@ function finishBattle(reason) {
   let earned = kills * GOLD_PER_KILL;
   const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
   if (battle.you > 0) { touchStreak(); addGold(earned); }
-  (kills > 0 && !isOut) ? fanfareSnd() : neutralSnd();
+  (kills > 0 && !isOut) ? bigFanfareSnd() : neutralSnd();
+  if (battle.you > 0 && earned > 0) coinSnd(kills > 0 && !isOut ? 1.4 : 0.2);
   const badge = (kills > 0 && !isOut) ? '<span class="badge-chip win">WIN！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   const face = (kills > 0 && !isOut) ? "king_celebrate.png" : "king_wave.png";
   const verdict = isOut
