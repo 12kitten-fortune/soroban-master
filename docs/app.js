@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-8"; // 最新反映の確認用
+const BUILD = "2026-09-04-9"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1130,7 +1130,7 @@ const ENEMIES = [
   { file: "enemy_rock.png", name: "いわゴーレム" },
   { file: "enemy_tree.png", name: "モリのぬし" },
   { file: "enemy_wizard.png", name: "まほうつかい" },
-  { file: "enemy_mimic.png", name: "ミミック" },
+  { file: "enemy_box.png", name: "たからばこオバケ" },
 ];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
