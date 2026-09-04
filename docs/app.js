@@ -10,31 +10,48 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-2"; // 最新反映の確認用
+const BUILD = "2026-09-04-3"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
+// 珠算：日本計算技能連盟の公式サンプル問題(PDF)から抽出した実測値。
+// ★=サンプルで確認、△=サンプルが無く前後から補間（7級・10級・1〜2級のみとり）
 const SOROBAN_STD = {
-  1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } },
-  2: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 3 }, wari: { D: 7, dv: 3, qd: 4 } },
-  3: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } },
-  4: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 2, qd: 3 } },
-  5: { mitori: { digits: 4, terms: 10 }, kake: { a: 3, b: 3 }, wari: { D: 4, dv: 2, qd: 2 } },
-  6: { mitori: { digits: 3, terms: 10 }, kake: { a: 3, b: 2 }, wari: { D: 4, dv: 2, qd: 2 } },
-  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 3, b: 1 }, wari: { D: 3, dv: 1, qd: 2 } },
-  8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },
-  9: { mitori: { digits: 2, terms: 6 }, kake: { a: 2, b: 1 }, wari: null },
-  10: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },
-  11: { mitori: { digits: 1, terms: 7 }, kake: null, wari: null },
-  12: { mitori: { digits: 1, terms: 6 }, kake: null, wari: null },
-  13: { mitori: { digits: 1, terms: 5 }, kake: null, wari: null },
-  14: { mitori: { digits: 1, terms: 4 }, kake: null, wari: null },
-  15: { mitori: { digits: 1, terms: 3 }, kake: null, wari: null },
+  1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } }, // かけ★わり★ みとり△
+  2: { mitori: { digits: 6, terms: 10 }, kake: { a: 4, b: 4 }, wari: { D: 7, dv: 3, qd: 4 } }, // かけ★わり★ みとり△
+  3: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } }, // 全て★
+  4: { mitori: { digits: 4, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 2, qd: 3 } }, // 全て★
+  5: { mitori: { digits: 4, terms: 10 }, kake: { a: 3, b: 3 }, wari: { D: 4, dv: 2, qd: 2 } }, // 全て★
+  6: { mitori: { digits: 3, terms: 10 }, kake: { a: 3, b: 2 }, wari: { D: 4, dv: 1, qd: 3 } }, // 全て★
+  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 3, b: 1 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て△（サンプル無し）
+  8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },                    // ★
+  9: { mitori: { digits: 2, terms: 8 }, kake: { a: 2, b: 1 }, wari: null },                    // ★
+  10: { mitori: { digits: 2, terms: 6 }, kake: null, wari: null },                             // △
+  11: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
+  12: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
+  13: { mitori: { digits: 2, terms: 5 }, kake: null, wari: null },                             // ★
+  14: { mitori: { digits: 1, terms: 5 }, kake: null, wari: null },                             // ★
+  15: { mitori: { digits: 1, terms: 5 }, kake: null, wari: null },                             // ★
 };
+// 暗算（みとり暗算）：同じく公式サンプルの実測値。低い級はサンプルどおり ひき算を含めない
 const ANZAN_STD = {
-  10: { digits: 1, terms: 3 }, 9: { digits: 1, terms: 4 }, 8: { digits: 2, terms: 4 }, 7: { digits: 2, terms: 5 },
-  6: { digits: 2, terms: 3 }, 5: { digits: 2, terms: 4 }, 4: { digits: 2, terms: 5 }, 3: { digits: 2, terms: 6 },
-  2: { digits: 2, terms: 8 }, 1: { digits: 3, terms: 5 },
+  10: { digits: 1, terms: 3, sub: false }, //★
+  9: { digits: 1, terms: 4, sub: false },  //★
+  8: { digits: 2, terms: 3, sub: false },  //★
+  7: { digits: 2, terms: 3, sub: false },  //★
+  6: { digits: 2, terms: 4, sub: true },   //△（7級と5級から補間）
+  5: { digits: 2, terms: 5, sub: true },   //★
+  4: { digits: 2, terms: 6, sub: true },   //★
+  3: { digits: 2, terms: 8, sub: true },   //★
+  2: { digits: 2, terms: 12, sub: true },  //★
+  1: { digits: 3, terms: 5, sub: true },   //★
+};
+// 11〜20級は公式に無い当アプリ独自の入門ラダー
+const ANZAN_LOW = {
+  20: { digits: 1, terms: 2, sub: false }, 19: { digits: 1, terms: 2, sub: false }, 18: { digits: 1, terms: 2, sub: false },
+  17: { digits: 1, terms: 2, sub: false }, 16: { digits: 1, terms: 2, sub: false }, 15: { digits: 1, terms: 3, sub: false },
+  14: { digits: 1, terms: 3, sub: false }, 13: { digits: 1, terms: 3, sub: false }, 12: { digits: 1, terms: 3, sub: false },
+  11: { digits: 1, terms: 3, sub: false },
 };
 // フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。1個あたり約0.8秒で一定）
 const FLASH_STD = {
@@ -86,11 +103,12 @@ function difficulty(g, subj) {
       if (subj === "mitori") return s.mitori;
       if (subj === "kake") return s.kake;
       if (subj === "wari") return s.wari;
-      if (subj === "anzan") return { digits: Math.max(1, s.mitori.digits - 1), terms: s.mitori.terms }; // 暗算は珠算見取より1桁やさしめ
+      if (subj === "anzan") return ANZAN_STD[k] || ANZAN_LOW[k]; // 暗算は暗算検定の基準を使う（見取からの代用をやめた）
       if (subj === "flash") return k <= 10 ? FLASH_STD[k] : FLASH_KYU_LOW[k];
     } else {
       // 16〜20級：導入（見取・暗算・フラッシュのみ）
-      if (subj === "mitori" || subj === "anzan") return { digits: 1, terms: 2 };
+      if (subj === "anzan") return ANZAN_LOW[k];
+      if (subj === "mitori") return { digits: 1, terms: 2 };
       if (subj === "flash") return FLASH_KYU_LOW[k];
       return null;
     }
@@ -106,9 +124,10 @@ function difficulty(g, subj) {
 
 /* ============================================================ ジェネレータ */
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
-function genMitori({ digits, terms }) {
+function genMitori({ digits, terms, sub }) {
   const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（連盟サンプルに準拠してやさしめに）
-  const allowSub = terms >= 5; const nums = []; let total = 0;
+  // sub:false の級（暗算7〜10級など）はサンプルどおり ひき算を出さない
+  const allowSub = sub !== false && terms >= 3; const nums = []; let total = 0;
   for (let i = 0; i < terms; i++) {
     const v = randDigits(lo + Math.floor(Math.random() * (D - lo + 1)));
     if (i > 0 && allowSub && Math.random() < 0.35 && total > v) { nums.push(-v); total -= v; }
