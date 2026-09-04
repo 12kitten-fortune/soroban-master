@@ -21,6 +21,7 @@
           <button class="nav" data-view="today">🔥 本日の練習</button>
           <button class="nav" data-view="kingdom">🏰 王国</button>
           <button class="nav" data-view="battle">⚔️ たいせん</button>
+          <button class="nav" data-view="craft">🧱 クラフト</button>
           <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
           <div class="nav-sec">学習する</div>
           <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
@@ -242,6 +243,25 @@
             <p class="sub">そろばんを練習してGOLDを貯めると、王国が発展します。（GOLDは学習でだけ手に入ります）</p>
             <div id="shopList" class="shop-list"></div>
             <div id="shopMsg" class="shop-msg sub"></div>
+          </div>
+        </div>
+
+        <!-- クラフト（ブロックを積んで自分の世界を作る） -->
+        <div id="view-craft" class="view hidden">
+          <div class="card kingdom-head">
+            <div class="kd-title">🧱 クラフト王国　<span class="kd-lv">おいたブロック <span id="craftCount">0</span></span></div>
+            <div class="gold-badge"><img class="ico-coin" src="assets/coin.png" alt="" /> <span id="craftGold">0</span> GOLD</div>
+          </div>
+          <div class="card">
+            <div class="craft-tools">
+              <button id="craftMode" class="pill">🧱 おく</button>
+              <button id="craftUndo" class="pill">↩ ひとつ もどす</button>
+              <button id="craftReset" class="ghost">さらちに もどす</button>
+              <span id="craftMsg" class="craft-msg"></span>
+            </div>
+            <div class="craft-stage"><canvas id="craftCanvas" width="720" height="560"></canvas></div>
+            <p class="sub">マスを クリックすると ブロックを つめるよ。GOLDは そろばんの れんしゅうで たまる。</p>
+            <div id="craftPalette" class="craft-palette"></div>
           </div>
         </div>
 

@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-21"; // 最新反映の確認用
+const BUILD = "2026-09-04-22"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -419,7 +419,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", battle: "たいせん", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", kingdom: "王国", battle: "たいせん", craft: "クラフト王国", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
 function showView(v) {
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
@@ -429,6 +429,7 @@ function showView(v) {
   if (v === "today") renderToday();
   if (v === "kingdom") renderKingdom();
   if (v === "battle") renderBattle();
+  if (v === "craft") renderCraft();
   if (v === "parent") renderParent();
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
@@ -1325,6 +1326,212 @@ $("#battleStart").addEventListener("click", startBattle);
 $("#battleForm").addEventListener("submit", (e) => { e.preventDefault(); battleAnswer(parseInt($("#battleInput").value, 10)); });
 $("#battleAnswerBtn").addEventListener("click", () => battleAnswer(currentBattleAnswer()));
 $("#battleQuit").addEventListener("click", () => { if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null; renderBattle(); });
+
+
+/* ============================================================ クラフト王国（ブロックを積んで自分の世界を作る）
+   ブロックの絵もキャラクターも、すべてこのコードで描いている。既存ゲームの絵・素材は一切使っていない。
+   借りているのは「マス目に積んで世界を作る」という遊び方の枠組みだけ。 */
+const CRAFT_KEY = "soroban_craft";
+const CW_ = 14, CH_ = 14, CD_ = 7;               // 世界の広さ(14x14)と積める高さ(7段)
+const CTW = 46, CTH = 23, CBH = 27;                 // ひし形タイルの幅・高さ・ブロックの厚み
+// 色はすべてオリジナル。top=上面 / lf=左面 / rt=右面
+const BLOCKS = [
+  null,
+  { n: "くさ", top: "#7ec95e", lf: "#54913c", rt: "#69ad4b", cost: 1, pat: "grass" },
+  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "sand" },
+  { n: "いし", top: "#bcbcc2", lf: "#83838a", rt: "#a0a0a7", cost: 2, pat: "stone" },
+  { n: "き", top: "#c9954f", lf: "#8c6432", rt: "#ab7c41", cost: 2, pat: "wood" },
+  { n: "すな", top: "#ecdca8", lf: "#b8a476", rt: "#d3c090", cost: 2, pat: "sand" },
+  { n: "みず", top: "#63b4ee", lf: "#3573ad", rt: "#4a93cf", cost: 3, pat: "water" },
+  { n: "はっぱ", top: "#57ab3e", lf: "#356d26", rt: "#448b32", cost: 3, pat: "grass" },
+  { n: "レンガ", top: "#c9604c", lf: "#8d3d2f", rt: "#ab4e3d", cost: 4, pat: "brick" },
+  { n: "こおり", top: "#c7ecff", lf: "#84b6d4", rt: "#a6d2ea", cost: 5, pat: "water" },
+  { n: "きん", top: "#f4dc8d", lf: "#b8912a", rt: "#d9b445", cost: 8, pat: "gold" },
+];
+let craft = null, craftSel = 1, craftBreak = false, craftHist = [], craftPick = null, craftHover = -1;
+function loadCraft() {
+  const d = JSON.parse(localStorage.getItem(CRAFT_KEY) || "null");
+  if (d && d.w === CW_ && d.cells && d.cells.length === CW_ * CH_ * CD_) return d;
+  const cells = new Array(CW_ * CH_ * CD_).fill(0);
+  for (let y = 0; y < CH_; y++) for (let x = 0; x < CW_; x++) cells[(0 * CH_ + y) * CW_ + x] = 1; // さらち＝草
+  return { w: CW_, h: CH_, d: CD_, cells, hx: 6, hy: 6 };
+}
+const saveCraft = () => localStorage.setItem(CRAFT_KEY, JSON.stringify(craft));
+const cIdx = (x, y, z) => (z * CH_ + y) * CW_ + x;
+const cGet = (x, y, z) => craft.cells[cIdx(x, y, z)];
+function colTop(x, y) { for (let z = CD_ - 1; z >= 0; z--) if (cGet(x, y, z)) return z; return -1; }
+const isoX = (x, y) => (x - y) * (CTW / 2) + 360;
+const isoY = (x, y, z) => (x + y) * (CTH / 2) - z * CBH + 80;
+
+/* ---- ブロックを描く（上面の模様も手描き） ---- */
+function facePath(g, px, py) {
+  g.beginPath(); g.moveTo(px, py - CTH / 2); g.lineTo(px + CTW / 2, py);
+  g.lineTo(px, py + CTH / 2); g.lineTo(px - CTW / 2, py); g.closePath();
+}
+function topPattern(g, b, px, py) {
+  g.save(); facePath(g, px, py); g.clip(); g.globalAlpha = .45;
+  if (b.pat === "grass") {
+    g.strokeStyle = b.lf; g.lineWidth = 1.6;
+    for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(px + i * 8, py - 3); g.lineTo(px + i * 8 + 2, py + 3); g.stroke(); }
+  } else if (b.pat === "stone") {
+    g.fillStyle = b.lf;
+    [[-9, -2], [4, -4], [10, 3], [-3, 5]].forEach(function (p) { g.beginPath(); g.arc(px + p[0], py + p[1], 2.2, 0, 7); g.fill(); });
+  } else if (b.pat === "wood") {
+    g.strokeStyle = b.lf; g.lineWidth = 1.4;
+    for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(px - CTW / 2 + 5, py + i * 6); g.lineTo(px + CTW / 2 - 5, py + i * 6); g.stroke(); }
+  } else if (b.pat === "brick") {
+    g.strokeStyle = "#f0d3c6"; g.lineWidth = 1.3;
+    g.beginPath(); g.moveTo(px - CTW / 2, py); g.lineTo(px + CTW / 2, py); g.stroke();
+    g.beginPath(); g.moveTo(px, py - CTH / 2); g.lineTo(px, py + CTH / 2); g.stroke();
+  } else if (b.pat === "water") {
+    g.strokeStyle = "#ffffff"; g.lineWidth = 1.6;
+    g.beginPath(); g.moveTo(px - 12, py + 2); g.quadraticCurveTo(px - 4, py - 3, px + 4, py + 2);
+    g.quadraticCurveTo(px + 10, py + 6, px + 14, py + 2); g.stroke();
+  } else if (b.pat === "sand") {
+    g.fillStyle = b.lf;
+    [[-8, 0], [2, -3], [8, 4], [-2, 4]].forEach(function (p) { g.beginPath(); g.arc(px + p[0], py + p[1], 1.4, 0, 7); g.fill(); });
+  } else if (b.pat === "gold") {
+    g.globalAlpha = .85; g.fillStyle = "#fffbe6";
+    g.beginPath(); g.moveTo(px - 6, py - 2); g.lineTo(px - 1, py - 6); g.lineTo(px + 3, py - 1); g.lineTo(px - 2, py + 3); g.closePath(); g.fill();
+  }
+  g.restore();
+}
+function drawBlock(g, x, y, z, id, hi) {
+  const b = BLOCKS[id]; if (!b) return;
+  const px = isoX(x, y), py = isoY(x, y, z);
+  g.fillStyle = b.lf;                                  // 左の側面
+  g.beginPath(); g.moveTo(px - CTW / 2, py); g.lineTo(px, py + CTH / 2);
+  g.lineTo(px, py + CTH / 2 + CBH); g.lineTo(px - CTW / 2, py + CBH); g.closePath(); g.fill();
+  g.fillStyle = b.rt;                                  // 右の側面
+  g.beginPath(); g.moveTo(px + CTW / 2, py); g.lineTo(px, py + CTH / 2);
+  g.lineTo(px, py + CTH / 2 + CBH); g.lineTo(px + CTW / 2, py + CBH); g.closePath(); g.fill();
+  g.fillStyle = hi ? "#ffffff" : b.top;                // 上面
+  facePath(g, px, py); g.fill();
+  if (!hi) topPattern(g, b, px, py);
+  g.strokeStyle = "rgba(0,0,0,.22)"; g.lineWidth = 1; facePath(g, px, py); g.stroke();
+}
+/* ---- キャラクター（オリジナル：まる顔＋王冠のたんけん家） ---- */
+function drawHero(g, x, y, z) {
+  const px = isoX(x, y), py = isoY(x, y, z) - 4;
+  g.save();
+  g.fillStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.ellipse(px, py + 5, 13, 6, 0, 0, 7); g.fill(); // かげ
+  g.fillStyle = "#16305c"; g.fillRect(px - 9, py - 22, 18, 24);                                    // からだ
+  g.fillStyle = "#d4af37"; g.fillRect(px - 9, py - 10, 18, 4);                                     // ベルト
+  g.fillStyle = "#ffdcb5"; g.beginPath(); g.arc(px, py - 29, 11, 0, 7); g.fill();                  // かお
+  g.fillStyle = "#2b2b2b";
+  g.beginPath(); g.arc(px - 4, py - 30, 1.8, 0, 7); g.fill();
+  g.beginPath(); g.arc(px + 4, py - 30, 1.8, 0, 7); g.fill();
+  g.strokeStyle = "#2b2b2b"; g.lineWidth = 1.4;
+  g.beginPath(); g.arc(px, py - 26, 4, 0.25, Math.PI - 0.25); g.stroke();
+  g.fillStyle = "#f0d98a";                                                                          // 王冠
+  g.beginPath(); g.moveTo(px - 10, py - 37); g.lineTo(px - 6, py - 44); g.lineTo(px - 2, py - 38);
+  g.lineTo(px + 2, py - 44); g.lineTo(px + 6, py - 38); g.lineTo(px + 10, py - 44);
+  g.lineTo(px + 10, py - 35); g.lineTo(px - 10, py - 35); g.closePath(); g.fill();
+  g.strokeStyle = "#b8912a"; g.lineWidth = 1; g.stroke();
+  g.restore();
+}
+/* ---- 世界を描く（奥から手前へ塗り重ねる） ---- */
+function drawCraft() {
+  const cv = $("#craftCanvas"); if (!cv || !cv.getContext) return;
+  const g = cv.getContext("2d"); if (!g) return;
+  const sky = g.createLinearGradient(0, 0, 0, cv.height);
+  sky.addColorStop(0, "#bfe3ff"); sky.addColorStop(1, "#eaf7ff");
+  g.fillStyle = sky; g.fillRect(0, 0, cv.width, cv.height);
+  if (!craftPick) craftPick = document.createElement("canvas");
+  craftPick.width = cv.width; craftPick.height = cv.height;
+  const pg = craftPick.getContext ? craftPick.getContext("2d") : null;
+  if (pg) pg.clearRect(0, 0, craftPick.width, craftPick.height);
+  for (let s = 0; s <= (CW_ - 1) + (CH_ - 1); s++) {
+    for (let x = 0; x < CW_; x++) {
+      const y = s - x; if (y < 0 || y >= CH_) continue;
+      for (let z = 0; z < CD_; z++) { const id = cGet(x, y, z); if (id) drawBlock(g, x, y, z, id, false); }
+      const tz = colTop(x, y), col = x + y * CW_;
+      if (pg) { // 当たり判定：列の一番上の面を、その列の番号の色で塗る
+        pg.fillStyle = "rgb(" + ((col + 1) & 255) + "," + (((col + 1) >> 8) & 255) + ",7)";
+        facePath(pg, isoX(x, y), isoY(x, y, tz < 0 ? 0 : tz)); pg.fill();
+      }
+      if (craftHover === col && tz >= 0) { g.save(); g.globalAlpha = .38; drawBlock(g, x, y, tz, cGet(x, y, tz), true); g.restore(); }
+      if (craft.hx === x && craft.hy === y) drawHero(g, x, y, tz < 0 ? 0 : tz);
+    }
+  }
+}
+function craftPickAt(ev) {
+  const cv = $("#craftCanvas"); if (!cv || !cv.getBoundingClientRect) return null;
+  const r = cv.getBoundingClientRect();
+  const x = Math.round((ev.clientX - r.left) * (cv.width / r.width));
+  const y = Math.round((ev.clientY - r.top) * (cv.height / r.height));
+  const pg = craftPick && craftPick.getContext ? craftPick.getContext("2d") : null; if (!pg) return null;
+  if (x < 0 || y < 0 || x >= cv.width || y >= cv.height) return null;
+  const d = pg.getImageData(x, y, 1, 1).data;
+  if (d[2] !== 7) return null;
+  const col = (d[0] | (d[1] << 8)) - 1; if (col < 0) return null;
+  return { x: col % CW_, y: Math.floor(col / CW_), col: col };
+}
+function craftMsg(t) {
+  $("#craftMsg").textContent = t;
+  clearTimeout(craftMsg._t);
+  craftMsg._t = setTimeout(function () { $("#craftMsg").textContent = ""; }, 2400);
+}
+function craftClick(ev) {
+  const p = craftPickAt(ev); if (!p) return;
+  const tz = colTop(p.x, p.y);
+  if (craftBreak) {
+    if (tz < 0) return craftMsg("これいじょう けずれないよ");
+    const id = cGet(p.x, p.y, tz);
+    craft.cells[cIdx(p.x, p.y, tz)] = 0;
+    craftHist.push({ t: "b", x: p.x, y: p.y, z: tz, id: id });
+    addGold(Math.floor(BLOCKS[id].cost / 2));           // こわすと半分もどる
+    clickSnd();
+  } else {
+    const nz = tz + 1;
+    if (nz >= CD_) return craftMsg("これいじょう つめないよ");
+    const b = BLOCKS[craftSel], have = getGold();
+    if (have < b.cost) return craftMsg("GOLDが " + (b.cost - have) + " たりない…そろばんで かせごう！");
+    craft.cells[cIdx(p.x, p.y, nz)] = craftSel;
+    craftHist.push({ t: "p", x: p.x, y: p.y, z: nz, id: craftSel });
+    addGold(-b.cost); coinSnd();
+  }
+  if (craftHist.length > 200) craftHist.shift();
+  saveCraft(); renderCraft();
+}
+function renderCraftPalette() {
+  let html = "";
+  for (let i = 1; i < BLOCKS.length; i++) {
+    const b = BLOCKS[i];
+    html += '<button class="blk' + (i === craftSel ? " sel" : "") + '" data-b="' + i + '">' +
+      '<span class="blk-chip" style="--t:' + b.top + ';--l:' + b.lf + ';--r:' + b.rt + '"></span>' +
+      '<span class="blk-n">' + b.n + '</span><span class="blk-c">' + b.cost + 'G</span></button>';
+  }
+  $("#craftPalette").innerHTML = html;
+  $$("#craftPalette .blk").forEach(function (el) {
+    el.addEventListener("click", function () { craftSel = +el.dataset.b; craftBreak = false; renderCraft(); });
+  });
+}
+function renderCraft() {
+  if (!craft) craft = loadCraft();
+  $("#craftGold").textContent = getGold().toLocaleString();
+  $("#craftCount").textContent = craft.cells.filter(function (v) { return v; }).length;
+  $("#craftMode").textContent = craftBreak ? "⛏ こわす" : "🧱 おく";
+  $("#craftMode").className = "pill" + (craftBreak ? " danger" : "");
+  renderCraftPalette(); drawCraft(); renderGoldPill();
+}
+$("#craftCanvas").addEventListener("click", craftClick);
+$("#craftCanvas").addEventListener("mousemove", function (ev) {
+  const p = craftPickAt(ev), c = p ? p.col : -1;
+  if (c !== craftHover) { craftHover = c; drawCraft(); }
+});
+$("#craftCanvas").addEventListener("mouseleave", function () { craftHover = -1; drawCraft(); });
+$("#craftMode").addEventListener("click", function () { craftBreak = !craftBreak; renderCraft(); });
+$("#craftUndo").addEventListener("click", function () {
+  const a = craftHist.pop(); if (!a) return craftMsg("もどせる ものが ないよ");
+  if (a.t === "p") { craft.cells[cIdx(a.x, a.y, a.z)] = 0; addGold(BLOCKS[a.id].cost); }   // 置いたのを取り消し→GOLDを返す
+  else { craft.cells[cIdx(a.x, a.y, a.z)] = a.id; addGold(-Math.floor(BLOCKS[a.id].cost / 2)); } // 壊したのを取り消し
+  saveCraft(); renderCraft();
+});
+$("#craftReset").addEventListener("click", function () {
+  if (!confirm("ぜんぶ けして さらちに もどす？（つかったGOLDは もどりません）")) return;
+  localStorage.removeItem(CRAFT_KEY); craft = null; craftHist = []; renderCraft();
+});
 
 /* ---------- キーボード ---------- */
 document.addEventListener("keydown", (e) => {

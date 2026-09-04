@@ -393,3 +393,21 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .pill.gold .ico-coin { height: 22px; vertical-align: -6px; }
 .gold-earn { animation: goldPop .45s ease; }
 @keyframes goldPop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ============================================================ クラフト王国 */
+.craft-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.craft-tools .pill { cursor: pointer; font-weight: 700; }
+.craft-tools .pill.danger { background: linear-gradient(180deg,#ffd9d2,#f3a894); border-color: #c0392b; color: #7a2318; }
+.craft-msg { color: #c0392b; font-weight: 700; font-size: 14px; min-height: 20px; }
+.craft-stage { background: linear-gradient(180deg,#bfe3ff,#eaf7ff); border: 2px solid var(--line); border-radius: 14px; overflow: auto; }
+#craftCanvas { display: block; margin: 0 auto; max-width: 100%; height: auto; cursor: pointer; }
+.craft-palette { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.blk { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px 6px; color: #2b2b2b; }
+.blk.sel { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(22,48,92,.15); background: #f3f7ff; }
+.blk-n { font-size: 12px; font-weight: 700; }
+.blk-c { font-size: 11px; color: #8a7560; }
+/* パレットのブロック見本も、画像を使わずCSSだけで立体的に描く */
+.blk-chip { width: 30px; height: 30px; position: relative; display: block; }
+.blk-chip::before { content: ""; position: absolute; left: 0; top: 6px; width: 15px; height: 18px; background: var(--l); clip-path: polygon(0 0, 100% 25%, 100% 100%, 0 75%); }
+.blk-chip::after { content: ""; position: absolute; right: 0; top: 6px; width: 15px; height: 18px; background: var(--r); clip-path: polygon(0 25%, 100% 0, 100% 75%, 0 100%); }
+.blk-chip { background: linear-gradient(var(--t), var(--t)) no-repeat center top / 30px 12px; }
