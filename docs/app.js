@@ -319,17 +319,21 @@ const SFX_LIST = {
 };
 const sfxBuf = {};                       // 読みこんだ音
 let sfxTried = false;
+// 音の材料は mp3 / ogg / wav のどれでもよい（Kenney など海外の素材は ogg・wav が多い）
+const SFX_EXT = ["mp3", "ogg", "wav"];
+function sfxTry(name, k) {
+  if (k >= SFX_EXT.length) return;
+  try {
+    const a = new Audio(SFX_DIR + name + "." + SFX_EXT[k]);
+    a.preload = "auto";
+    a.addEventListener("canplaythrough", function () { if (!sfxBuf[name]) sfxBuf[name] = a; }, { once: true });
+    a.addEventListener("error", function () { sfxTry(name, k + 1); }, { once: true });   // 無ければ 次の形式を試す
+    a.load();
+  } catch (e) { sfxTry(name, k + 1); }
+}
 function sfxPreload() {
   if (sfxTried) return; sfxTried = true;
-  Object.values(SFX_LIST).forEach(function (n) {
-    try {
-      const a = new Audio(SFX_DIR + n + ".mp3");
-      a.preload = "auto";
-      a.addEventListener("canplaythrough", function () { sfxBuf[n] = a; }, { once: true });
-      a.addEventListener("error", function () { }, { once: true });
-      a.load();
-    } catch (e) { }
-  });
+  Object.values(SFX_LIST).forEach(function (n) { sfxTry(n, 0); });
 }
 // 材料があれば それを、無ければ 合成音を鳴らす
 function sfx(name, fallback) {
@@ -364,12 +368,16 @@ function bgmPlay(name) {
   if (!bgmOn || !soundOn) return bgmStop();
   if (bgmName === name && bgmEl) return;
   bgmStop();
-  try {
-    bgmEl = new Audio(SFX_DIR + name + ".mp3");
+  let ext = 0;
+  const tryNext = function () {
+    if (ext >= SFX_EXT.length) { bgmEl = null; bgmName = ""; return; }
+    bgmEl = new Audio(SFX_DIR + name + "." + SFX_EXT[ext++]);
     bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
-    bgmEl.addEventListener("error", function () { bgmEl = null; bgmName = ""; }, { once: true });
-    const pr = bgmEl.play();
-    if (pr && pr.catch) pr.catch(function () { });
+    bgmEl.addEventListener("error", tryNext, { once: true });
+    const p2 = bgmEl.play(); if (p2 && p2.catch) p2.catch(function () { });
+  };
+  try {
+    tryNext();
     let v = 0;                                  // そっと 音を上げる
     const id = setInterval(function () {
       if (!bgmEl) return clearInterval(id);
