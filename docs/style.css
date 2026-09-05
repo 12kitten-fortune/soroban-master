@@ -473,3 +473,34 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 #stepsRow { margin-top: 10px; }
 /* 数字は右そろえの縦一列（そろばんの見取算と同じ並び）。字の大きさはJSが行数に合わせて決める */
 .problem { max-width: 100%; overflow-wrap: anywhere; }
+
+/* ============================================================ レオ王のおねがい（クラフトの目的） */
+.craft-quest { background: linear-gradient(180deg,#fffaf0,#fff6e4); border: 2px solid var(--royal-gold); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; text-align: left; }
+.cq-h { font-weight: 800; color: var(--navy); font-size: 15px; }
+.cq-h small { font-weight: 400; color: #8a7560; font-size: 12px; }
+.cq-tip { font-size: 13px; color: #6b5a45; margin: 2px 0 6px; }
+.cq-items { display: flex; gap: 14px; flex-wrap: wrap; }
+.cq-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.cq-n { font-weight: 700; min-width: 68px; }
+.cq-bar { display: block; width: 90px; height: 9px; background: #ece3d2; border-radius: 999px; overflow: hidden; }
+.cq-bar i { display: block; height: 100%; background: linear-gradient(90deg,#e0b84a,#d4af37); }
+.cq-c { color: #8a7560; font-variant-numeric: tabular-nums; }
+.cq-badges { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.cq-badge { font-size: 12px; font-weight: 700; background: #fff2cf; border: 1px solid var(--royal-gold); border-radius: 999px; padding: 2px 10px; }
+
+/* ============================================================ クラフトを画面いっぱいに（没入モード） */
+body.craft-full .sidebar, body.craft-full .topbar, body.craft-full .kingdom-head,
+body.craft-full #view-craft .sub, body.craft-full .era.locked { display: none; }
+body.craft-full .content { padding: 0; max-width: none; }
+body.craft-full #view-craft .card { margin: 0; border: none; border-radius: 0; box-shadow: none; padding: 8px 10px; }
+body.craft-full .craft-tools { margin-bottom: 6px; }
+body.craft-full .craft-quest { margin-bottom: 6px; padding: 6px 12px; }
+body.craft-full .craft-stage { border-radius: 8px; }
+/* 道具・おねがい・パレットのぶんを引いた、のこり全部を世界にあてる */
+body.craft-full #craftCanvas { height: calc(100vh - 240px); }
+body.craft-full .craft-palette { max-height: 108px; overflow-y: auto; margin-top: 6px; }
+body.craft-full .era { margin: 4px 0; padding: 4px 8px; }
+body.craft-full .blk { padding: 4px 8px 3px; }
+body.craft-full .blk-chip { width: 28px; height: 28px; }
+/* ブラウザの全画面のときは、まわりが黒くならないように背景を塗る */
+#view-craft:fullscreen { background: var(--bg); overflow: auto; }

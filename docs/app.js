@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-28"; // 最新反映の確認用
+const BUILD = "2026-09-05-29"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1527,6 +1527,18 @@ const BLOCKS = [
   { n: "ひかり", top: "#fff6c9", lf: "#ddcb72", rt: "#efe19b", cost: 32, pat: "glow", era: 5 },
   { n: "にじいろ", top: "#ffb3d1", lf: "#5fbcd0", rt: "#ffd36b", cost: 40, pat: "rainbow", era: 5 },
 ];
+/* ---- レオ王のお願い（クラフトの目的）----
+   ごほうびは「称号」だけ。GOLDは学習からしか出さない方針を守る。
+   お願いは時代（＝合格した級）で開いていくので、勉強が進むほど作れる物が増える。 */
+const QUESTS = [
+  { id: "hut", era: 0, n: "はじめての 家", ttl: "木こり見習い", need: { "き": 4, "はっぱ": 6 }, tip: "き で 柱を たてて、はっぱ で 屋根に しよう" },
+  { id: "lake", era: 0, n: "いずみを つくる", ttl: "水の まもり人", need: { "みず": 8, "いし": 6 }, tip: "いし で ふちを かこんで、中に みず を 入れよう" },
+  { id: "brick", era: 1, n: "レンガの 小屋", ttl: "古代の 大工", need: { "レンガ": 12, "わら": 6 }, tip: "レンガ の かべに、わら の 屋根" },
+  { id: "road", era: 2, n: "まちの 大通り", ttl: "まちの 設計士", need: { "いた": 10, "いしレンガ": 14 }, tip: "いしレンガ を まっすぐ ならべて 道に しよう" },
+  { id: "gold", era: 3, n: "金の モニュメント", ttl: "黄金の 建築家", need: { "きん": 6, "大理石": 10 }, tip: "大理石 の 台の上に きん を つみ上げよう" },
+  { id: "tower", era: 4, n: "ガラスの タワー", ttl: "現代の 名工", need: { "てつ": 12, "ガラス": 10, "コンクリート": 14 }, tip: "たかく たかく。ガラス は うしろが すけるよ" },
+  { id: "castle", era: 5, n: "ひかりの 城", ttl: "そろばん王国の 王", need: { "クリスタル": 8, "ひかり": 6, "にじいろ": 4 }, tip: "さいごの お願い。きみだけの 城を" },
+];
 // ブロックは名前で引く（並び順を変えても地形づくりが壊れないように）
 const bId = (n) => { for (let i = 1; i < BLOCKS.length; i++) if (BLOCKS[i].n === n) return i; return 0; };
 const B_GRASS = bId("くさ"), B_DIRT = bId("つち"), B_STONE = bId("いし"), B_WOOD = bId("き"),
@@ -1592,7 +1604,7 @@ function makeWorld() {
       if (hash2(x * 3 + z, y * 11) > 0.22) put(x, y, z, B_LEAF);
     });
   });
-  return { w: CW_, h: CH_, d: CD_, cells, hx: CW_ >> 1, hy: CH_ >> 1, built: 0 };
+  return { w: CW_, h: CH_, d: CD_, cells, hx: CW_ >> 1, hy: CH_ >> 1, built: 0, placed: {}, done: [] };
 }
 /* ---- 保存（同じ値の連続をまとめて小さくする） ---- */
 function packCells(a) { const o = []; let v = a[0], c = 0; for (let i = 0; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v, c); v = a[i]; c = 1; } } o.push(v, c); return o; }
@@ -1619,14 +1631,14 @@ function loadCraft() {
       const cells = unpackCells(d.rle);
       if (cells.length === CW_ * CH_ * CD_) {
         if (d.v !== 2) fixOldWorld(cells);
-        return { w: CW_, h: CH_, d: CD_, cells, hx: d.hx, hy: d.hy, built: d.built || 0 };
+        return { w: CW_, h: CH_, d: CD_, cells, hx: d.hx, hy: d.hy, built: d.built || 0, placed: d.placed || {}, done: d.done || [] };
       }
     }
   } catch (e) {}
   return makeWorld();
 }
 function saveCraft() {
-  try { localStorage.setItem(CRAFT_KEY, JSON.stringify({ v: 2, w: CW_, h: CH_, d: CD_, hx: craft.hx, hy: craft.hy, built: craft.built || 0, rle: packCells(craft.cells) })); }
+  try { localStorage.setItem(CRAFT_KEY, JSON.stringify({ v: 2, w: CW_, h: CH_, d: CD_, hx: craft.hx, hy: craft.hy, built: craft.built || 0, placed: craft.placed || {}, done: craft.done || [], rle: packCells(craft.cells) })); }
   catch (e) { craftMsg("ほぞんに しっぱいしました"); }
 }
 const cIdx = (x, y, z) => (z * CH_ + y) * CW_ + x;
@@ -2039,9 +2051,11 @@ function craftClick(ev) {
     if (have < b.cost) return craftMsg("GOLDが " + (b.cost - have) + " たりない…そろばんで かせごう！");
     craft.cells[cIdx(p.x, p.y, nz)] = craftSel;
     craftHist.push({ t: "p", x: p.x, y: p.y, z: nz, id: craftSel }); craft.built = (craft.built || 0) + 1;
+    craft.placed = craft.placed || {}; craft.placed[b.n] = (craft.placed[b.n] || 0) + 1;   // お願いの進み具合
     addGold(-b.cost); coinSnd();
   }
   if (craftHist.length > 300) craftHist.shift();
+  checkQuest();
   saveCraft(); renderCraft();
 }
 function craftCenterOnHero() {
@@ -2074,6 +2088,37 @@ function renderCraftPalette() {
   });
 }
 function craftBuiltCount() { return (craft && craft.built) || 0; }  // 自分で置いた数（地形は数えない）
+/* ---- レオ王のお願い（目的）---- */
+const questDone = (q) => (craft.done || []).indexOf(q.id) >= 0;
+const questHave = (n) => ((craft.placed || {})[n] || 0);
+const questOK = (q) => Object.keys(q.need).every((n) => questHave(n) >= q.need[n]);
+function currentQuest() {
+  const e = myEra();
+  return QUESTS.find((q) => q.era <= e && !questDone(q)) || null;   // いま挑戦できる、いちばん古いお願い
+}
+function checkQuest() {
+  const q = currentQuest(); if (!q || !questOK(q)) return;
+  craft.done = (craft.done || []).concat([q.id]);
+  saveCraft();
+  craftMsg("🎉 「" + q.n + "」 かんせい！ 称号『" + q.ttl + "』を もらった！");
+  try { bigFanfareSnd(); } catch (e) {}
+}
+function renderCraftQuest() {
+  const el = $("#craftQuest"); if (!el) return;
+  const q = currentQuest();
+  const badges = (craft.done || []).map((id) => { const x = QUESTS.find((v) => v.id === id); return x ? `<span class="cq-badge">🏅 ${x.ttl}</span>` : ""; }).join("");
+  if (!q) {
+    el.innerHTML = `<div class="cq-h">👑 レオ王：<b>ぜんぶ かなえてくれた！ ありがとう</b></div><div class="cq-badges">${badges}</div>`;
+    return;
+  }
+  const bars = Object.keys(q.need).map((n) => {
+    const have = Math.min(questHave(n), q.need[n]), pct = Math.round(have / q.need[n] * 100);
+    return `<div class="cq-item"><span class="cq-n">${n}</span>` +
+      `<span class="cq-bar"><i style="width:${pct}%"></i></span><span class="cq-c">${have} / ${q.need[n]}</span></div>`;
+  }).join("");
+  el.innerHTML = `<div class="cq-h">👑 レオ王の おねがい：<b>${q.n}</b>　<small>ごほうびは 称号『${q.ttl}』</small></div>` +
+    `<div class="cq-tip">${q.tip}</div><div class="cq-items">${bars}</div>` + (badges ? `<div class="cq-badges">${badges}</div>` : "");
+}
 function renderCraft() {
   const fresh = !craft;
   if (fresh) craft = loadCraft();
@@ -2086,7 +2131,7 @@ function renderCraft() {
   const el2 = $("#craftEra"); if (el2) el2.textContent = ERAS[myEra()].n;
   $("#craftMode").textContent = craftBreak ? "⛏ こわす" : "🧱 おく";
   $("#craftMode").className = "pill" + (craftBreak ? " danger" : "");
-  renderCraftPalette(); drawCraft(); renderGoldPill();
+  renderCraftQuest(); renderCraftPalette(); drawCraft(); renderGoldPill();
 }
 /* ---- 画面の移動と拡大縮小 ---- */
 function craftZoom(f) { const cv = $("#craftCanvas"); if (!cv) return; const cx = cv.width / 2, cy = cv.height / 2;
@@ -2118,6 +2163,28 @@ $("#craftUndo").addEventListener("click", function () {
 $("#craftReset").addEventListener("click", function () {
   if (!confirm("世界を つくりなおす？（つかったGOLDは もどりません）")) return;
   localStorage.removeItem(CRAFT_KEY); craft = null; craftHist = []; renderCraft(); craftCenterOnHero(); drawCraft();
+});
+/* ---- 画面いっぱいにする（没入モード）----
+   ブラウザの全画面にできればそれを使い、できない環境では画面いっぱいに広げるだけにする。 */
+function craftFullOn() { return document.body.classList.contains("craft-full"); }
+function setCraftFull(on) {
+  document.body.classList.toggle("craft-full", !!on);
+  const b = $("#craftFull"); if (b) b.textContent = on ? "⛶ もどす" : "⛶ 大きくする";
+  setTimeout(function () { if (craft) { resizeCraftCanvas(); drawCraft(); } }, 60);   // 大きさが変わってから描き直す
+}
+$("#craftFull").addEventListener("click", function () {
+  const v = $("#view-craft");
+  if (!craftFullOn()) {
+    setCraftFull(true);
+    if (v.requestFullscreen) v.requestFullscreen().catch(function () {});
+  } else {
+    setCraftFull(false);
+    if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function () {});
+  }
+});
+// Escで全画面を抜けたときも、表示を元に戻す
+document.addEventListener("fullscreenchange", function () {
+  if (!document.fullscreenElement && craftFullOn()) setCraftFull(false);
 });
 // 画面の大きさが変わったら、canvasも作りなおす（ぼやけ防止）
 (function () {
