@@ -3108,30 +3108,24 @@ function pzHasMove(c) {
 /* ---- 1面のはじまり ---- */
 function pzStart(lvNo, items) {
   const lv = pzLevel(lvNo);
-  let cells = pzMakeBoard(lv.kinds);
-  let guard = 0;
-  while (pzFindMatches(cells).hit.size && guard++ < 20) cells = pzMakeBoard(lv.kinds);
-  while (!pzHasMove(cells) && guard++ < 40) cells = pzMakeBoard(lv.kinds);
+  const stage = pzMakeStage(lv);
+  pz = {
+    cells: new Array(PZ_W * PZ_H).fill(null), lv: lv, moves: lv.moves, got: 0, sel: -1,
+    busy: false, done: false, combo: 0, score: 0, floor: stage.floor, block: stage.block,
+  };
+  pzFillBoard(lv.kinds);                       // 箱をよけて、そろっていない盤を作る
+  if (!pzHasMove(pz.cells)) pzReshuffle();     // 動かせる手が無ければ 作り直す
   // 買ったアイテムを 盤に置く
   (items || []).forEach(function (it) {
-    for (let t = 0; t < 60; t++) {
+    for (let t = 0; t < 80; t++) {
       const i = Math.floor(Math.random() * PZ_W * PZ_H);
-      if (cells[i] && !cells[i].sp) {
+      if (pz.cells[i] && !pz.cells[i].sp) {
         const d = PZ_ITEMS.find((q) => q.id === it);
-        cells[i].sp = d ? (d.sp === "rh" ? (Math.random() < 0.5 ? "rh" : "rv") : d.sp) : "rh";
+        pz.cells[i].sp = d ? (d.sp === "rh" ? (Math.random() < 0.5 ? "rh" : "rv") : d.sp) : "rh";
         break;
       }
     }
   });
-  const stage = pzMakeStage(lv);
-  pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0, score: 0,
-         floor: stage.floor, block: stage.block };
-  stage.block.forEach((b, i) => { if (b) pz.cells[i] = null; });     // 箱のマスに 玉は置かない
-  pzFall(pz.cells, lv.kinds);
-  let g2 = 0;
-  while (pzFindMatches(pz.cells).hit.size && g2++ < 25) {
-    pz.cells.forEach((t, i) => { if (t) pz.cells[i] = pzNewTile(PZ_KINDS[Math.floor(Math.random() * lv.kinds)].k); });
-  }
   return pz;
 }
 /* ---- 入れかえ（画面側は 1手ずつ 呼んで アニメーションさせる） ---- */
@@ -3238,9 +3232,38 @@ function pzCascade(swapAt) {
   return { cleared: r.cleared, got: got, before: before };
 }
 // ④ 1手ぶん おわり
+/* 盤に玉を配る。箱のマスは あけたまま、置いたそばから そろわないように 色をえらぶ。
+   （でたらめに置くと ほぼ必ずどこかが そろってしまうので、1マスずつ制約を見て置く） */
+function pzFillBoard(kinds) {
+  const c = pz.cells;
+  const at = (x, y) => { if (!pzIn(x, y)) return null; const j = pzIdx(x, y); return (pz.block && pz.block[j]) ? null : c[j]; };
+  for (let y = 0; y < PZ_H; y++) for (let x = 0; x < PZ_W; x++) {
+    const i = pzIdx(x, y);
+    if (pz.block && pz.block[i]) { c[i] = null; continue; }
+    const bad = {};
+    const l1 = at(x - 1, y), l2 = at(x - 2, y), u1 = at(x, y - 1), u2 = at(x, y - 2), d1 = at(x - 1, y - 1);
+    if (l1 && l2 && l1.k === l2.k) bad[l1.k] = 1;                              // よこ3つ を作らない
+    if (u1 && u2 && u1.k === u2.k) bad[u1.k] = 1;                              // たて3つ を作らない
+    if (l1 && u1 && d1 && l1.k === u1.k && l1.k === d1.k) bad[l1.k] = 1;        // 2×2 を作らない
+    const ok = [];
+    for (let t = 0; t < kinds; t++) if (!bad[PZ_KINDS[t].k]) ok.push(PZ_KINDS[t].k);
+    c[i] = pzNewTile(ok.length ? ok[(Math.random() * ok.length) | 0] : PZ_KINDS[0].k);
+  }
+}
+// 手づまりのときの 並べ直し。動かせる手ができるまで やり直す
+function pzReshuffle() {
+  for (let guard = 0; guard < 30; guard++) {
+    pzFillBoard(pz.lv.kinds);
+    if (pzHasMove(pz.cells)) return true;
+  }
+  return false;
+}
 function pzFinishTurn() {
   pz.moves--;
-  if (!pzHasMove(pz.cells)) pz.cells = pzMakeBoard(pz.lv.kinds);   // 手づまりなら 並べ直す
+  if (!pzHasMove(pz.cells)) {
+    if (pzReshuffle()) { try { pzMsg("手づまり！ ならべ直したよ", "ok"); } catch (e) { } }
+    else pz.moves = 0;                       // どうしても手が無ければ そこで終わりにする（固まらせない）
+  }
   const win = pz.got >= pz.lv.need;
   if (win || pz.moves <= 0) pz.done = win ? "win" : "lose";
   return pz.done;
@@ -3538,6 +3561,7 @@ async function pzUseTool(i) {
   } else { const d = pzLoad(); d.items[id] = stock - 1; pzSave(d); }
   pzArmed = null;
   pz.busy = true;
+  try {
   pzRenderTools(); $("#pzToolTip").textContent = "";
   pzDelay = new Map(); pzFxQ = [];
   const gone = new Set();
@@ -3560,9 +3584,13 @@ async function pzUseTool(i) {
   while (await pzCascadeAnim(i, ++chain)) { if (chain > 30) break; }
   const win = pz.got >= pz.lv.need;
   if (win) pz.done = "win";
-  pz.busy = false;
+  if (!pz.done && !pzHasMove(pz.cells)) {          // 道具のあとに 手づまりでも 固まらない
+    if (pzReshuffle()) { try { pzMsg("手づまり！ ならべ直したよ", "ok"); } catch (e) { } }
+    else { pz.moves = 0; pz.done = "lose"; }
+  }
   pzSync(); pzRenderHud(); pzRenderTools();
   if (pz.done) setTimeout(() => pzFinish(pz.done), 260);
+  } finally { pz.busy = false; }                   // 何があっても 操作できる状態にもどす
   return true;
 }
 /* ---- レオ王の顔（のこり手数で 表情が変わる） ---- */
@@ -3586,6 +3614,7 @@ async function pzTry(a, b) {
     return;
   }
   pz.busy = true; pz.sel = -1;
+  try {
   try { clickSnd(); } catch (e) { }
   pzSync();                     // 入れかえが すべって見える
   await pzWait(150);
@@ -3606,9 +3635,9 @@ async function pzTry(a, b) {
     if (chain > 30) break;
   }
   const done = pzFinishTurn();
-  pz.busy = false;
   pzSync(); pzRenderHud();
   if (done) setTimeout(() => pzFinish(done), 260);
+  } finally { pz.busy = false; }              // 何があっても 操作できる状態にもどす
 }
 function pzAdj(a, b) { return Math.abs(a % PZ_W - b % PZ_W) + Math.abs(((a / PZ_W) | 0) - ((b / PZ_W) | 0)) === 1; }
 /* ---- クリアの ごほうびの儀式（ここが いちばん うれしい所） ---- */
