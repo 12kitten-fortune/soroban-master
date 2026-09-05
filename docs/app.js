@@ -316,6 +316,7 @@ const SFX_DIR = "assets/sfx/";
 const SFX_LIST = {
   click: "click", correct: "correct", wrong: "wrong", coin: "coin",
   pop: "pop", rocket: "rocket", boom: "boom", clear: "clear", levelup: "levelup", star: "star",
+  sparkle: "sparkle",   // 金の星の玉が 消えたとき
 };
 const sfxBuf = {};                       // 読みこんだ音
 let sfxTried = false;
@@ -3277,8 +3278,15 @@ function pzShowFx(o) {
   }
 }
 /* ---- 順番に こわす（ロケットは通った所から、TNTは中心から） ---- */
+// 消えるマスに 金の星の玉が あったか
+function pzHadStar(list) {
+  let hit = false;
+  (list && list.forEach ? list : []).forEach(function (i) { const t = pz.cells[i]; if (t && t.k === "bead") hit = true; });
+  return hit;
+}
 async function pzPlayBlast(gone, delay, fx) {
   (fx || []).forEach((o) => setTimeout(() => pzShowFx(o), o.at || 0));
+  if (pzHadStar(gone)) setTimeout(function () { sfx("sparkle"); }, 120);
   let maxD = 0;
   (gone || []).forEach((i) => {
     const d = (delay && delay.get(i)) || 0;
@@ -3535,6 +3543,7 @@ async function pzCascadeAnim(swapAt, chain) {
     setTimeout(() => pzBurst(i, t.k, r.gone.size > 12 ? 3 : 5), d);
   });
   pzTone(chain * 2, r.big);
+  if (pzHadStar(r.gone)) sfx("sparkle");        // 金の星が 消えたら キラッ
   if (r.big || maxD > 100) pzShake(maxD > 150);
   if (chain >= 2) {
     pzFx(mid < 0 ? 27 : mid, PZ_PRAISE[Math.min(chain, PZ_PRAISE.length - 1)], "pz-praise", 1000);
