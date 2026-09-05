@@ -602,34 +602,63 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   touch-action: none; user-select: none;
 }
 .pz-t {
-  position: absolute; width: var(--pzt); height: var(--pzt);
-  transform: translate(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)));
-  transition: transform .16s ease; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  position: absolute; width: var(--pzt); height: var(--pzt); left: 0; top: 0;
+  transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0);
+  /* 落ちるときに ほんの少し 行きすぎて もどる＝重さが出る */
+  transition: transform .26s cubic-bezier(.34, 1.32, .5, 1);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; will-change: transform;
 }
 .pz-t::before {
-  content: ""; position: absolute; inset: 3px; border-radius: 10px;
-  background: linear-gradient(160deg, var(--g), var(--c)); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.15);
+  content: ""; position: absolute; inset: 3px; border-radius: 11px;
+  background: linear-gradient(160deg, var(--g), var(--c));
+  box-shadow: inset 0 -4px 0 rgba(0,0,0,.22), inset 0 2px 0 rgba(255,255,255,.35), 0 2px 3px rgba(0,0,0,.18);
+  transition: transform .12s ease, box-shadow .12s ease;
 }
+.pz-t:active::before { transform: scale(.92); }
 .pz-t.k-spade { --c: #3a3a46; --g: #5b5b6b; }
 .pz-t.k-heart { --c: #d0342c; --g: #e8695f; }
 .pz-t.k-dia { --c: #2b6fd0; --g: #5d9ae8; }
 .pz-t.k-club { --c: #2e7d5b; --g: #54a97f; }
 .pz-t.k-bead { --c: #d99a2b; --g: #f0c364; }
-.pz-mark { position: relative; color: #fff; font-size: calc(var(--pzt) * .5); font-style: normal; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
-.pz-mark.sm { font-size: 20px; }
+.pz-mark { position: relative; color: #fff; font-size: calc(var(--pzt) * .5); font-style: normal; line-height: 1; text-shadow: 0 2px 3px rgba(0,0,0,.35); }
+.pz-mark.sm { font-size: 20px; text-shadow: none; }
 .pz-mark.sm.k-spade { color: #3a3a46; } .pz-mark.sm.k-heart { color: #d0342c; }
 .pz-mark.sm.k-dia { color: #2b6fd0; } .pz-mark.sm.k-club { color: #2e7d5b; }
-/* そろばん玉：五角形（ひし形をつぶした形） */
-.pz-bead { position: relative; width: calc(var(--pzt) * .56); height: calc(var(--pzt) * .42);
-  background: linear-gradient(180deg,#fff3cf,#c98b1e); clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
-  box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+/* そろばん玉：五角形 */
+.pz-bead { position: relative; width: calc(var(--pzt) * .58); height: calc(var(--pzt) * .44);
+  background: linear-gradient(180deg,#fff6d8,#c4841a); clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
+  box-shadow: 0 2px 3px rgba(0,0,0,.3); }
 .pz-bead.sm { width: 20px; height: 15px; display: inline-block; vertical-align: -2px; }
-.pz-t.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff; border-radius: 12px; box-shadow: 0 0 0 3px var(--royal-gold); }
-.pz-t.sp::before { box-shadow: inset 0 0 0 3px #fff8d8, inset 0 -3px 0 rgba(0,0,0,.18); }
-.pz-sp { position: absolute; font-size: calc(var(--pzt) * .42); filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+/* えらんでいる玉：ふわっと ゆれる */
+.pz-t.sel::after { content: ""; position: absolute; inset: 1px; border: 3px solid #fff; border-radius: 13px; box-shadow: 0 0 0 3px var(--royal-gold), 0 0 14px rgba(212,175,55,.7); }
+.pz-t.sel { animation: pzsel .6s ease-in-out infinite alternate; z-index: 3; }
+@keyframes pzsel { to { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt) - 3px), 0) scale(1.06); } }
+/* だめな入れかえ：首をふる */
+.pz-t.no { animation: pzno .38s ease; z-index: 4; }
+@keyframes pzno {
+  0%,100% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0); }
+  25% { transform: translate3d(calc(var(--x) * var(--pzt) - 6px), calc(var(--y) * var(--pzt)), 0) rotate(-6deg); }
+  75% { transform: translate3d(calc(var(--x) * var(--pzt) + 6px), calc(var(--y) * var(--pzt)), 0) rotate(6deg); }
+}
+/* アイテムに変わった玉：ぽんっと出る */
+.pz-t.sp::before { box-shadow: inset 0 0 0 3px #fff8d8, inset 0 -4px 0 rgba(0,0,0,.2), 0 0 12px rgba(255,225,140,.9); }
+.pz-t.born::before { animation: pzborn .4s cubic-bezier(.2,1.6,.4,1); }
+@keyframes pzborn { 0% { transform: scale(.4) rotate(-20deg); } 100% { transform: scale(1) rotate(0); } }
+.pz-sp { position: absolute; font-size: calc(var(--pzt) * .44); filter: drop-shadow(0 1px 1px rgba(0,0,0,.45)); }
 .pz-sp.pz-v { transform: rotate(-90deg); }
-.pz-t.pop { animation: pzpop .22s ease forwards; }
-@keyframes pzpop { to { transform: translate(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt))) scale(1.35); opacity: 0; } }
+/* 消える：ふくらんで はじける */
+.pz-t.pop { animation: pzpop .19s ease-in forwards; animation-delay: var(--d, 0ms); z-index: 2; }
+@keyframes pzpop {
+  35% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(1.28); filter: brightness(1.6); }
+  100% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(.1); opacity: 0; }
+}
+/* 盤ゆれ */
+.pz-board.shake { animation: pzsh .28s ease; }
+.pz-board.shake-b { animation: pzsh .4s ease; }
+@keyframes pzsh { 0%,100% { transform: translate(0,0); } 20% { transform: translate(-4px,2px); } 45% { transform: translate(4px,-2px); } 70% { transform: translate(-2px,1px); } }
+/* れんさ の文字 */
+.pz-msg.show { animation: pzmsg .5s cubic-bezier(.2,1.6,.4,1); font-size: 20px; }
+@keyframes pzmsg { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
 /* 結果 */
 .pz-over { margin-top: 14px; text-align: center; background: #fffdf6; border: 2px solid var(--royal-gold); border-radius: 14px; padding: 16px; }
 .pz-res-h { font-size: 22px; font-weight: 800; }

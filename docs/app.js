@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-35"; // 最新反映の確認用
+const BUILD = "2026-09-05-36"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2588,12 +2588,12 @@ function pzBlast(c, i, out, fired) {
   else if (t.sp === "bomb") for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (pzIn(x + dx, y + dy)) add(pzIdx(x + dx, y + dy));
 }
 /* ---- 消す → 上から落ちてくる → 空きを埋める（1回ぶん） ---- */
-function pzResolveOnce(c, kinds, swapAt) {
+// 消える所と 生まれるアイテムを 調べるだけ（まだ盤は変えない＝アニメーションのため）
+function pzCollect(c, swapAt) {
   const { hit, runs } = pzFindMatches(c);
   if (!hit.size) return null;
   const gone = new Set(hit);
   hit.forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, gone); });   // 巻きこまれたアイテムも発動
-  // 4つ以上そろったら アイテムが生まれる
   const made = [];
   runs.forEach((r) => {
     if (r.len < 4) return;
@@ -2602,15 +2602,17 @@ function pzResolveOnce(c, kinds, swapAt) {
   });
   const counts = {};
   gone.forEach((i) => { if (c[i]) counts[c[i].k] = (counts[c[i].k] || 0) + 1; });
-  gone.forEach((i) => { c[i] = null; });
-  made.forEach((mk) => { if (!c[mk.at]) c[mk.at] = { id: pzUid++, k: mk.k, sp: mk.sp, born: true }; });
-  // 落とす
-  for (let x = 0; x < PZ_W; x++) {
-    let w = PZ_H - 1;
-    for (let y = PZ_H - 1; y >= 0; y--) { const t = c[pzIdx(x, y)]; if (t) { c[pzIdx(x, y)] = null; c[pzIdx(x, w)] = t; w--; } }
-    for (let y = w; y >= 0; y--) c[pzIdx(x, y)] = pzNewTile(PZ_KINDS[Math.floor(Math.random() * kinds)].k);
-  }
-  return { cleared: gone.size, counts: counts, made: made.length };
+  return { gone: gone, made: made, counts: counts, big: gone.size >= 6 };
+}
+// 実際に消して、アイテムを置く
+function pzApply(c, r) {
+  r.gone.forEach((i) => { c[i] = null; });
+  r.made.forEach((mk) => { if (!c[mk.at]) c[mk.at] = { id: pzUid++, k: mk.k, sp: mk.sp, born: true }; });
+}
+function pzResolveOnce(c, kinds, swapAt) {
+  const r = pzCollect(c, swapAt); if (!r) return null;
+  pzApply(c, r); pzFall(c, kinds);
+  return { cleared: r.gone.size, counts: r.counts, made: r.made.length };
 }
 /* ---- 入れかえられるか（そろう形になるときだけ 入れかえられる） ---- */
 function pzWouldMatch(c, a, b) {
@@ -2709,66 +2711,122 @@ function pzStars() {
   return left >= 0.4 ? 3 : left >= 0.2 ? 2 : 1;
 }
 
-/* ---------- パズルの画面 ---------- */
+/* ---------- パズルの画面（玉ひとつずつに DOM を持たせて なめらかに動かす） ---------- */
 let pzBuy = {};                 // 買ったアイテム { rocket:1, bomb:0 }
+let pzNodes = {};               // 玉のid → 画面の要素
 const pzWait = (ms) => new Promise((r) => setTimeout(r, ms));
-function pzTileHTML(t, i) {
-  const kd = PZ_KINDS.find((k) => k.k === t.k) || PZ_KINDS[0];
-  const x = i % PZ_W, y = Math.floor(i / PZ_W);
-  const sp = t.sp === "bomb" ? '<b class="pz-sp">💣</b>' : t.sp === "rh" ? '<b class="pz-sp">🚀</b>' : t.sp === "rv" ? '<b class="pz-sp pz-v">🚀</b>' : "";
-  const face = t.k === "bead" ? '<i class="pz-bead"></i>' : '<i class="pz-mark">' + kd.s + '</i>';
-  return '<div class="pz-t k-' + t.k + (t.sp ? " sp" : "") + '" data-i="' + i + '" style="--x:' + x + ';--y:' + y + '">' + face + sp + '</div>';
+const pzKind = (k) => PZ_KINDS.find((x) => x.k === k) || PZ_KINDS[0];
+function pzFaceHTML(t) {
+  const face = t.k === "bead" ? '<i class="pz-bead"></i>' : '<i class="pz-mark">' + pzKind(t.k).s + "</i>";
+  const sp = t.sp === "bomb" ? '<b class="pz-sp">💣</b>' : t.sp ? '<b class="pz-sp' + (t.sp === "rv" ? " pz-v" : "") + '">🚀</b>' : "";
+  return face + sp;
 }
-function pzRenderBoard(pop) {
+/* 盤面を いまの状態に合わせる。位置だけ変えるので CSS が動きを付けてくれる */
+function pzSync(instant) {
   const el = $("#pzBoard"); if (!el || !pz) return;
-  el.innerHTML = pz.cells.map((t, i) => (t ? pzTileHTML(t, i) : "")).join("");
-  if (pz.sel >= 0) { const s = el.querySelector('[data-i="' + pz.sel + '"]'); if (s) s.classList.add("sel"); }
-  if (pop && pop.length) pop.forEach((i) => { const d = el.querySelector('[data-i="' + i + '"]'); if (d) d.classList.add("pop"); });
+  const seen = {};
+  pz.cells.forEach((t, i) => {
+    if (!t) return;
+    seen[t.id] = 1;
+    const x = i % PZ_W, y = Math.floor(i / PZ_W);
+    let n = pzNodes[t.id];
+    if (!n) {
+      n = document.createElement("div");
+      n.className = "pz-t k-" + t.k + (t.sp ? " sp" : "");
+      n.innerHTML = pzFaceHTML(t);
+      n.style.setProperty("--x", x);
+      n.style.setProperty("--y", instant ? y : y - PZ_H);   // 上から 落ちてくる
+      el.appendChild(n);
+      pzNodes[t.id] = n;
+      if (!instant) requestAnimationFrame(() => requestAnimationFrame(() => n.style.setProperty("--y", y)));
+    } else {
+      n.style.setProperty("--x", x);
+      n.style.setProperty("--y", y);
+      if (t.sp && !n.classList.contains("sp")) { n.classList.add("sp", "born"); n.innerHTML = pzFaceHTML(t); }
+    }
+    n.dataset.i = i;
+    n.classList.toggle("sel", pz.sel === i);
+  });
+  Object.keys(pzNodes).forEach((id) => { if (!seen[id]) { pzNodes[id].remove(); delete pzNodes[id]; } });
+}
+function pzResetBoard() {
+  const el = $("#pzBoard"); if (el) el.innerHTML = "";
+  pzNodes = {};
+  pzSync(true);
 }
 function pzRenderHud() {
   if (!pz) return;
-  const kd = PZ_KINDS.find((k) => k.k === pz.lv.target) || PZ_KINDS[0];
-  const face = pz.lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + '</i>';
-  $("#pzGoal").innerHTML = face + ' <b>' + Math.min(pz.got, pz.lv.need) + ' / ' + pz.lv.need + '</b>';
-  $("#pzMoves").innerHTML = 'のこり <b>' + Math.max(0, pz.moves) + '</b> 手';
+  const kd = pzKind(pz.lv.target);
+  const face = pz.lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
+  $("#pzGoal").innerHTML = face + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>";
+  $("#pzMoves").innerHTML = "のこり <b>" + Math.max(0, pz.moves) + "</b> 手";
   $("#pzLv").textContent = "レベル " + pz.lv.n;
   const bar = $("#pzBar"); if (bar) bar.style.width = Math.min(100, Math.round(pz.got / pz.lv.need * 100)) + "%";
 }
 function pzMsg(t, cls) {
   const el = $("#pzMsg"); if (!el) return;
-  el.textContent = t; el.className = "pz-msg " + (cls || "");
-  clearTimeout(pzMsg._t); pzMsg._t = setTimeout(() => { el.textContent = ""; }, 1600);
+  el.textContent = t; el.className = "pz-msg " + (cls || "") + " show";
+  clearTimeout(pzMsg._t); pzMsg._t = setTimeout(() => { el.className = "pz-msg"; }, 1200);
 }
-/* ---- マスをえらぶ・入れかえる ---- */
-async function pzPick(i) {
+function pzShake(strong) {
+  const b = $("#pzBoard"); if (!b) return;
+  b.classList.remove("shake", "shake-b"); void b.offsetWidth;
+  b.classList.add(strong ? "shake-b" : "shake");
+  setTimeout(() => b.classList.remove("shake", "shake-b"), 400);
+}
+/* ---- 1回ぶん消す（消える→落ちる を見せる） ---- */
+async function pzCascadeAnim(swapAt, chain) {
+  const r = pzCollect(pz.cells, swapAt);
+  if (!r) return null;
+  r.gone.forEach((i) => {
+    const t = pz.cells[i]; if (!t) return;
+    const n = pzNodes[t.id]; if (!n) return;
+    n.classList.add("pop");
+    n.style.setProperty("--d", (Math.abs(i % PZ_W - (swapAt != null ? swapAt % PZ_W : 4)) * 12) + "ms");
+  });
+  if (r.big) pzShake(false);
+  try { chain > 1 ? correctSnd() : clickSnd(); } catch (e) { }
+  await pzWait(chain > 1 ? 150 : 175);
+  pzApply(pz.cells, r);
+  pzFall(pz.cells, pz.lv.kinds);
+  pz.got += r.counts[pz.lv.target] || 0;
+  pzSync();
+  pzRenderHud();
+  await pzWait(200);
+  return r;
+}
+/* ---- 玉をえらぶ・入れかえる ---- */
+async function pzTry(a, b) {
   if (!pz || pz.busy || pz.done) return;
-  if (pz.sel < 0) { pz.sel = i; pzRenderBoard(); return; }
-  if (pz.sel === i) { pz.sel = -1; pzRenderBoard(); return; }
-  const a = pz.sel, b = i;
-  pz.sel = -1;
   const s = pzBeginSwap(a, b);
-  if (!s.ok) { pzMsg(s.why || "そこは 入れかえられないよ", "ng"); pzRenderBoard(); return; }
-  pz.busy = true;
-  clickSnd();
-  pzRenderBoard();
+  if (!s.ok) {
+    // だめな入れかえは その場で 首をふる
+    [a, b].forEach((i) => { const t = pz.cells[i]; const n = t && pzNodes[t.id]; if (n) { n.classList.add("no"); setTimeout(() => n.classList.remove("no"), 380); } });
+    pz.sel = -1; pzSync();
+    return;
+  }
+  pz.busy = true; pz.sel = -1;
+  try { clickSnd(); } catch (e) { }
+  pzSync();                     // 入れかえが すべって見える
   await pzWait(150);
   const f = pzFireSpecials(a, b);
-  if (f) { pzRenderBoard(f.gone); try { bigFanfareSnd(); } catch (e) { } await pzWait(240); pzRenderBoard(); pzRenderHud(); await pzWait(120); }
-  let chain = 0, r;
-  while ((r = pzCascade(b)) !== null) {
-    chain++;
-    pzRenderBoard();
-    pzRenderHud();
+  if (f) {
+    pzShake(true);
+    try { bigFanfareSnd(); } catch (e) { }
+    pzSync(); pzRenderHud();
+    await pzWait(220);
+  }
+  let chain = 0;
+  while (await pzCascadeAnim(b, ++chain)) {
     if (chain >= 2) pzMsg(chain + "れんさ！", "ok");
-    try { chain > 1 ? correctSnd() : clickSnd(); } catch (e) { }
-    await pzWait(230);
     if (chain > 30) break;
   }
   const done = pzFinishTurn();
   pz.busy = false;
-  pzRenderBoard(); pzRenderHud();
-  if (done) pzFinish(done);
+  pzSync(); pzRenderHud();
+  if (done) setTimeout(() => pzFinish(done), 260);
 }
+function pzAdj(a, b) { return Math.abs(a % PZ_W - b % PZ_W) + Math.abs(((a / PZ_W) | 0) - ((b / PZ_W) | 0)) === 1; }
 /* ---- 1面の終わり ---- */
 function pzFinish(done) {
   const d = pzLoad(), st = pzStars();
@@ -2780,54 +2838,53 @@ function pzFinish(done) {
     pzSave(d);
     try { bigFanfareSnd(); } catch (e) { }
     msg = '<div class="pz-res-h ok">🎉 レベル ' + pz.lv.n + ' クリア！</div>' +
-      '<div class="pz-stars">' + "★".repeat(st) + "☆".repeat(3 - st) + '</div>' +
-      '<div class="sub">のこり ' + pz.moves + ' 手</div>';
+      '<div class="pz-stars">' + '<span>★</span>'.repeat(st) + "☆".repeat(3 - st) + "</div>" +
+      '<div class="sub">のこり ' + pz.moves + " 手</div>";
   } else {
     try { wrongSnd(); } catch (e) { }
-    msg = '<div class="pz-res-h ng">手数ぎれ…</div><div class="sub">あと ' + Math.max(0, pz.lv.need - pz.got) + ' こ だったね</div>';
+    msg = '<div class="pz-res-h ng">手数ぎれ…</div><div class="sub">あと ' + Math.max(0, pz.lv.need - pz.got) + " こ だったね</div>";
   }
   const g = getGold();
   msg += '<div class="pz-res-btns">' +
-    (g >= PZ_PLAY_COST ? '<button id="pzAgain">▶ ' + (done === "win" ? "つぎの レベル" : "もう一度") + '（' + PZ_PLAY_COST + 'G）</button>' :
-      '<div class="sub">GOLDが たりない。そろばんで かせごう！</div>') +
+    (g >= PZ_PLAY_COST ? '<button id="pzAgain">▶ ' + (done === "win" ? "つぎの レベル" : "もう一度") + "（" + PZ_PLAY_COST + "G）</button>"
+      : '<div class="sub">GOLDが たりない。そろばんで かせごう！</div>') +
     ' <button id="pzHome" class="ghost">やめる</button></div>';
   $("#pzOver").innerHTML = msg;
   $("#pzOver").classList.remove("hidden");
   const ag = $("#pzAgain"); if (ag) ag.onclick = () => { pz = null; renderPuzzle(); };
   $("#pzHome").onclick = () => { pz = null; renderPuzzle(); };
 }
-/* ---- あそぶ前の画面（レベルと アイテム） ---- */
+/* ---- あそぶ前の画面 ---- */
 function pzRenderLobby() {
   const d = pzLoad(), lv = pzLevel(d.lv), g = getGold();
-  const kd = PZ_KINDS.find((k) => k.k === lv.target) || PZ_KINDS[0];
-  const face = lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + '</i>';
+  const kd = pzKind(lv.target);
+  const face = lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
   const items = PZ_ITEMS.map((it) => {
     const n = pzBuy[it.id] || 0;
-    return '<div class="pz-item"><span class="pz-em">' + it.em + '</span><span class="pz-in"><b>' + it.n + '</b><small>' + it.tip + '</small></span>' +
-      '<span class="pz-ic">' + it.cost + 'G</span>' +
-      '<button class="pz-buy" data-it="' + it.id + '"' + (g < it.cost ? " disabled" : "") + '>＋</button>' +
-      '<span class="pz-have">' + (n ? "×" + n : "") + '</span></div>';
+    return '<div class="pz-item"><span class="pz-em">' + it.em + '</span><span class="pz-in"><b>' + it.n + "</b><small>" + it.tip + "</small></span>" +
+      '<span class="pz-ic">' + it.cost + "G</span>" +
+      '<button class="pz-buy" data-it="' + it.id + '"' + (g < it.cost ? " disabled" : "") + ">＋</button>" +
+      '<span class="pz-have">' + (n ? "×" + n : "") + "</span></div>";
   }).join("");
   const buyCost = Object.keys(pzBuy).reduce((a, k) => a + (pzBuy[k] || 0) * (PZ_ITEMS.find((i) => i.id === k) || {}).cost, 0);
   const total = PZ_PLAY_COST + buyCost;
   const stars = [];
   for (let i = Math.max(1, d.lv - 4); i < d.lv; i++) stars.push('<span class="pz-past">' + i + "：" + "★".repeat(d.stars[i] || 0) + "</span>");
   $("#pzLobby").innerHTML =
-    '<div class="pz-lv-big">レベル <b>' + lv.n + '</b></div>' +
-    '<div class="pz-goal-big">' + face + ' を <b>' + lv.need + '</b> こ　／　<b>' + lv.moves + '</b> 手 いない</div>' +
+    '<div class="pz-lv-big">レベル <b>' + lv.n + "</b></div>" +
+    '<div class="pz-goal-big">' + face + " を <b>" + lv.need + "</b> こ　／　<b>" + lv.moves + "</b> 手 いない</div>" +
     (stars.length ? '<div class="pz-past-row">' + stars.join("") + "</div>" : "") +
     '<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>' + items +
-    '<div class="pz-total">つかう GOLD：<b>' + total + '</b>　（もっている ' + g.toLocaleString() + '）</div>' +
+    '<div class="pz-total">つかう GOLD：<b>' + total + "</b>　（もっている " + g.toLocaleString() + "）</div>" +
     (g >= total ? '<button id="pzGo" class="big-cta">▶ はじめる</button>'
-      : '<div class="pz-need">GOLDが ' + (total - g) + ' たりない。そろばんの れんしゅうで かせごう！</div>') +
+      : '<div class="pz-need">GOLDが ' + (total - g) + " たりない。そろばんの れんしゅうで かせごう！</div>") +
     '<p class="sub">※ パズルでは GOLDは 増えません。GOLDが 増えるのは そろばんの れんしゅうと ランキングの ごほうびだけ。</p>';
   $$("#pzLobby .pz-buy").forEach((b) => {
     b.onclick = () => {
       const it = PZ_ITEMS.find((i) => i.id === b.dataset.it);
       const cur = Object.keys(pzBuy).reduce((a, k) => a + (pzBuy[k] || 0) * (PZ_ITEMS.find((i) => i.id === k) || {}).cost, 0);
       if (getGold() < PZ_PLAY_COST + cur + it.cost) return pzMsg("GOLDが たりないよ", "ng");
-      pzBuy[it.id] = (pzBuy[it.id] || 0) + 1;
-      if (pzBuy[it.id] > 3) pzBuy[it.id] = 3;
+      pzBuy[it.id] = Math.min(3, (pzBuy[it.id] || 0) + 1);
       pzRenderLobby();
     };
   });
@@ -2851,17 +2908,45 @@ function renderPuzzle() {
   ov.classList.add("hidden"); ov.innerHTML = "";
   if (!pz || pz.done) {
     lob.classList.remove("hidden"); brd.classList.add("hidden");
+    pzNodes = {}; const b = $("#pzBoard"); if (b) b.innerHTML = "";
     pzRenderLobby();
   } else {
     lob.classList.add("hidden"); brd.classList.remove("hidden");
-    pzRenderBoard(); pzRenderHud();
+    pzResetBoard(); pzRenderHud();
   }
   renderGoldPill();
 }
-$("#pzBoard").addEventListener("click", function (ev) {
-  const t = ev.target.closest ? ev.target.closest(".pz-t") : null;
-  if (t) pzPick(+t.dataset.i);
-});
+/* ---- 指でなぞって入れかえる（ロイヤルマッチと同じ感じ） ---- */
+(function () {
+  const el = $("#pzBoard"); if (!el) return;
+  let from = -1, prev = -1, sx = 0, sy = 0, moved = false;
+  const cellOf = (ev) => { const t = ev.target.closest ? ev.target.closest(".pz-t") : null; return t ? +t.dataset.i : -1; };
+  el.addEventListener("pointerdown", (ev) => {
+    if (!pz || pz.busy || pz.done) return;
+    const i = cellOf(ev); if (i < 0) return;
+    prev = pz.sel; from = i; sx = ev.clientX; sy = ev.clientY; moved = false;
+    pz.sel = i; pzSync();
+  });
+  el.addEventListener("pointermove", (ev) => {
+    if (from < 0 || moved || !pz || pz.busy) return;
+    const dx = ev.clientX - sx, dy = ev.clientY - sy;
+    if (Math.abs(dx) < 14 && Math.abs(dy) < 14) return;
+    moved = true;
+    const x = from % PZ_W, y = (from / PZ_W) | 0;
+    let nx = x, ny = y;
+    if (Math.abs(dx) > Math.abs(dy)) nx += dx > 0 ? 1 : -1; else ny += dy > 0 ? 1 : -1;
+    const f = from; from = -1; prev = -1;
+    if (!pzIn(nx, ny)) { pz.sel = -1; pzSync(); return; }
+    pzTry(f, pzIdx(nx, ny));                    // なぞった向きへ 入れかえ
+  });
+  el.addEventListener("pointerup", () => {
+    if (from < 0 || moved) { from = -1; return; }
+    const i = from; from = -1;
+    if (prev >= 0 && prev !== i && pzAdj(prev, i)) { pzTry(prev, i); return; }   // 2回タップでも 入れかえ
+    prev = -1;
+  });
+  el.addEventListener("pointercancel", () => { from = -1; });
+})();
 $("#pzQuit").addEventListener("click", function () {
   if (pz && !pz.done && !confirm("やめる？（つかった GOLDは もどりません）")) return;
   pz = null; renderPuzzle();
