@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-40"; // 最新反映の確認用
+const BUILD = "2026-09-05-41"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2525,10 +2525,46 @@ const PZ_ITEMS = [
 function pzLevel(n) {
   const kinds = n < 4 ? 4 : 5;                                   // はじめは4種、4面目から5種
   const target = PZ_KINDS[(n - 1) % kinds].k;                    // 集める絵がらは 面ごとに かわる
-  const need = 18 + Math.floor((n - 1) * 2.5);
   const moves = Math.max(18, 30 - Math.floor((n - 1) * 0.6));
-  return { n, kinds, target, need, moves };
+  // 仕掛けの面と ふつうの面を 交互に（3面目で草、5面目で箱がはじめて出る）
+  const kind = n <= 2 ? "color" : ["grass", "color", "box", "color"][(n - 3) % 4];
+  if (kind === "grass") {
+    const need = Math.min(34, 8 + n * 2);
+    return { n, kinds, target, need, moves, goal: "grass", grass: need, box: 0 };
+  }
+  if (kind === "box") {
+    const need = Math.min(14, 3 + Math.floor(n / 2));
+    return { n, kinds, target, need, moves, goal: "box", grass: 0, box: need };
+  }
+  return { n, kinds, target, need: 18 + Math.floor((n - 1) * 2.5), moves, goal: "color", grass: 0, box: 0 };
 }
+/* ---- 仕掛け（障害物）----
+   草：玉が その上で消えると はがれる（動きは じゃましない）
+   木箱：となりで そろうと こわれる（1回）。石の箱は 2回いる。玉は通りぬけられない */
+const PZ_BLOCK = { box: { n: "木箱", hp: 1 }, stone: { n: "石の箱", hp: 2 } };
+function pzMakeStage(lv) {
+  const floor = new Array(PZ_W * PZ_H).fill(0), block = new Array(PZ_W * PZ_H).fill(null);
+  if (lv.grass) {                                   // 草は 下のほうに かたまりで
+    let put = 0, guard = 0;
+    while (put < lv.grass && guard++ < 500) {
+      const x = Math.floor(Math.random() * PZ_W), y = 2 + Math.floor(Math.random() * (PZ_H - 2));
+      const i = pzIdx(x, y); if (floor[i]) continue;
+      floor[i] = 1; put++;
+    }
+  }
+  if (lv.box) {                                     // 箱は ばらばらに（上2段には置かない＝詰まないように）
+    let put = 0, guard = 0;
+    while (put < lv.box && guard++ < 500) {
+      const x = Math.floor(Math.random() * PZ_W), y = 2 + Math.floor(Math.random() * (PZ_H - 3));
+      const i = pzIdx(x, y); if (block[i]) continue;
+      const stone = lv.n >= 9 && Math.random() < 0.35;
+      block[i] = { t: stone ? "stone" : "box", hp: stone ? 2 : 1 };
+      put++;
+    }
+  }
+  return { floor, block };
+}
+const pzBlocked = (i) => !!(pz && pz.block && pz.block[i]);
 const pzLoad = () => { try { return JSON.parse(localStorage.getItem(PZ_KEY) || "null") || { lv: 1, stars: {}, best: 0, plays: 0 }; } catch (e) { return { lv: 1, stars: {}, best: 0, plays: 0 }; } };
 const pzSave = (d) => { try { localStorage.setItem(PZ_KEY, JSON.stringify(d)); } catch (e) { } };
 
@@ -2745,7 +2781,34 @@ function pzCollect(c, swapAt) {
   pzDelay = keepD; pzFxQ = keepQ;
   const counts = {};
   gone.forEach((i) => { if (c[i]) counts[c[i].k] = (counts[c[i].k] || 0) + 1; });
-  return { gone: gone, made: made, counts: counts, big: gone.size >= 6, delay: delay, fx: fx };
+  const hit = pzHitStage(gone);
+  return { gone: gone, made: made, counts: counts, big: gone.size >= 6, delay: delay, fx: fx, grass: hit.grass, broke: hit.broke, dmg: hit.dmg };
+}
+/* 消えたマスから、草をはがし、となりの箱にダメージを与える */
+function pzHitStage(gone) {
+  const out = { grass: 0, broke: 0, dmg: [] };
+  if (!pz || !pz.floor) return out;
+  const seen = {};
+  gone.forEach((i) => {
+    if (pz.floor[i]) { pz.floor[i] = 0; out.grass++; }
+    const x = i % PZ_W, y = (i / PZ_W) | 0;
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach((d) => {
+      const nx = x + d[0], ny = y + d[1]; if (!pzIn(nx, ny)) return;
+      const j = pzIdx(nx, ny); if (!pz.block[j] || seen[j]) return;
+      seen[j] = 1;                                   // 1回の消しで 1ダメージまで
+      pz.block[j].hp--;
+      out.dmg.push(j);
+      if (pz.block[j].hp <= 0) { pz.block[j] = null; out.broke++; }
+    });
+  });
+  return out;
+}
+// 目あてに かぞえる数（色あつめ／草はがし／箱こわし）
+function pzGotFrom(r) {
+  if (!pz || !pz.lv) return 0;
+  if (pz.lv.goal === "grass") return r.grass || 0;
+  if (pz.lv.goal === "box") return r.broke || 0;
+  return (r.counts && r.counts[pz.lv.target]) || 0;
 }
 // 実際に消して、アイテムを置く
 function pzApply(c, r) {
@@ -2755,10 +2818,11 @@ function pzApply(c, r) {
 function pzResolveOnce(c, kinds, swapAt) {
   const r = pzCollect(c, swapAt); if (!r) return null;
   pzApply(c, r); pzFall(c, kinds);
-  return { cleared: r.gone.size, counts: r.counts, made: r.made.length };
+  return { cleared: r.gone.size, counts: r.counts, made: r.made.length, grass: r.grass, broke: r.broke };
 }
 /* ---- 入れかえられるか（そろう形になるときだけ 入れかえられる） ---- */
 function pzWouldMatch(c, a, b) {
+  if (!c[a] || !c[b]) return false;                    // 箱のマスは 動かせない
   const t = c[a]; c[a] = c[b]; c[b] = t;
   const ok = pzFindMatches(c).hit.size > 0 || (c[a] && c[a].sp) || (c[b] && c[b].sp);
   const t2 = c[a]; c[a] = c[b]; c[b] = t2;
@@ -2790,7 +2854,15 @@ function pzStart(lvNo, items) {
       }
     }
   });
-  pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0, score: 0 };
+  const stage = pzMakeStage(lv);
+  pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0, score: 0,
+         floor: stage.floor, block: stage.block };
+  stage.block.forEach((b, i) => { if (b) pz.cells[i] = null; });     // 箱のマスに 玉は置かない
+  pzFall(pz.cells, lv.kinds);
+  let g2 = 0;
+  while (pzFindMatches(pz.cells).hit.size && g2++ < 25) {
+    pz.cells.forEach((t, i) => { if (t) pz.cells[i] = pzNewTile(PZ_KINDS[Math.floor(Math.random() * lv.kinds)].k); });
+  }
   return pz;
 }
 /* ---- 入れかえ（画面側は 1手ずつ 呼んで アニメーションさせる） ---- */
@@ -2815,11 +2887,14 @@ function pzPlanSpecials(a, b) {
   return { gone: Array.from(gone), delay: delay, fx: fx, label: label };
 }
 function pzApplyPlan(plan) {
-  let got = 0;
-  plan.gone.forEach((i) => { if (pz.cells[i] && pz.cells[i].k === pz.lv.target) got++; });
+  const counts = {};
+  plan.gone.forEach((i) => { if (pz.cells[i]) counts[pz.cells[i].k] = (counts[pz.cells[i].k] || 0) + 1; });
+  const hit = pzHitStage(new Set(plan.gone));
   plan.gone.forEach((i) => { pz.cells[i] = null; });
   pzFall(pz.cells, pz.lv.kinds);
+  const got = pzGotFrom({ counts: counts, grass: hit.grass, broke: hit.broke });
   pz.got += got;
+  plan.broke = hit.broke; plan.grass = hit.grass;
   return got;
 }
 // まとめて1手ぶん（テストや自動プレイ用）
@@ -2889,7 +2964,7 @@ function pzCascade(swapAt) {
   const before = pz.cells.map((t) => (t ? t.id : 0));
   const r = pzResolveOnce(pz.cells, pz.lv.kinds, swapAt);
   if (!r) return null;
-  const got = r.counts[pz.lv.target] || 0;
+  const got = pzGotFrom(r);
   pz.got += got;
   return { cleared: r.cleared, got: got, before: before };
 }
@@ -2903,10 +2978,18 @@ function pzFinishTurn() {
 }
 // 上から落として すき間を埋める
 function pzFall(c, kinds) {
+  const blocked = (i) => !!(pz && pz.block && pz.block[i]);
   for (let x = 0; x < PZ_W; x++) {
-    let w = PZ_H - 1;
-    for (let y = PZ_H - 1; y >= 0; y--) { const t = c[pzIdx(x, y)]; if (t) { c[pzIdx(x, y)] = null; c[pzIdx(x, w)] = t; w--; } }
-    for (let y = w; y >= 0; y--) c[pzIdx(x, y)] = pzNewTile(PZ_KINDS[Math.floor(Math.random() * kinds)].k);
+    let end = PZ_H - 1;
+    while (end >= 0) {
+      if (blocked(pzIdx(x, end))) { end--; continue; }
+      let top = end;
+      while (top - 1 >= 0 && !blocked(pzIdx(x, top - 1))) top--;      // 箱で区切られた ひとつづき
+      let w = end;
+      for (let y = end; y >= top; y--) { const t = c[pzIdx(x, y)]; if (t) { c[pzIdx(x, y)] = null; c[pzIdx(x, w)] = t; w--; } }
+      for (let y = w; y >= top; y--) c[pzIdx(x, y)] = pzNewTile(PZ_KINDS[Math.floor(Math.random() * kinds)].k);
+      end = top - 1;
+    }
   }
 }
 // まとめて1手（テストや自動プレイ用）
@@ -2932,19 +3015,35 @@ let pzNodes = {};               // 玉のid → 画面の要素
 const pzWait = (ms) => new Promise((r) => setTimeout(r, ms));
 const pzKind = (k) => PZ_KINDS.find((x) => x.k === k) || PZ_KINDS[0];
 const PZ_SP_ICON = { rh: "🚀", rv: "🚀", tnt: "💣", prop: "🚁", disco: "✨" };
-// 玉は「色ちがい」ではなく「形ちがい」にする（ロイヤルマッチと同じで、ひと目で見分けられる）
+// 玉は「色ちがい」ではなく「形ちがい」。さらに面取り・つや・内側の影を重ねて 立体の物に見せる。
 const PZ_PATH = {
-  spade: "M50 8 C 30 30, 10 42, 10 58 A 18 18 0 0 0 42 70 L 36 92 L 64 92 L 58 70 A 18 18 0 0 0 90 58 C 90 42, 70 30, 50 8 Z",
-  heart: "M50 92 C 18 68, 6 50, 6 34 A 21 21 0 0 1 50 24 A 21 21 0 0 1 94 34 C 94 50, 82 68, 50 92 Z",
-  dia: "M50 5 L93 50 L50 95 L7 50 Z",
-  club: "M50 6 A 19 19 0 0 1 66 36 A 19 19 0 1 1 66 66 A 19 19 0 0 1 50 62 A 19 19 0 0 1 34 66 A 19 19 0 1 1 34 36 A 19 19 0 0 1 50 6 Z M42 62 L36 94 L64 94 L58 62 Z",
-  bead: "M50 8 L92 40 L76 90 L24 90 L8 40 Z",
+  spade: "M50 6 C 28 30, 8 44, 8 60 A 17 17 0 0 0 41 70 L 34 93 L 66 93 L 59 70 A 17 17 0 0 0 92 60 C 92 44, 72 30, 50 6 Z",
+  heart: "M50 93 C 17 68, 5 50, 5 34 A 21 21 0 0 1 50 24 A 21 21 0 0 1 95 34 C 95 50, 83 68, 50 93 Z",
+  dia: "M50 4 L94 50 L50 96 L6 50 Z",
+  club: "M42 60 L34 94 L66 94 L58 60 Z M50 6 A 19 19 0 0 1 67 35 A 19 19 0 1 1 67 65 A 19 19 0 0 1 33 65 A 19 19 0 1 1 33 35 A 19 19 0 0 1 50 6 Z",
+  bead: "M50 7 L93 39 L76 91 L24 91 L8 39 Z",
+};
+// 内側に入れる 面取りの線（宝石らしさ・木目らしさ）
+const PZ_FACET = {
+  spade: '<path d="M50 22 C 36 40, 22 50, 22 59" stroke="rgba(255,255,255,.45)" stroke-width="5" fill="none" stroke-linecap="round"/>',
+  heart: '<path d="M28 34 A 12 12 0 0 1 45 32" stroke="rgba(255,255,255,.5)" stroke-width="6" fill="none" stroke-linecap="round"/>',
+  dia: '<path d="M50 4 L50 96 M6 50 L94 50" stroke="rgba(255,255,255,.28)" stroke-width="3"/><path d="M50 22 L72 50 L50 78 L28 50 Z" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="3"/>',
+  club: '<circle cx="50" cy="25" r="10" fill="rgba(255,255,255,.28)"/>',
+  bead: '<path d="M18 39 L82 39" stroke="rgba(0,0,0,.35)" stroke-width="4"/><rect x="44" y="34" width="12" height="12" rx="3" fill="rgba(60,30,0,.55)"/>',
 };
 function pzFaceHTML(t) {
-  if (t.sp === "disco") return '<i class="pz-disco"></i>';                       // 光の玉は 色を持たない見た目
-  const face = '<svg class="pz-svg" viewBox="0 0 100 100" aria-hidden="true">' +
-    '<path d="' + (PZ_PATH[t.k] || PZ_PATH.dia) + '" fill="url(#g-' + t.k + ')" stroke="rgba(0,0,0,.45)" stroke-width="5" stroke-linejoin="round"/>' +
-    '<ellipse class="pz-gloss" cx="36" cy="30" rx="15" ry="9" transform="rotate(-24 36 30)"/></svg>';
+  if (t.sp === "disco") return '<i class="pz-disco"></i>';              // 光の玉は 色を持たない見た目
+  const p = PZ_PATH[t.k] || PZ_PATH.dia;
+  const face =
+    '<svg class="pz-svg" viewBox="0 0 100 100" aria-hidden="true">' +
+    // 影 → 本体 → 内側の影 → 面取り → つや の順に重ねる
+    '<path d="' + p + '" fill="rgba(0,0,0,.35)" transform="translate(0 5)"/>' +
+    '<path d="' + p + '" fill="url(#g-' + t.k + ')" stroke="url(#s-' + t.k + ')" stroke-width="6" stroke-linejoin="round"/>' +
+    '<path d="' + p + '" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="3" transform="translate(0 3) scale(.98) translate(1 0)"/>' +
+    (PZ_FACET[t.k] || "") +
+    '<ellipse cx="35" cy="28" rx="14" ry="8" fill="rgba(255,255,255,.7)" transform="rotate(-26 35 28)"/>' +
+    '<ellipse cx="63" cy="22" rx="5" ry="3" fill="rgba(255,255,255,.5)" transform="rotate(-26 63 22)"/>' +
+    "</svg>";
   const sp = t.sp ? '<b class="pz-sp sp-' + t.sp + '">' + (PZ_SP_ICON[t.sp] || "") + "</b>" : "";
   return face + sp;
 }
@@ -2975,17 +3074,45 @@ function pzSync(instant) {
     n.classList.toggle("sel", pz.sel === i);
   });
   Object.keys(pzNodes).forEach((id) => { if (!seen[id]) { pzNodes[id].remove(); delete pzNodes[id]; } });
+  pzStageSync();
 }
 function pzResetBoard() {
   const el = $("#pzBoard"); if (el) el.innerHTML = "";
   pzNodes = {};
   pzSync(true);
 }
+/* 草と箱を 盤に描く（玉より下・玉より上のレイヤー） */
+function pzStageSync() {
+  const el = $("#pzBoard"); if (!el || !pz || !pz.floor) return;
+  el.querySelectorAll(".pz-fl, .pz-bk").forEach((n) => n.remove());
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < pz.floor.length; i++) {
+    if (!pz.floor[i]) continue;
+    const d = document.createElement("i");
+    d.className = "pz-fl";
+    d.style.setProperty("--x", i % PZ_W); d.style.setProperty("--y", (i / PZ_W) | 0);
+    frag.appendChild(d);
+  }
+  for (let i = 0; i < pz.block.length; i++) {
+    const b = pz.block[i]; if (!b) continue;
+    const d = document.createElement("i");
+    d.className = "pz-bk " + b.t + (b.t === "stone" && b.hp === 1 ? " cracked" : "");
+    d.style.setProperty("--x", i % PZ_W); d.style.setProperty("--y", (i / PZ_W) | 0);
+    frag.appendChild(d);
+  }
+  el.appendChild(frag);
+}
+function pzGoalIcon() {
+  if (!pz) return "";
+  if (pz.lv.goal === "grass") return '<i class="pz-fl sm"></i>';
+  if (pz.lv.goal === "box") return '<i class="pz-bk box sm"></i>';
+  const t = { k: pz.lv.target };
+  return '<span class="pz-mini">' + pzFaceHTML(t) + "</span>";
+}
 function pzRenderHud() {
   if (!pz) return;
-  const kd = pzKind(pz.lv.target);
-  const face = pz.lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
-  $("#pzGoal").innerHTML = face + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>";
+  const done = pz.got >= pz.lv.need;
+  $("#pzGoal").innerHTML = pzGoalIcon() + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>" + (done ? ' <span class="pz-ok">✓</span>' : "");
   $("#pzMoves").innerHTML = "のこり <b>" + Math.max(0, pz.moves) + "</b> 手";
   const sc = $("#pzScore"); if (sc) sc.textContent = (pz.score || 0).toLocaleString();
   $("#pzLv").textContent = "レベル " + pz.lv.n;
@@ -3074,7 +3201,7 @@ async function pzCascadeAnim(swapAt, chain) {
   await pzWait(Math.max(chain > 1 ? 150 : 175, maxD + 190));
   pzApply(pz.cells, r);
   pzFall(pz.cells, pz.lv.kinds);
-  const got = r.counts[pz.lv.target] || 0;
+  const got = pzGotFrom(r);
   pz.got += got;
   pzScoreAdd(pts, mid);
   if (got) pzGoalPop();
@@ -3278,8 +3405,9 @@ function pzBuyCost() {
 }
 function pzRenderLobby() {
   const d = pzLoad(), lv = pzLevel(d.lv), g = getGold();
-  const kd = pzKind(lv.target);
-  const face = lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
+  const face = lv.goal === "grass" ? '<i class="pz-fl sm"></i> 草を'
+    : lv.goal === "box" ? '<i class="pz-bk box sm"></i> 箱を'
+    : '<span class="pz-mini">' + pzFaceHTML({ k: lv.target }) + '</span> を';
   const items = PZ_ITEMS.map((it) => {
     const n = pzBuy[it.id] || 0;
     const stock = (d.items && d.items[it.id]) || 0;
@@ -3293,7 +3421,7 @@ function pzRenderLobby() {
   for (let i = Math.max(1, d.lv - 4); i < d.lv; i++) stars.push('<span class="pz-past">' + i + "：" + "★".repeat(d.stars[i] || 0) + "</span>");
   $("#pzLobby").innerHTML =
     '<div class="pz-lv-big">レベル <b>' + lv.n + "</b></div>" +
-    '<div class="pz-goal-big">' + face + " を <b>" + lv.need + "</b> こ　／　<b>" + lv.moves + "</b> 手 いない</div>" +
+    '<div class="pz-goal-big">' + face + " <b>" + lv.need + "</b> こ　／　<b>" + lv.moves + "</b> 手 いない</div>" +
     (stars.length ? '<div class="pz-past-row">' + stars.join("") + "</div>" : "") +
     '<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>' + items +
     '<div class="pz-total">つかう GOLD：<b>' + total + "</b>　（もっている " + g.toLocaleString() + "）</div>" +

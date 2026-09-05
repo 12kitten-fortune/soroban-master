@@ -773,3 +773,31 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   padding: 6px 16px; box-shadow: 0 3px 0 #8a6d14, inset 0 2px 0 rgba(255,255,255,.7); color: #5d3a12; font-weight: 800; }
 .pz-goal b, .pz-moves b { color: #b5300f; }
 .pz-score-w { background: rgba(255,255,255,.7); border-radius: 12px; padding: 5px 12px; }
+
+/* ---- 仕掛け（草・木箱・石の箱） ---- */
+.pz-fl { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt); z-index: 0; pointer-events: none;
+  transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0);
+  background:
+    radial-gradient(circle at 30% 70%, rgba(255,255,255,.35) 0 12%, transparent 13%),
+    repeating-linear-gradient(115deg, #4faa46 0 4px, #3d8f38 4px 8px);
+  box-shadow: inset 0 0 0 2px rgba(30,80,25,.55), inset 0 -4px 8px rgba(0,0,0,.25); border-radius: 4px; }
+.pz-fl.sm { position: static; width: 22px; height: 22px; display: inline-block; vertical-align: -4px; transform: none; }
+.pz-bk { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt); z-index: 3; pointer-events: none;
+  transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0); border-radius: 8px; }
+.pz-bk.box { background:
+    linear-gradient(180deg, rgba(255,255,255,.35), rgba(0,0,0,.25)),
+    repeating-linear-gradient(90deg, #b0783c 0 8px, #9a6631 8px 10px), #a86f36;
+  box-shadow: inset 0 0 0 3px #6d4118, inset 0 -6px 10px rgba(0,0,0,.35), 0 3px 4px rgba(0,0,0,.3); }
+.pz-bk.box::after { content: ""; position: absolute; inset: 22% 8%; border: 3px solid rgba(90,50,15,.65); border-radius: 3px; }
+.pz-bk.stone { background:
+    linear-gradient(180deg, rgba(255,255,255,.4), rgba(0,0,0,.3)),
+    repeating-linear-gradient(45deg, #9c9c9c 0 7px, #8a8a8a 7px 14px), #939393;
+  box-shadow: inset 0 0 0 3px #5d5d5d, inset 0 -6px 10px rgba(0,0,0,.4), 0 3px 4px rgba(0,0,0,.3); }
+.pz-bk.stone.cracked { background:
+    linear-gradient(35deg, transparent 46%, rgba(30,30,30,.75) 47% 52%, transparent 53%),
+    linear-gradient(180deg, rgba(255,255,255,.3), rgba(0,0,0,.35)),
+    repeating-linear-gradient(45deg, #8a8a8a 0 7px, #787878 7px 14px), #7d7d7d; }
+.pz-bk.sm { position: static; width: 22px; height: 22px; display: inline-block; vertical-align: -4px; transform: none; }
+.pz-mini { display: inline-block; width: 26px; height: 26px; vertical-align: -6px; }
+.pz-mini .pz-svg { width: 100%; height: 100%; }
+.pz-ok { color: var(--ok); font-size: 20px; }
