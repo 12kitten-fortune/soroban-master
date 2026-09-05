@@ -451,7 +451,7 @@ function setSfxLevel(n) {
   sfxVol = SFX_STEPS[sfxLevel];
   soundOn = sfxLevel > 0;
   try { localStorage.setItem(VOL_KEY, String(sfxLevel)); localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); } catch (e) { }
-  if (!soundOn) bgmStop(); else { sfxPreload(); }
+  sfxPreload();                     // 効果音を切っても BGMは そのまま（別々に決められる）
   renderVolSegs();
 }
 // 上のバーと 設定画面、どちらのボタンも 同じ状態にする
@@ -462,7 +462,7 @@ function renderVolSegs() {
   });
 }
 function bgmPlay(name) {
-  if (!bgmOn || !soundOn) return bgmStop();
+  if (!bgmOn) return bgmStop();     // BGMは 自分の設定だけで 決まる
   if (bgmName === name && bgmEl) return;
   bgmStop();
   // 一度よみこんだ曲は とっておく（ステージを行き来しても 読み直さない＝通信の無駄をなくす）
