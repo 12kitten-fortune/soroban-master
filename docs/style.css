@@ -720,3 +720,36 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 @keyframes pzopen { 0% { transform: scale(1); } 40% { transform: scale(1.5) rotate(-8deg); } 100% { transform: scale(1.15); } }
 .pz-gift-item { font-size: 18px; font-weight: 800; color: var(--navy); margin-top: 6px; animation: pzstar .5s cubic-bezier(.2,1.8,.4,1); }
 .pz-stock { font-weight: 700; color: var(--ok); font-size: 13px; }
+
+/* ---- アイテムの爆発（飛ぶ絵と 崩れ方） ---- */
+.pz-rk { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt); z-index: 8; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--pzt) * .6);
+  filter: drop-shadow(0 0 8px rgba(255,220,120,.9)); }
+.pz-rk.h { animation: pzrkh .38s linear forwards; }
+.pz-rk.v { animation: pzrkv .38s linear forwards; }
+@keyframes pzrkh {
+  0% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) rotate(calc(var(--s) * 90deg)); opacity: 1; }
+  100% { transform: translate3d(calc((var(--x) + var(--s) * var(--far)) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) rotate(calc(var(--s) * 90deg)); opacity: .2; } }
+@keyframes pzrkv {
+  0% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) rotate(calc(var(--s) * 90deg + 90deg)); opacity: 1; }
+  100% { transform: translate3d(calc(var(--x) * var(--pzt)), calc((var(--y) + var(--s) * var(--far)) * var(--pzt)), 0) rotate(calc(var(--s) * 90deg + 90deg)); opacity: .2; } }
+/* TNTの 輪が広がる */
+.pz-ring { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt); z-index: 7; pointer-events: none;
+  border-radius: 50%; border: 4px solid rgba(255,230,150,.95); box-sizing: border-box;
+  transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0);
+  animation: pzringx .5s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes pzringx {
+  0% { opacity: 1; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(.2); }
+  100% { opacity: 0; transform: translate3d(calc((var(--x) - (var(--r) - 1) / 2) * var(--pzt)), calc((var(--y) - (var(--r) - 1) / 2) * var(--pzt)), 0) scale(var(--r)); } }
+/* プロペラが 飛んでいく */
+.pz-fly { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt); z-index: 9; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; font-size: calc(var(--pzt) * .62);
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.35));
+  animation: pzfly var(--dur, 260ms) cubic-bezier(.4,.1,.5,1) forwards; }
+@keyframes pzfly {
+  0% { transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(.7) rotate(0); }
+  60% { transform: translate3d(calc((var(--x) + (var(--tx) - var(--x)) * .6) * var(--pzt)), calc((var(--y) + (var(--ty) - var(--y)) * .6) * var(--pzt) - 18px), 0) scale(1.15) rotate(180deg); }
+  100% { transform: translate3d(calc(var(--tx) * var(--pzt)), calc(var(--ty) * var(--pzt)), 0) scale(1) rotate(360deg); } }
+/* 光の玉：盤ぜんたいが 光る */
+.pz-flash { position: absolute; inset: 0; z-index: 6; pointer-events: none; background: #fff; animation: pzflash .4s ease-out forwards; }
+@keyframes pzflash { 0% { opacity: .85; } 100% { opacity: 0; } }

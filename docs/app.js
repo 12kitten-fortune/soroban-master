@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-38"; // 最新反映の確認用
+const BUILD = "2026-09-05-39"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2532,6 +2532,8 @@ function pzLevel(n) {
 const pzLoad = () => { try { return JSON.parse(localStorage.getItem(PZ_KEY) || "null") || { lv: 1, stars: {}, best: 0, plays: 0 }; } catch (e) { return { lv: 1, stars: {}, best: 0, plays: 0 }; } };
 const pzSave = (d) => { try { localStorage.setItem(PZ_KEY, JSON.stringify(d)); } catch (e) { } };
 
+let pzDelay = null, pzFxQ = [];      // 消える順番（Map）と 見せる演出のならび
+function pzShow(o) { if (pzFxQ) pzFxQ.push(o); }
 let pz = null;   // 進行中の盤面 { cells, lv, moves, got, sel, busy, items }
 let pzUid = 1;
 const pzIdx = (x, y) => y * PZ_W + x;
@@ -2633,17 +2635,35 @@ function pzTargetsOf(c, kind) {
   for (let i = 0; i < c.length; i++) if (c[i] && c[i].k === kind) list.push(i);
   return list;
 }
+/* 消える順番（ミリ秒）も記録する。ロケットは通った所から、TNTは中心から輪のように壊れる。
+   pzFx0 に「飛んでいく絵」を出す指示もためる（画面側が拾って見せる）。 */
 function pzBlast(c, i, out, fired, opt) {
   fired = fired || new Set(); opt = opt || {};
   const t = c[i]; if (!t || (!t.sp && !opt.force) || fired.has(i)) return;
   fired.add(i); out.add(i);
   const x = i % PZ_W, y = Math.floor(i / PZ_W);
-  const add = (j) => { if (j == null || j < 0 || j >= c.length || !c[j]) return; out.add(j); if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired, {}); };
+  const base = opt.at || 0;
+  const D = pzDelay;                                   // 消える時刻の記録（Map）
+  const setD = (j, d) => { if (D && (!D.has(j) || D.get(j) > d)) D.set(j, d); };
+  setD(i, base);
+  const add = (j, d) => {
+    if (j == null || j < 0 || j >= c.length || !c[j]) return;
+    out.add(j); setD(j, base + (d || 0));
+    if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired, { at: base + (d || 0) + 60 });   // 巻きこまれた物は 少し遅れて発動
+  };
   const sp = opt.as || t.sp;
-  if (sp === "rh") for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y));
-  else if (sp === "rv") for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k));
-  else if (sp === "tnt") { const r = opt.big ? 2 : 1; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (pzIn(x + dx, y + dy)) add(pzIdx(x + dx, y + dy)); }
-  else if (sp === "cross") { for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y)); for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k)); }
+  if (sp === "rh") { pzShow({ fx: "rocket", dir: "h", x: x, y: y, at: base }); for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y), Math.abs(k - x) * 26); }
+  else if (sp === "rv") { pzShow({ fx: "rocket", dir: "v", x: x, y: y, at: base }); for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k), Math.abs(k - y) * 26); }
+  else if (sp === "tnt") {
+    const r = opt.big ? 2 : 1;
+    pzShow({ fx: "ring", x: x, y: y, r: r, at: base });
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (pzIn(x + dx, y + dy)) add(pzIdx(x + dx, y + dy), Math.max(Math.abs(dx), Math.abs(dy)) * 75);
+  }
+  else if (sp === "cross") {
+    pzShow({ fx: "rocket", dir: "h", x: x, y: y, at: base }); pzShow({ fx: "rocket", dir: "v", x: x, y: y, at: base });
+    for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y), Math.abs(k - x) * 26);
+    for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k), Math.abs(k - y) * 26);
+  }
   else if (sp === "prop") {
     const n = opt.count || 1;
     for (let p = 0; p < n; p++) {
@@ -2651,9 +2671,11 @@ function pzBlast(c, i, out, fired, opt) {
       const pool = want.length ? want : c.map((v, j) => j).filter((j) => c[j] && !out.has(j));
       if (!pool.length) break;
       const j = pool[Math.floor(Math.random() * pool.length)];
-      add(j);
+      const fly = 260 + p * 130;                                      // 飛んでいる時間
+      pzShow({ fx: "prop", from: i, to: j, at: base + p * 130, dur: fly - p * 130 });
+      add(j, fly);
       const jx = j % PZ_W, jy = (j / PZ_W) | 0;                       // 着地のまわりも すこし
-      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach((d) => { if (pzIn(jx + d[0], jy + d[1])) add(pzIdx(jx + d[0], jy + d[1])); });
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach((d) => { if (pzIn(jx + d[0], jy + d[1])) add(pzIdx(jx + d[0], jy + d[1]), fly + 60); });
     }
   }
   else if (sp === "disco") {
@@ -2661,7 +2683,11 @@ function pzBlast(c, i, out, fired, opt) {
       const cnt = {}; c.forEach((v) => { if (v && !v.sp) cnt[v.k] = (cnt[v.k] || 0) + 1; });
       return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
     })();
-    for (let j = 0; j < c.length; j++) if (c[j] && c[j].k === kind) add(j);
+    pzShow({ fx: "flash", at: base });
+    for (let j = 0; j < c.length; j++) if (c[j] && c[j].k === kind) {
+      const jx = j % PZ_W, jy = (j / PZ_W) | 0;
+      add(j, 60 + (Math.abs(jx - x) + Math.abs(jy - y)) * 22);        // 光の玉から 近い順に
+    }
   }
 }
 /* ---- 特殊ピース同士を入れかえたとき（コンボ） ---- */
@@ -2712,10 +2738,14 @@ function pzCollect(c, swapAt) {
     if (g.sp) made.push({ at: g.at, sp: g.sp, k: g.k });
   });
   const fired = new Set();
+  const keepD = pzDelay, keepQ = pzFxQ;
+  pzDelay = new Map(); pzFxQ = [];
   Array.from(gone).forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, gone, fired, {}); });   // 巻きこまれた特殊も発動
+  const delay = pzDelay, fx = pzFxQ;
+  pzDelay = keepD; pzFxQ = keepQ;
   const counts = {};
   gone.forEach((i) => { if (c[i]) counts[c[i].k] = (counts[c[i].k] || 0) + 1; });
-  return { gone: gone, made: made, counts: counts, big: gone.size >= 6 };
+  return { gone: gone, made: made, counts: counts, big: gone.size >= 6, delay: delay, fx: fx };
 }
 // 実際に消して、アイテムを置く
 function pzApply(c, r) {
@@ -2773,19 +2803,86 @@ function pzBeginSwap(a, b) {
   const t = pz.cells[a]; pz.cells[a] = pz.cells[b]; pz.cells[b] = t;
   return { ok: true };
 }
-// ② アイテムを直接動かしたときは その場で発動
-function pzFireSpecials(a, b) {
+// ② アイテムを直接動かしたとき
+/* ---- アイテムの爆発：先に「どこが いつ 壊れるか」を決めてから 見せる ---- */
+function pzPlanSpecials(a, b) {
   const gone = new Set();
+  pzDelay = new Map(); pzFxQ = [];
   const label = pzCombo(pz.cells, a, b, gone);
+  const delay = pzDelay, fx = pzFxQ;
+  pzDelay = null; pzFxQ = [];
   if (!gone.size) return null;
-  pz.comboText = typeof label === "string" ? label : "";
+  return { gone: Array.from(gone), delay: delay, fx: fx, label: label };
+}
+function pzApplyPlan(plan) {
   let got = 0;
-  gone.forEach((i) => { if (pz.cells[i] && pz.cells[i].k === pz.lv.target) got++; });
-  const list = Array.from(gone);
-  gone.forEach((i) => { pz.cells[i] = null; });
+  plan.gone.forEach((i) => { if (pz.cells[i] && pz.cells[i].k === pz.lv.target) got++; });
+  plan.gone.forEach((i) => { pz.cells[i] = null; });
   pzFall(pz.cells, pz.lv.kinds);
   pz.got += got;
-  return { gone: list, cleared: list.length, got: got };
+  return got;
+}
+// まとめて1手ぶん（テストや自動プレイ用）
+function pzFireSpecials(a, b) {
+  const plan = pzPlanSpecials(a, b);
+  if (!plan) return null;
+  pz.comboText = typeof plan.label === "string" ? plan.label : "";
+  const got = pzApplyPlan(plan);
+  return { gone: plan.gone, cleared: plan.gone.length, got: got, delay: plan.delay, fx: plan.fx };
+}
+/* ---- 飛ぶ絵 ---- */
+function pzFxEl(cls) {
+  const el = $("#pzBoard"); if (!el) return null;
+  const d = document.createElement("div");
+  d.className = cls;
+  el.appendChild(d);
+  return d;
+}
+function pzShowFx(o) {
+  if (o.fx === "rocket") {
+    [-1, 1].forEach((s) => {
+      const d = pzFxEl("pz-rk " + (o.dir === "h" ? "h" : "v"));
+      if (!d) return;
+      d.textContent = "🚀";
+      d.style.setProperty("--x", o.x); d.style.setProperty("--y", o.y);
+      d.style.setProperty("--s", s);
+      d.style.setProperty("--far", (o.dir === "h" ? PZ_W : PZ_H));
+      setTimeout(() => d.remove(), 460);
+    });
+  } else if (o.fx === "ring") {
+    const d = pzFxEl("pz-ring");
+    if (!d) return;
+    d.style.setProperty("--x", o.x); d.style.setProperty("--y", o.y);
+    d.style.setProperty("--r", (o.r || 1) * 2 + 1);
+    setTimeout(() => d.remove(), 520);
+  } else if (o.fx === "prop") {
+    const d = pzFxEl("pz-fly");
+    if (!d) return;
+    d.textContent = "🚁";
+    d.style.setProperty("--x", o.from % PZ_W); d.style.setProperty("--y", (o.from / PZ_W) | 0);
+    d.style.setProperty("--tx", o.to % PZ_W); d.style.setProperty("--ty", (o.to / PZ_W) | 0);
+    d.style.setProperty("--dur", (o.dur || 260) + "ms");
+    setTimeout(() => d.remove(), (o.dur || 260) + 160);
+  } else if (o.fx === "flash") {
+    const d = pzFxEl("pz-flash");
+    if (d) setTimeout(() => d.remove(), 420);
+  }
+}
+/* ---- 順番に こわす（ロケットは通った所から、TNTは中心から） ---- */
+async function pzPlayBlast(gone, delay, fx) {
+  (fx || []).forEach((o) => setTimeout(() => pzShowFx(o), o.at || 0));
+  let maxD = 0;
+  (gone || []).forEach((i) => {
+    const d = (delay && delay.get(i)) || 0;
+    if (d > maxD) maxD = d;
+    const t = pz.cells[i];
+    const n = t && pzNodes[t.id];
+    if (n) { n.style.setProperty("--d", d + "ms"); n.classList.add("pop"); }
+    setTimeout(() => { if (t) pzBurst(i, t.k, 4); }, d);
+    if (d > 0) setTimeout(() => pzTone(2 + Math.min(10, d / 30), false), d);
+  });
+  pzShake(maxD > 150);
+  await pzWait(maxD + 210);
 }
 // ③ そろっている所を1回ぶん消す（返り値が null になるまで くり返す＝連鎖）
 function pzCascade(swapAt) {
@@ -2947,22 +3044,24 @@ async function pzCascadeAnim(swapAt, chain) {
   const r = pzCollect(pz.cells, swapAt);
   if (!r) return null;
   const pts = r.gone.size * 10 * Math.min(chain, 5);
-  let mid = -1;
+  let mid = -1, maxD = 0;
+  (r.fx || []).forEach((o) => setTimeout(() => pzShowFx(o), o.at || 0));
   r.gone.forEach((i) => {
     const t = pz.cells[i]; if (!t) return;
     if (mid < 0) mid = i;
-    const n = pzNodes[t.id]; if (!n) return;
-    n.classList.add("pop");
-    n.style.setProperty("--d", (Math.abs(i % PZ_W - (swapAt != null ? swapAt % PZ_W : 4)) * 12) + "ms");
-    pzBurst(i, t.k, r.gone.size > 12 ? 3 : 5);
+    const d = (r.delay && r.delay.get(i)) || (Math.abs(i % PZ_W - (swapAt != null ? swapAt % PZ_W : 4)) * 12);
+    if (d > maxD) maxD = d;
+    const n = pzNodes[t.id];
+    if (n) { n.style.setProperty("--d", d + "ms"); n.classList.add("pop"); }
+    setTimeout(() => pzBurst(i, t.k, r.gone.size > 12 ? 3 : 5), d);
   });
   pzTone(chain * 2, r.big);
-  if (r.big) pzShake(false);
+  if (r.big || maxD > 100) pzShake(maxD > 150);
   if (chain >= 2) {
     pzFx(mid < 0 ? 27 : mid, PZ_PRAISE[Math.min(chain, PZ_PRAISE.length - 1)], "pz-praise", 1000);
     pzMsg(chain + "れんさ！", "ok");
   }
-  await pzWait(chain > 1 ? 150 : 175);
+  await pzWait(Math.max(chain > 1 ? 150 : 175, maxD + 190));
   pzApply(pz.cells, r);
   pzFall(pz.cells, pz.lv.kinds);
   const got = r.counts[pz.lv.target] || 0;
@@ -3028,13 +3127,16 @@ async function pzTry(a, b) {
   try { clickSnd(); } catch (e) { }
   pzSync();                     // 入れかえが すべって見える
   await pzWait(150);
-  const f = pzFireSpecials(a, b);
-  if (f) {
+  const plan = pzPlanSpecials(a, b);
+  if (plan) {
+    pz.comboText = typeof plan.label === "string" ? plan.label : "";
     if (pz.comboText) pzMsg(pz.comboText, "ok");
-    pzShake(true);
     try { bigFanfareSnd(); } catch (e) { }
+    await pzPlayBlast(plan.gone, plan.delay, plan.fx);   // 飛んで → 通った所から こわれる
+    pzApplyPlan(plan);
+    pzScoreAdd(plan.gone.length * 15);
     pzSync(); pzRenderHud();
-    await pzWait(220);
+    await pzWait(150);
   }
   let chain = 0;
   while (await pzCascadeAnim(b, ++chain)) {
