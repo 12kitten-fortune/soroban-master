@@ -399,18 +399,16 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .craft-tools .pill { cursor: pointer; font-weight: 700; }
 .craft-tools .pill.danger { background: linear-gradient(180deg,#ffd9d2,#f3a894); border-color: #c0392b; color: #7a2318; }
 .craft-msg { color: #c0392b; font-weight: 700; font-size: 14px; min-height: 20px; }
-.craft-stage { background: linear-gradient(180deg,#bfe3ff,#eaf7ff); border: 2px solid var(--line); border-radius: 14px; overflow: auto; }
-#craftCanvas { display: block; margin: 0 auto; max-width: 100%; height: auto; cursor: pointer; }
+.craft-stage { background: linear-gradient(180deg,#bfe3ff,#eaf7ff); border: 2px solid var(--line); border-radius: 14px; overflow: hidden; }
+/* canvasの実際の画素数はJSが端末の細かさに合わせて決める（ここでは見た目の大きさだけ） */
+#craftCanvas { display: block; width: 100%; height: min(62vh, 560px); cursor: pointer; touch-action: none; }
 .craft-palette { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
 .blk { display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px 6px; color: #2b2b2b; }
 .blk.sel { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(22,48,92,.15); background: #f3f7ff; }
 .blk-n { font-size: 12px; font-weight: 700; }
 .blk-c { font-size: 11px; color: #8a7560; }
-/* パレットのブロック見本も、画像を使わずCSSだけで立体的に描く */
-.blk-chip { width: 30px; height: 30px; position: relative; display: block; }
-.blk-chip::before { content: ""; position: absolute; left: 0; top: 6px; width: 15px; height: 18px; background: var(--l); clip-path: polygon(0 0, 100% 25%, 100% 100%, 0 75%); }
-.blk-chip::after { content: ""; position: absolute; right: 0; top: 6px; width: 15px; height: 18px; background: var(--r); clip-path: polygon(0 25%, 100% 0, 100% 75%, 0 100%); }
-.blk-chip { background: linear-gradient(var(--t), var(--t)) no-repeat center top / 30px 12px; }
+/* パレットの見本は、世界に置くときと同じ絵（JSが焼いた画像）をそのまま使う */
+.blk-chip { width: 36px; height: 36px; display: block; background: no-repeat center / contain; }
 
 /* ============================================================ 時代ごとのブロック（文明の発展） */
 .era { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; margin: 8px 0; background: #fffdf8; }
@@ -421,3 +419,57 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .era-b { display: flex; flex-wrap: wrap; gap: 8px; }
 .blk.lock { opacity: .45; filter: grayscale(.7); cursor: not-allowed; }
 .craft-palette { display: block; }
+
+/* ============================================================ まちがえ方のクセ（1セット終わりの図解つき説明） */
+.miss-report { text-align: left; margin: 14px 0; background: #fffdf6; border: 2px solid var(--line); border-radius: 14px; padding: 14px 16px; font-size: 15px; line-height: 1.7; }
+.miss-report.all-ok { background: #f3fbf3; border-color: #8dc98d; }
+.mr-acc { font-size: 18px; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
+.mr-acc b { font-size: 26px; }
+.mr-acc .sub { font-size: 14px; font-weight: 400; }
+.mr-h { font-weight: 800; color: var(--navy); border-top: 1px dashed var(--line); padding-top: 10px; margin-top: 4px; }
+.mr-top { font-size: 17px; margin: 6px 0; }
+.mr-top b { color: #b5651d; }
+.mr-tip { background: #fff6e0; border-left: 5px solid var(--gold, #d4af37); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+/* 図解：まちがえた1手を「前 ▶ あと」で並べて見せる */
+.mr-fig { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 10px 0 4px; }
+.mr-fig-1 { text-align: center; }
+.mr-cap { font-size: 13px; font-weight: 700; color: #8a7560; margin-bottom: 3px; }
+.mr-arrow { text-align: center; font-size: 13px; color: var(--navy); }
+.mr-arrow span { display: block; font-size: 22px; color: var(--bead-hi); line-height: 1; }
+.mr-moves .move { padding: 3px 0 3px 18px; position: relative; color: #444; font-size: 14px; }
+.mr-moves .move::before { content: "•"; position: absolute; left: 4px; color: var(--bead-hi); }
+.mr-moves .hint { color: #b5651d; font-weight: 700; }
+.mr-others { font-size: 14px; color: #8a7560; margin-top: 8px; }
+.mr-wrongs { margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; }
+.mr-wrongs .qrow { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 14px; padding: 3px 0; }
+.mr-wrongs .qq { font-weight: 700; color: #2b2b2b; }
+.mr-wrongs .qa { color: #666; }
+.mr-wrongs .qk { margin-left: auto; font-size: 12px; color: #b5651d; background: #fff2e2; border-radius: 999px; padding: 1px 10px; }
+.mr-more { margin-top: 10px; }
+.mr-steps { margin-top: 10px; }
+
+/* ============================================================ にがて克服メニュー */
+.weak-menu { margin-top: 14px; text-align: left; background: #fffdf6; border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+.wm-h { font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+.wm-none { font-size: 13px; color: #8a7560; }
+.wm-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.wm-row:last-of-type { border-bottom: none; }
+.wm-em { font-size: 20px; }
+.wm-n { font-weight: 700; flex: 1; font-size: 14px; }
+.wm-c { font-size: 13px; color: #b5651d; background: #fff2e2; border-radius: 999px; padding: 1px 10px; }
+.wm-go { font-size: 13px; padding: 6px 12px; background: var(--ok); }
+.mr-drill { display: block; width: 100%; margin-top: 12px; background: var(--ok); font-size: 16px; padding: 12px; }
+
+/* ============================================================ 問題が多い級（5級・4級など）で見切れないように */
+/* 広い画面では「問題は左・そろばんは右」に並べて、たてに長くならないようにする */
+@media (min-width: 1000px) {
+  #view-play > .card { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(330px, 470px); gap: 20px; align-items: start; }
+  #view-play > .card > * { grid-column: 1 / -1; }
+  #view-play > .card > .play-hud { grid-row: 1; }
+  #view-play > .card > #playProblemWrap { grid-column: 1; grid-row: 2; margin: 0; }
+  #view-play > .card > #playSorobanWrap { grid-column: 2; grid-row: 2; }
+  #view-play > .card > #playProblemWrap .problem { margin-bottom: 0; }
+}
+#stepsRow { margin-top: 10px; }
+/* 数字は右そろえの縦一列（そろばんの見取算と同じ並び）。字の大きさはJSが行数に合わせて決める */
+.problem { max-width: 100%; overflow-wrap: anywhere; }

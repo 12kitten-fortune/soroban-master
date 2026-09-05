@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-04-24"; // 最新反映の確認用
+const BUILD = "2026-09-05-28"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -284,9 +284,13 @@ function nextGoalHint() {
 
 /* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
 const SESSIONS = "soroban_sessions";
-function logSession(subj, N, correct, sumSec, pauses) {
+function logSession(subj, N, correct, sumSec, pauses, results) {
   const l = JSON.parse(localStorage.getItem(SESSIONS) || "[]");
-  l.push({ d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 });
+  const e = { d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 };
+  // まちがえた問題は「何をどう間違えたか」まで残す（あとで週ごとのクセを出すため）
+  const miss = (results || []).filter((r) => !r.ok).slice(0, 8).map((r) => ({ q: r.compact, u: r.user, a: r.ans, k: missKind(r) }));
+  if (miss.length) e.miss = miss;
+  l.push(e);
   localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-1500)));
 }
 const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
@@ -510,7 +514,34 @@ function renderHome() {
   $("#homeMonth").textContent = `${ms.days}日`;
   const doneToday = JSON.parse(localStorage.getItem(ROUTINE) || "[]").some((h) => h.date === today());
   $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
+  renderWeakMenu();
   renderGoldPill();
+}
+/* ---------- にがて克服メニュー（その子のまちがえ方から作る） ---------- */
+// 最近の記録から「どのクセで何回まちがえたか」を数える（新しい記録ほど重く見る）
+function weakProfile(days) {
+  const from = new Date(Date.now() - (days || 14) * 86400000).toISOString().slice(0, 10);
+  const tally = {};
+  allSessions().forEach((e) => {
+    if (!e.miss || e.d < from) return;
+    const fresh = e.d >= new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10) ? 2 : 1;  // 直近3日は2倍
+    e.miss.forEach((mm) => { const k = mm.k || "other"; tally[k] = (tally[k] || 0) + fresh; });
+  });
+  return Object.keys(tally).filter((k) => k !== "other")
+    .map((k) => ({ k, n: tally[k] })).sort((a, b) => b.n - a.n);
+}
+function renderWeakMenu() {
+  const el = $("#weakMenu"); if (!el) return;
+  const w = weakProfile(14);
+  if (!w.length) { el.innerHTML = '<div class="wm-none">まちがえた記録が たまると、ここに <b>にがて克服メニュー</b> が出ます。</div>'; return; }
+  const rows = w.slice(0, 3).map((x) => {
+    const K = MISS_KINDS[x.k] || MISS_KINDS.other;
+    return `<div class="wm-row"><span class="wm-em">${K.em}</span><span class="wm-n">${K.n}</span>` +
+      `<span class="wm-c">${x.n}回</span><button class="wm-go" data-k="${x.k}">▶ 5問 やる</button></div>`;
+  }).join("");
+  el.innerHTML = `<div class="wm-h">🎯 きみの にがて克服メニュー</div>${rows}` +
+    `<div class="sub">まちがえたクセと同じ形の問題だけを 出します。正解すると GOLD ももらえるよ。</div>`;
+  $$("#weakMenu .wm-go").forEach((b) => { b.onclick = () => startWeakSession(b.dataset.k, 5); });
 }
 function accBySubject(sessions) {
   const m = {};
@@ -603,20 +634,38 @@ $("#saveProfileBtn").addEventListener("click", () => {
   setTimeout(() => ($("#saveMsg").textContent = ""), 1500);
 });
 
+/* ---------- じぶんのそろばんを使うか（画面のそろばんを出すか） ---------- */
+const MYSORO = "soroban_mysoroban";
+const useMySoroban = () => localStorage.getItem(MYSORO) === "1";
+// 自分のそろばんを使う子は、画面のそろばんを出さずに数字で答える（問題が見切れないようにするため）
+const answerModeFor = (cf) => (cf.answer === "soroban" && useMySoroban() ? "input" : cf.answer);
+(function () {
+  const el = $("#mySoroban"); if (!el) return;
+  el.checked = useMySoroban();
+  el.addEventListener("change", () => { localStorage.setItem(MYSORO, el.checked ? "1" : "0"); updateInfo(); });
+})();
+// 口数が多い級（5級・4級など）でも1画面に収まるよう、行数に合わせて字の大きさを変える
+function fitProblem(text) {
+  const el = $("#playProblem"); if (!el) return;
+  const lines = String(text || "").split("\n").length;
+  el.style.fontSize = lines >= 13 ? "17px" : lines >= 10 ? "20px" : lines >= 7 ? "24px" : "";
+  el.style.lineHeight = lines >= 7 ? "1.32" : "";
+}
+
 /* ============================================================ セッション */
 function startSession(subj) {
   const grade = currentGrade();
   if (subj === "flash") return startFlash(grade);
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
   const cf = SUBJECT[subj];
-  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: cf.answer, timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
+  session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
-  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
-  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
+  $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", subj !== "anzan"); // あんざんのときだけコツを出す
   $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(subj) ? "" : "none";
@@ -663,9 +712,11 @@ function resumePlay() {
 $("#pauseBtn").addEventListener("click", () => (session && session.paused ? resumePlay() : pausePlay()));
 $("#resumeBtn").addEventListener("click", resumePlay);
 function nextPlayProblem() {
-  session.cur = genProblemFor(session.grade, session.subj);
+  // にがて克服のときは、あらかじめ作っておいた問題を順に出す
+  session.cur = (session.queue && session.queue.length) ? session.queue.shift() : genProblemFor(session.grade, session.subj);
   stepCtx = { subj: session.subj, cur: session.cur }; // 解き方用（完了後も参照できるよう保持）
   $("#playProblem").textContent = session.cur.display;
+  fitProblem(session.cur.display);       // 口数が多くても1画面に収める
   $("#playMark").classList.add("hidden");
   const prog = session.mode === "end" ? `回答 ${Math.min(session.idx + 1, session.N)} / ${session.N}` : `${Math.min(session.idx + 1, session.N)} / ${session.N}　正解 ${session.correct}`;
   $("#playProgress").textContent = prog;
@@ -694,7 +745,8 @@ function submitAnswer(val) {
   const ok = val === session.cur.answer;
   if (ok) session.correct++;
   const qt = session.qStart ? (performance.now() - session.qStart) / 1000 : null;
-  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer, t: qt });
+  // 1問ごとに「何を出して・何と答えて・正解は何か」を残す（まちがえ方のクセを調べるため）
+  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer, t: qt, nums: session.cur.nums || null, subj: session.subj });
   if (session.mode === "end") {
     neutralSnd(); // 検定方式：正誤を明かさず最後にまとめて採点
     advance();
@@ -727,11 +779,18 @@ function finishSession() {
     msg += `<div class="marks">` + session.results.map((r) => `<span class="mk ${r.ok ? "ok" : "ng"}">${r.ok ? "◎" : "×"}</span>`).join("") + `</div>`;
   }
   msg += `タイム <b>${fmtClock(el)}</b>　正解 ${session.correct} / ${session.N}`;
+  const report = missReportHTML(session.results);   // 正答率と「まちがえ方のクセ」の図解
   let cls = "ok", bestUpdated = false;
   touchStreak(); // streak更新（GOLD連続ボーナスの前に）
-  if (completed) {
+  if (completed && session.weak) {
+    // にがて克服は問題の形がちがうので、自己ベストには入れない（記録とGOLDだけ）
+    logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
+    const K = MISS_KINDS[session.weak] || MISS_KINDS.other;
+    msg += `<br>🎯 <b>${K.n}</b> の 克服れんしゅう`;
+    if (session.correct === session.N) msg += `　<b class="hl">✨ ぜんぶ せいかい！ このクセ、なおってきたよ</b>`;
+  } else if (completed) {
     const r = saveTime(session.grade.key, session.subj, el); bestUpdated = r.improved;
-    logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount);
+    logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
     msg += `<br>⏱ 自己ベスト：${fmtClock(bestTime(session.grade.key, session.subj))}`;
     if (bestUpdated) msg += `　<b class="hl">✨自己ベスト更新！</b>`;
     else if (r.prev != null && el > r.prev) msg += `　<span class="sub">あと ${(el - r.prev).toFixed(1)}秒で自己ベスト！</span>`;
@@ -745,6 +804,7 @@ function finishSession() {
     cls = pass ? "ok" : "ng";
     if (pass) { certify(session.grade.key); msg += `<br>🎓 ${session.grade.key} 認定！`; }
   }
+  msg += report;
   if (completed) { // GOLDは学習の成果としてのみ付与
     const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed, grade: session.grade });
     let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
@@ -763,9 +823,9 @@ function finishSession() {
   msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<span class="rh-badge">${badge}</span>` : ""}</div>` + msg;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
   $("#playProblem").textContent = "おつかれさま！";
-  const subj = session.subj; session = null;
-  $("#againBtn").onclick = () => startSession(subj);
-  const tk = $("#toKingdomBtn"); if (tk) tk.onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
+  const subj = session.subj, weak = session.weak, weakN = session.weakN; session = null;
+  $("#againBtn").onclick = () => (weak ? startWeakSession(weak, weakN) : startSession(subj));
+  const tk = $("#toKingdomBtn"); if (tk) tk.onclick = () => { showView("craft"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
   $("#homeBtn").onclick = () => { showView("grades"); setActiveNav(document.querySelector('.nav[data-view="grades"]')); updateInfo(); };
 }
 function quitSession() {
@@ -820,14 +880,14 @@ function runStep() {
 function startQuizSection(step) {
   const grade = routineState.grade, cf = SUBJECT[step.subj];
   // 採点は最後にまとめて（mode:end）。暗算は入力式（そろばんを出さない）、かけ/わり/みとりはそろばん
-  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: cf.answer, timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
+  session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
-  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
-  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
+  $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", step.subj !== "anzan");
   $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(step.subj) ? "" : "none";
@@ -840,8 +900,8 @@ function startQuizSection(step) {
 }
 function finishRoutineSection() {
   const el = playElapsed();
-  routineState.sections.push({ label: session.label, correct: session.correct, N: session.N, sec: el, items: session.results });
-  logSession(session.subj, session.N, session.correct, el, session.pauseCount);
+  routineState.sections.push({ label: session.label, subj: session.subj, correct: session.correct, N: session.N, sec: el, items: session.results });
+  logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
   const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true, grade: session.grade });
   routineState.gold = (routineState.gold || 0) + g;
   correctSnd();
@@ -862,7 +922,7 @@ function showRest(step) {
   $("#playResult").textContent = ""; $("#playGrade").textContent = "本日の練習：休憩"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
   $("#playRest").classList.remove("hidden");
   const last = routineState.sections[routineState.sections.length - 1];
-  $("#restResult").innerHTML = last ? sectionResultHTML(last) : "";
+  $("#restResult").innerHTML = last ? missReportHTML(last.items) + sectionResultHTML(last) : "";
   $("#restNext").textContent = step.next ? `つぎは：${step.next}（自動で始まります）` : "";
   let left = step.rest;
   const render = () => ($("#restTimer").textContent = fmtClock(left));
@@ -904,8 +964,9 @@ function finishRoutine() {
   const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
-  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${goldBlock}${detail}<br><button id="toKingdomBtn2">🧱 クラフトへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
-  $("#toKingdomBtn2").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
+  const allItems = rs.sections.reduce((a, s) => a.concat(s.items || []), []);   // 本日の練習ぜんぶ分のクセ
+  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${missReportHTML(allItems)}${goldBlock}${detail}<br><button id="toKingdomBtn2">🧱 クラフトへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#toKingdomBtn2").onclick = () => { showView("craft"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
 }
@@ -972,6 +1033,160 @@ function mitoriStepsHTML(nums) {
   }).join("");
   return `<div class="soro-legend">🟠 入っている玉　🟡 この手で動いた位（ここが違えばそこで間違い）</div>` + body;
 }
+/* ============================================================ まちがえ方のクセを見つける
+   1問ごとの「出した数・答えた数・正解」から、そろばんのどの技でつまずいたのかを判定する。
+   言い方は解き方の説明（solveSteps）と同じ「5の友」「10の友」でそろえる。 */
+const MISS_KINDS = {
+  five: { n: "五玉（5の友）", em: "🖐", tip: "5の友は 1と4 ／ 2と3。<b>4をたす</b>ときは 一玉が たりないので〈<b>五玉を入れて 1を払う</b>〉。", ex: [3, 4] },
+  ten: { n: "くり上がり・くり下がり（10の友）", em: "🔟", tip: "10の友は 1と9 ／ 2と8 ／ 3と7 ／ 4と6。<b>となりの位に 1を入れて</b>、この位から 友だちの数を 払う。", ex: [8, 5] },
+  keta: { n: "位（くらい）の ずれ", em: "📏", tip: "答えが 10倍 や 10分の1 になっているよ。<b>一の位を どこに 置いたか</b>を たしかめよう。", ex: null },
+  skip: { n: "数を 1つ とばした", em: "👀", tip: "読む数を 1つ 飛ばしたみたい。<b>ゆびで おさえながら</b> 上から順に 読もう。", ex: null },
+  minus: { n: "たす・ひく の とりちがえ", em: "➕", tip: "たすところを ひいてしまったみたい。<b>＋と − を 声に出して</b> 読もう。", ex: null },
+  kuku: { n: "九九の おぼえまちがい", em: "✖", tip: "答えが 九九ひとつぶん ずれているよ。その段を もう一度 声に出そう。", ex: null },
+  other: { n: "そのほか", em: "🤔", tip: "もう一度 ゆっくり 計算してみよう。どこまで 合っていたかを たしかめると 見つかるよ。", ex: null },
+};
+// その問題を解くのに「5の友」「10の友」が必要だったかを、解き方の手順から調べる
+function needsTech(nums, needle) {
+  if (!nums) return false;
+  try { return solveSteps(nums).some((t) => t.moves.some((m) => m.indexOf(needle) >= 0)); } catch (e) { return false; }
+}
+function missKind(r) {
+  const u = Number(r.user), a = Number(r.ans);
+  if (!Number.isFinite(u) || !Number.isFinite(a) || u === a) return "other";
+  const diff = u - a, nums = r.nums;
+  if (a !== 0 && (u === a * 10 || a === u * 10)) return "keta";                 // 桁ずれ
+  // ちょうど10ずれていて、その問題にくり上がりがあるなら、まず「くり上がり忘れ」を疑う
+  if (Math.abs(diff) % 10 === 0 && needsTech(nums, "10の友")) return "ten";
+  if (nums) {
+    for (const v of nums) if (v !== 0 && a - u === v) return "skip";            // 1つ とばした
+    for (const v of nums) if (v !== 0 && a - u === 2 * v) return "minus";       // たすところを ひいた
+  }
+  if (r.subj === "kake" || r.subj === "wari") return Math.abs(diff) < a * 0.5 ? "kuku" : "other";
+  if (Math.abs(diff) <= 6 && needsTech(nums, "5の友")) return "five";
+  if (Math.abs(diff) % 10 === 0) return "ten";
+  return "other";
+}
+// クセの図解：その子が実際にまちがえた問題の中から、つまずいた1手を取り出して そろばんの絵で見せる
+function techFigHTML(kind, nums) {
+  const K = MISS_KINDS[kind], needle = kind === "five" ? "5の友" : "10の友";
+  let use = needsTech(nums, needle) ? nums : (K.ex || null);
+  if (!use) return "";
+  let prev = 0, hit = null;
+  for (const t of solveSteps(use)) {
+    if (t.moves.some((m) => m.indexOf(needle) >= 0)) { hit = { before: prev, after: t.running, label: t.label, moves: t.moves }; break; }
+    prev = t.running;
+  }
+  if (!hit) return "";
+  const cols = Math.max(2, String(hit.after).length);
+  return `<div class="mr-fig">` +
+    `<div class="mr-fig-1"><div class="mr-cap">${hit.before.toLocaleString()}</div>${sorobanSVG(hit.before, cols)}</div>` +
+    `<div class="mr-arrow"><b>${hit.label}</b><span>▶</span></div>` +
+    `<div class="mr-fig-1"><div class="mr-cap">${hit.after.toLocaleString()}</div>${sorobanSVG(hit.after, cols, changedCols(hit.before, hit.after, cols))}</div>` +
+    `</div><div class="mr-moves">${hit.moves.map((m) => `<div class="move">${m}</div>`).join("")}</div>`;
+}
+/* 1セット終わったときに出す「正答率＋クセの図解」 */
+function missReportHTML(items) {
+  const list = (items || []).filter((x) => x && !x.ok);
+  const N = (items || []).length, ok = N - list.length;
+  const acc = N ? Math.round(ok / N * 100) : 0;
+  const head = `<div class="mr-acc">正答率 <b>${acc}%</b>　<span class="sub">(${ok} / ${N})</span></div>`;
+  if (!list.length) return `<div class="miss-report all-ok">${head}<div class="mr-top">🎉 <b>全問せいかい！</b> まちがえた クセは ありません。</div></div>`;
+  const tally = {};
+  list.forEach((r) => { const k = r.k || missKind(r); (tally[k] = tally[k] || []).push(r); });
+  const order = Object.keys(tally).sort((a, b) => tally[b].length - tally[a].length);
+  const top = order[0], K = MISS_KINDS[top] || MISS_KINDS.other, sample = tally[top][0];
+  const others = order.slice(1).map((k) => `${(MISS_KINDS[k] || MISS_KINDS.other).n} ${tally[k].length}回`).join("　");
+  const wrongs = list.map((r) => `<div class="qrow"><span class="qq">${r.compact}</span><span class="qa">きみ ${r.user} ／ 正解 <b>${r.ans}</b></span><span class="qk">${(MISS_KINDS[r.k || missKind(r)] || MISS_KINDS.other).n}</span></div>`).join("");
+  const steps = sample.nums ? mitoriStepsHTML(sample.nums) : "";
+  return `<div class="miss-report">${head}` +
+    `<div class="mr-h">🔍 きみの まちがえ方の クセ</div>` +
+    `<div class="mr-top">${K.em} <b>${K.n}</b> で <b>${tally[top].length}回</b> まちがえたよ</div>` +
+    `<div class="mr-tip">${K.tip}</div>` +
+    techFigHTML(top, sample.nums) +
+    (others ? `<div class="mr-others">ほかに：${others}</div>` : "") +
+    `<div class="mr-wrongs">${wrongs}</div>` +
+    `<button type="button" class="mr-drill" data-k="${top}">🎯 この クセの もんだいを 5問 やる</button>` +
+    (steps ? `<button type="button" class="ghost mr-more">この問題の 解き方を ぜんぶ見る</button><div class="mr-steps steps hidden">${steps}</div>` : "") +
+    `</div>`;
+}
+/* ============================================================ にがて克服の問題づくり
+   「そのクセが必ず出る形」だけを作る。作った候補を解き方エンジンにかけて、
+   5の友／10の友が本当に必要かを確かめてから採用する（＝ねらいが外れない）。 */
+function mitoriProblem(nums) {
+  const compact = nums.map((v, i) => (i === 0 ? String(v) : (v < 0 ? "−" : "+") + Math.abs(v))).join("");
+  return { display: mitoriDisplay(nums), compact, answer: nums.reduce((a, b) => a + b, 0), nums };
+}
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+function weakCandidate(kind) {
+  if (kind === "five") return [rnd(1, 8), rnd(1, 8)];                     // 五玉の出し入れ
+  if (kind === "ten") return [rnd(2, 9), rnd(2, 9)];                      // くり上がり
+  if (kind === "skip") return [rnd(1, 9), rnd(1, 9), rnd(1, 9), rnd(1, 9)]; // 口数を増やして読む練習
+  if (kind === "minus") return [rnd(5, 9), -rnd(1, 4), rnd(1, 4)];        // ＋と−が混ざる
+  if (kind === "keta") return [rnd(11, 89), rnd(1, 9), rnd(11, 89)];      // 位をそろえる練習
+  return [rnd(1, 9), rnd(1, 9), rnd(1, 9)];
+}
+function genWeakSet(kind, n) {
+  if (kind === "kuku") {                                                   // 九九は かけ算で出す
+    const out = [], seen = {};
+    for (let g = 0; g < 200 && out.length < n; g++) {
+      const a = rnd(2, 9), b = rnd(2, 9), key = a + "x" + b;
+      if (seen[key]) continue; seen[key] = 1;
+      out.push({ display: `${a} × ${b}`, compact: `${a}×${b}`, answer: a * b, fa: a, fb: b });
+    }
+    return out;
+  }
+  const out = [], seen = {};
+  for (let g = 0; g < 3000 && out.length < n; g++) {
+    const nums = weakCandidate(kind);
+    let run = 0, ok = true;
+    for (const v of nums) { run += v; if (run < 0) ok = false; }           // 途中で0より小さくならない
+    if (!ok) continue;
+    if (kind === "five" && (!needsTech(nums, "5の友") || needsTech(nums, "10の友"))) continue;
+    if (kind === "ten" && !needsTech(nums, "10の友")) continue;
+    const p = mitoriProblem(nums);
+    if (seen[p.compact]) continue; seen[p.compact] = 1;
+    out.push(p);
+  }
+  return out;
+}
+// にがて克服セッション（自己ベストや検定には影響させない。GOLDは正解のぶんだけ出る）
+function startWeakSession(kind, n) {
+  const K = MISS_KINDS[kind] || MISS_KINDS.other;
+  const qs = genWeakSet(kind, n || 5);
+  if (!qs.length) { alert("この にがての問題を うまく作れませんでした"); return; }
+  const subj = kind === "kuku" ? "kake" : "mitori", cf = SUBJECT[subj];
+  session = {
+    subj, grade: currentGrade(), cf, N: qs.length, idx: 0, correct: 0, answerBy: cf.answer,
+    timed: false, mode: "each", results: [], locking: false, start: performance.now(), cur: null,
+    paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0, queue: qs.slice(), weak: kind, weakN: qs.length,
+  };
+  $("#playMark").classList.add("hidden");
+  $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
+  showView("play");
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#anzanTip").classList.add("hidden");
+  $("#showSteps").style.display = "";
+  $("#playGrade").textContent = `🎯 にがて克服：${K.n}`;
+  $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
+  $("#playResult").innerHTML = `<div class="mr-tip">${K.em} ${K.tip}</div>`; $("#playResult").className = "result";
+  $("#steps").classList.add("hidden");
+  playTimer = setInterval(tickPlay, 150);
+  nextPlayProblem();
+}
+// 「解き方をぜんぶ見る」の開け閉め（結果画面は毎回作りなおすので、まとめて受ける）
+document.addEventListener("click", function (e) {
+  if (!e.target.closest) return;
+  const drill = e.target.closest(".mr-drill");
+  if (drill) { startWeakSession(drill.dataset.k, 5); return; }
+  const b = e.target.closest(".mr-more"); if (!b) return;
+  const box = b.parentNode.querySelector(".mr-steps"); if (!box) return;
+  box.classList.toggle("hidden");
+  b.textContent = box.classList.contains("hidden") ? "この問題の 解き方を ぜんぶ見る" : "解き方を とじる";
+});
 function kakeStepsHTML(a, b, ans) {
   const bs = String(b).split("").reverse();
   const moves = [];
@@ -1262,7 +1477,7 @@ function finishBattle(reason) {
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🧱 クラフトへ</button>`;
   renderProfile();
   $("#battleAgain").onclick = () => renderBattle();
-  $("#battleToKingdom").onclick = () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
+  $("#battleToKingdom").onclick = () => { showView("craft"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); };
 }
 $("#battleStart").addEventListener("click", startBattle);
 $("#battleForm").addEventListener("submit", (e) => { e.preventDefault(); battleAnswer(parseInt($("#battleInput").value, 10)); });
@@ -1290,28 +1505,39 @@ const ERAS = [
 const BLOCKS = [
   null,
   { n: "くさ", top: "#7ec95e", lf: "#54913c", rt: "#69ad4b", cost: 1, pat: "grass", era: 0 },
-  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "sand", era: 0 },
+  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "dirt", era: 0 },
   { n: "いし", top: "#bcbcc2", lf: "#83838a", rt: "#a0a0a7", cost: 2, pat: "stone", era: 0 },
-  { n: "き", top: "#c9954f", lf: "#8c6432", rt: "#ab7c41", cost: 2, pat: "wood", era: 0 },
-  { n: "はっぱ", top: "#57ab3e", lf: "#356d26", rt: "#448b32", cost: 2, pat: "grass", era: 0 },
+  { n: "き", top: "#b5813f", lf: "#7a5227", rt: "#996b33", cost: 2, pat: "wood", era: 0 },
+  { n: "はっぱ", top: "#57ab3e", lf: "#2f6321", rt: "#3f8a2d", cost: 2, pat: "leaf", era: 0 },
   { n: "すな", top: "#ecdca8", lf: "#b8a476", rt: "#d3c090", cost: 2, pat: "sand", era: 0 },
   { n: "みず", top: "#63b4ee", lf: "#3573ad", rt: "#4a93cf", cost: 3, pat: "water", era: 0 },
-  { n: "わら", top: "#e3c96f", lf: "#ab9445", rt: "#c8b057", cost: 4, pat: "wood", era: 1 },
+  { n: "わら", top: "#e3c96f", lf: "#ab9445", rt: "#c8b057", cost: 4, pat: "straw", era: 1 },
   { n: "レンガ", top: "#c9604c", lf: "#8d3d2f", rt: "#ab4e3d", cost: 5, pat: "brick", era: 1 },
-  { n: "いしレンガ", top: "#a8a8ae", lf: "#74747a", rt: "#8e8e95", cost: 5, pat: "brick", era: 1 },
-  { n: "いた", top: "#d8a86a", lf: "#a67c46", rt: "#bf9258", cost: 6, pat: "wood", era: 2 },
-  { n: "ガラス", top: "#d8f2ff", lf: "#9cc4d6", rt: "#bcdcea", cost: 7, pat: "water", era: 2 },
-  { n: "やねがわら", top: "#4a6fa5", lf: "#2f4a73", rt: "#3c5c8c", cost: 7, pat: "brick", era: 2 },
-  { n: "大理石", top: "#f2efe6", lf: "#c4c0b5", rt: "#dbd7cc", cost: 9, pat: "stone", era: 3 },
+  { n: "いしレンガ", top: "#a8a8ae", lf: "#74747a", rt: "#8e8e95", cost: 5, pat: "sbrick", era: 1 },
+  { n: "いた", top: "#d8a86a", lf: "#a67c46", rt: "#bf9258", cost: 6, pat: "plank", era: 2 },
+  { n: "ガラス", top: "#d8f2ff", lf: "#9cc4d6", rt: "#bcdcea", cost: 7, pat: "glass", era: 2 },
+  { n: "やねがわら", top: "#4a6fa5", lf: "#2f4a73", rt: "#3c5c8c", cost: 7, pat: "tile", era: 2 },
+  { n: "大理石", top: "#f2efe6", lf: "#c4c0b5", rt: "#dbd7cc", cost: 9, pat: "marble", era: 3 },
   { n: "きん", top: "#f4dc8d", lf: "#b8912a", rt: "#d9b445", cost: 12, pat: "gold", era: 3 },
-  { n: "ランプ", top: "#ffdf9b", lf: "#c9a44a", rt: "#e6c069", cost: 12, pat: "gold", era: 3 },
-  { n: "コンクリート", top: "#c6c6c2", lf: "#8b8b88", rt: "#a9a9a5", cost: 15, pat: "stone", era: 4 },
-  { n: "てつ", top: "#b9c2cc", lf: "#7b8592", rt: "#9aa4b0", cost: 18, pat: "stone", era: 4 },
-  { n: "ネオン", top: "#ff8fdc", lf: "#a82e84", rt: "#d45bb0", cost: 20, pat: "gold", era: 4 },
-  { n: "クリスタル", top: "#c3b2ff", lf: "#7a63d1", rt: "#9e8bea", cost: 28, pat: "water", era: 5 },
-  { n: "ひかり", top: "#fff6c9", lf: "#ddcb72", rt: "#efe19b", cost: 32, pat: "gold", era: 5 },
-  { n: "にじいろ", top: "#ffb3d1", lf: "#5fbcd0", rt: "#ffd36b", cost: 40, pat: "gold", era: 5 },
+  { n: "ランプ", top: "#ffdf9b", lf: "#c9a44a", rt: "#e6c069", cost: 12, pat: "glow", era: 3 },
+  { n: "コンクリート", top: "#c6c6c2", lf: "#8b8b88", rt: "#a9a9a5", cost: 15, pat: "concrete", era: 4 },
+  { n: "てつ", top: "#b9c2cc", lf: "#7b8592", rt: "#9aa4b0", cost: 18, pat: "metal", era: 4 },
+  { n: "ネオン", top: "#ff8fdc", lf: "#a82e84", rt: "#d45bb0", cost: 20, pat: "neon", era: 4 },
+  { n: "クリスタル", top: "#c3b2ff", lf: "#7a63d1", rt: "#9e8bea", cost: 28, pat: "crystal", era: 5 },
+  { n: "ひかり", top: "#fff6c9", lf: "#ddcb72", rt: "#efe19b", cost: 32, pat: "glow", era: 5 },
+  { n: "にじいろ", top: "#ffb3d1", lf: "#5fbcd0", rt: "#ffd36b", cost: 40, pat: "rainbow", era: 5 },
 ];
+// ブロックは名前で引く（並び順を変えても地形づくりが壊れないように）
+const bId = (n) => { for (let i = 1; i < BLOCKS.length; i++) if (BLOCKS[i].n === n) return i; return 0; };
+const B_GRASS = bId("くさ"), B_DIRT = bId("つち"), B_STONE = bId("いし"), B_WOOD = bId("き"),
+  B_LEAF = bId("はっぱ"), B_SAND = bId("すな"), B_WATER = bId("みず"), B_GLASS = bId("ガラス");
+// 立方体をやめて、それらしい形で描くブロック
+const SHAPE = {};
+[["き", "trunk"], ["はっぱ", "canopy"], ["ランプ", "glow"], ["ネオン", "glow"], ["ひかり", "glow"], ["クリスタル", "crystal"]]
+  .forEach(function (p) { const i = bId(p[0]); if (i) SHAPE[i] = p[1]; });
+// マスをぴったり埋めない＝うしろが透けて見えるブロック（かくれ判定から外す）
+const SEETHRU = {}; [B_WATER, B_GLASS, B_LEAF, B_WOOD, bId("クリスタル")].forEach(function (i) { if (i) SEETHRU[i] = 1; });
+
 // いま使える時代（検定に合格した級で決まる）
 function myRankIdx() { try { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.idx : -1; } catch (e) { return -1; } }
 function eraOpen(e) { return myRankIdx() >= ERAS[e].need; }
@@ -1334,6 +1560,7 @@ function vnoise(x, y, sc) {
 function makeWorld() {
   const cells = new Array(CW_ * CH_ * CD_).fill(0);
   const put = (x, y, z, v) => { cells[(z * CH_ + y) * CW_ + x] = v; };
+  const trees = [];
   for (let y = 0; y < CH_; y++) for (let x = 0; x < CW_; x++) {
     // 中心ほど高く、はしは海になるようにする（島の形）
     const dx = (x - CW_ / 2) / (CW_ / 2), dy = (y - CH_ / 2) / (CH_ / 2);
@@ -1342,46 +1569,76 @@ function makeWorld() {
     // ノイズを強めに効かせて、輪っかではなく でこぼこした島にする
     let h = Math.round(n * 3.4 + fall * 3.6);
     h = Math.max(1, Math.min(7, h));
-    for (let z = 0; z < h; z++) put(x, y, z, z < h - 2 ? 3 : 2);   // 下はいし、上はつち
+    for (let z = 0; z < h; z++) put(x, y, z, z < h - 2 ? B_STONE : B_DIRT);   // 下はいし、上はつち
     const t = h - 1;
-    if (h <= SEA) { for (let z = h; z <= SEA; z++) put(x, y, z, 6); }   // 海
-    else if (h === SEA + 1) put(x, y, t, 5);                            // すなはま
-    else if (h >= 7) put(x, y, t, 3);                                   // いちばん高い山の頂上だけ いし
+    if (h <= SEA) { for (let z = h; z <= SEA; z++) put(x, y, z, B_WATER); }   // 海
+    else if (h === SEA + 1) put(x, y, t, B_SAND);                             // すなはま
+    else if (h >= 7) put(x, y, t, B_STONE);                                   // いちばん高い山の頂上だけ いし
     else {
-      put(x, y, t, 1);                                                  // くさ
-      if (hash2(x * 7 + 1, y * 13 + 3) > 0.955 && t + 3 < CD_) {        // 木
-        put(x, y, t + 1, 4); put(x, y, t + 2, 4); put(x, y, t + 3, 7);
+      put(x, y, t, B_GRASS);                                                  // くさ
+      if (hash2(x * 7 + 1, y * 13 + 3) > 0.955 && t + 4 < CD_) {              // 木（幹2つ＋葉のかたまり）
+        put(x, y, t + 1, B_WOOD); put(x, y, t + 2, B_WOOD);
+        put(x, y, t + 3, B_LEAF); put(x, y, t + 4, B_LEAF);
+        trees.push([x, y, t + 3]);
       }
     }
   }
+  // まわりにも葉を広げて、こんもりした木にする（となりのマスの上に浮かせる）
+  trees.forEach(function (p) {
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+      const x = p[0] + d[0], y = p[1] + d[1], z = p[2];
+      if (x < 0 || y < 0 || x >= CW_ || y >= CH_) return;
+      if (cells[(z * CH_ + y) * CW_ + x]) return;
+      if (hash2(x * 3 + z, y * 11) > 0.22) put(x, y, z, B_LEAF);
+    });
+  });
   return { w: CW_, h: CH_, d: CD_, cells, hx: CW_ >> 1, hy: CH_ >> 1, built: 0 };
 }
 /* ---- 保存（同じ値の連続をまとめて小さくする） ---- */
 function packCells(a) { const o = []; let v = a[0], c = 0; for (let i = 0; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v, c); v = a[i]; c = 1; } } o.push(v, c); return o; }
 function unpackCells(o) { const a = []; for (let i = 0; i < o.length; i += 2) for (let k = 0; k < o[i + 1]; k++) a.push(o[i]); return a; }
+// 古い世界の直し（海が すな・はまべが はっぱ・木のてっぺんが みず になっていた分をなおす）
+function fixOldWorld(cells) {
+  const at = (x, y, z) => cells[(z * CH_ + y) * CW_ + x];
+  const set = (x, y, z, v) => { cells[(z * CH_ + y) * CW_ + x] = v; };
+  for (let y = 0; y < CH_; y++) for (let x = 0; x < CW_; x++) {
+    let top = -1; for (let z = CD_ - 1; z >= 0; z--) if (at(x, y, z)) { top = z; break; }
+    for (let z = 0; z < CD_; z++) {
+      const v = at(x, y, z); if (!v) continue;
+      if (v === B_WATER && z > 0 && at(x, y, z - 1) === B_WOOD) set(x, y, z, B_LEAF);      // 木のてっぺん
+      else if (v === B_LEAF && z === SEA + 1 && z === top) set(x, y, z, B_SAND);           // はまべ
+      else if (v === B_SAND && z <= SEA && top <= SEA) set(x, y, z, B_WATER);              // 海
+    }
+  }
+  return cells;
+}
 function loadCraft() {
   try {
     const d = JSON.parse(localStorage.getItem(CRAFT_KEY) || "null");
     if (d && d.w === CW_ && d.h === CH_ && d.d === CD_ && d.rle) {
       const cells = unpackCells(d.rle);
-      if (cells.length === CW_ * CH_ * CD_) return { w: CW_, h: CH_, d: CD_, cells, hx: d.hx, hy: d.hy, built: d.built || 0 };
+      if (cells.length === CW_ * CH_ * CD_) {
+        if (d.v !== 2) fixOldWorld(cells);
+        return { w: CW_, h: CH_, d: CD_, cells, hx: d.hx, hy: d.hy, built: d.built || 0 };
+      }
     }
   } catch (e) {}
   return makeWorld();
 }
 function saveCraft() {
-  try { localStorage.setItem(CRAFT_KEY, JSON.stringify({ w: CW_, h: CH_, d: CD_, hx: craft.hx, hy: craft.hy, built: craft.built || 0, rle: packCells(craft.cells) })); }
+  try { localStorage.setItem(CRAFT_KEY, JSON.stringify({ v: 2, w: CW_, h: CH_, d: CD_, hx: craft.hx, hy: craft.hy, built: craft.built || 0, rle: packCells(craft.cells) })); }
   catch (e) { craftMsg("ほぞんに しっぱいしました"); }
 }
 const cIdx = (x, y, z) => (z * CH_ + y) * CW_ + x;
 const cGet = (x, y, z) => craft.cells[cIdx(x, y, z)];
 function colTop(x, y) { for (let z = CD_ - 1; z >= 0; z--) if (cGet(x, y, z)) return z; return -1; }
 // 手前のブロックに完全にかくれるものは描かない（広い世界でも軽く動かすため）
+const solidAt = (x, y, z) => { const v = cGet(x, y, z); return v && !SEETHRU[v] ? v : 0; };
 function occluded(x, y, z) {
-  if (z + 1 < CD_ && !cGet(x, y, z + 1)) return false;
   if (z + 1 >= CD_) return false;
-  if (x + 1 < CW_ && !cGet(x + 1, y, z)) return false;
-  if (y + 1 < CH_ && !cGet(x, y + 1, z)) return false;
+  if (!solidAt(x, y, z + 1)) return false;
+  if (x + 1 < CW_ && !solidAt(x + 1, y, z)) return false;
+  if (y + 1 < CH_ && !solidAt(x, y + 1, z)) return false;
   return true;
 }
 const isoX = (x, y) => (x - y) * (CTW / 2);
@@ -1392,47 +1649,271 @@ function facePath(g, px, py) {
   g.beginPath(); g.moveTo(px, py - CTH / 2); g.lineTo(px + CTW / 2, py);
   g.lineTo(px, py + CTH / 2); g.lineTo(px - CTW / 2, py); g.closePath();
 }
-function topPattern(g, b, px, py) {
-  g.save(); facePath(g, px, py); g.clip(); g.globalAlpha = .45;
-  if (b.pat === "grass") {
-    g.strokeStyle = b.lf; g.lineWidth = 1.6;
-    for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(px + i * 8, py - 3); g.lineTo(px + i * 8 + 2, py + 3); g.stroke(); }
-  } else if (b.pat === "stone") {
-    g.fillStyle = b.lf;
-    [[-9, -2], [4, -4], [10, 3], [-3, 5]].forEach(function (p) { g.beginPath(); g.arc(px + p[0], py + p[1], 2.2, 0, 7); g.fill(); });
-  } else if (b.pat === "wood") {
-    g.strokeStyle = b.lf; g.lineWidth = 1.4;
-    for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(px - CTW / 2 + 5, py + i * 6); g.lineTo(px + CTW / 2 - 5, py + i * 6); g.stroke(); }
-  } else if (b.pat === "brick") {
-    g.strokeStyle = "#f0d3c6"; g.lineWidth = 1.3;
-    g.beginPath(); g.moveTo(px - CTW / 2, py); g.lineTo(px + CTW / 2, py); g.stroke();
-    g.beginPath(); g.moveTo(px, py - CTH / 2); g.lineTo(px, py + CTH / 2); g.stroke();
-  } else if (b.pat === "water") {
-    g.strokeStyle = "#ffffff"; g.lineWidth = 1.6;
-    g.beginPath(); g.moveTo(px - 12, py + 2); g.quadraticCurveTo(px - 4, py - 3, px + 4, py + 2);
-    g.quadraticCurveTo(px + 10, py + 6, px + 14, py + 2); g.stroke();
-  } else if (b.pat === "sand") {
-    g.fillStyle = b.lf;
-    [[-8, 0], [2, -3], [8, 4], [-2, 4]].forEach(function (p) { g.beginPath(); g.arc(px + p[0], py + p[1], 1.4, 0, 7); g.fill(); });
-  } else if (b.pat === "gold") {
-    g.globalAlpha = .85; g.fillStyle = "#fffbe6";
-    g.beginPath(); g.moveTo(px - 6, py - 2); g.lineTo(px - 1, py - 6); g.lineTo(px + 3, py - 1); g.lineTo(px - 2, py + 3); g.closePath(); g.fill();
+/* ============================================================ ブロックの絵づくり
+   模様は 16×16 の「テクセル（ドット）」で作り、ひし形の面にぴったり貼る。
+   1個ずつ絵を焼いておいて（bakeBlocks）、世界を描くときは貼るだけにする。   */
+const TEXN = 16;                       // 1面あたりのドットの数（細かいほど精密）
+let craftDPR = 1, BAKE = 3;            // 画面の細かさ／焼き込みの倍率
+const SPR = {}, SIL = {}, CHIP = {};   // 焼いた絵／白いシルエット／パレット用の小さい絵
+const TEXC = {};                       // テクスチャの使いまわし
+let WATER = [], waterPhase = 0, craftAnim = null;
+
+const newCv = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
+const cl255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
+const hx2n = (h) => { const s = h.replace("#", ""); return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)]; };
+const tint = (c, f) => [cl255(c[0] * f), cl255(c[1] * f), cl255(c[2] * f)];
+const mixc = (a, b, t) => [cl255(a[0] + (b[0] - a[0]) * t), cl255(a[1] + (b[1] - a[1]) * t), cl255(a[2] + (b[2] - a[2]) * t)];
+const css = (c) => "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+const stepq = (v, n) => Math.floor(v * n) / (n - 1);   // 0〜1を n段の階調にする（ドット絵らしさ）
+const C_SOIL = [138, 95, 58], C_MORTAR = [239, 228, 214], C_WHITE = [255, 255, 255];
+
+/* ドット1個の色を決める。face 0=上面 1=左面 2=右面 */
+function texel(b, id, face, i, j, ph) {
+  const N = TEXN, base = hx2n(face === 0 ? b.top : face === 1 ? b.lf : b.rt);
+  const sd = id * 37 + face * 11;
+  const r1 = hash2(i + sd, j * 3 + sd), r2 = hash2(i * 5 + sd * 7, j + sd);
+  let f = 1, c = null, a = 255;
+  switch (b.pat) {
+    case "grass":
+      if (face > 0) {                                        // 側面は「上が草・下は土」。境目はドット単位でギザギザ
+        const e = 3 + Math.floor(hash2(i + sd, 7) * 2.6);
+        if (j >= e) { c = tint(C_SOIL, 0.8 + stepq(r1, 4) * 0.32); break; }
+      }
+      f = 0.86 + stepq(r1, 5) * 0.3; if (r2 > 0.9) f -= 0.12;
+      break;
+    case "leaf":
+      f = 0.78 + stepq(r1, 5) * 0.44; if (r2 > 0.9) f -= 0.16;
+      break;
+    case "dirt":
+      f = 0.88 + stepq(r1, 4) * 0.22; if (r2 > 0.94) c = tint(base, 1.28);   // ときどき小石
+      break;
+    case "sand":
+      f = 0.94 + stepq(r1, 4) * 0.13; if (r2 > 0.94) f -= 0.08;
+      break;
+    case "stone": {
+      f = 0.9 + stepq(r1, 4) * 0.16;
+      const n = vnoise(i + sd, j, 6); if (n > 0.58 && n < 0.64) f -= 0.22;   // ひび
+      break;
+    }
+    case "concrete":
+      f = 0.96 + stepq(r1, 3) * 0.07; if (r2 > 0.95) f -= 0.13;
+      break;
+    case "metal":
+      f = 0.92 + stepq(hash2(i + sd, 3), 4) * 0.16;                          // たてのヘアライン
+      if ((i === 2 || i === N - 3) && (j === 2 || j === N - 3)) c = tint(base, 0.72);  // びょう
+      break;
+    case "marble": {
+      f = 0.98 + stepq(r1, 3) * 0.04;
+      const n = vnoise(i * 1.6 + sd, j * 0.6, 9);
+      if (n > 0.52 && n < 0.58) c = mixc(base, [120, 118, 128], 0.5);        // すじ模様
+      break;
+    }
+    case "wood":                                                            // 木の幹：たての溝と ふしめ
+      f = 0.9 + stepq(hash2(i + sd, 1), 4) * 0.2;
+      if ((i + Math.floor(hash2(0, j + sd) * 2)) % 5 === 0) f -= 0.15;
+      if (hash2(i >> 2, j >> 3) > 0.93) f -= 0.1;
+      break;
+    case "plank": {                                                         // いた：よこ板＋木目
+      const row = Math.floor(j / 5);
+      f = 0.93 + stepq(hash2(i + row * 13 + sd, row), 4) * 0.14;
+      if (j % 5 === 0) f -= 0.2;
+      break;
+    }
+    case "straw": {
+      const s0 = (i + j * 2 + sd) % 5;
+      f = s0 === 0 ? 0.84 : 0.9 + stepq(r1, 3) * 0.2;
+      break;
+    }
+    case "brick": case "sbrick": {
+      const rh = b.pat === "brick" ? 4 : 8, bw = 8, row = Math.floor(j / rh), ii = (i + (row % 2) * (bw / 2)) % bw;
+      if (j % rh === 0 || ii === 0) { c = mixc(base, C_MORTAR, b.pat === "brick" ? 0.55 : 0.3); break; }
+      f = 0.92 + stepq(hash2(row * 31 + Math.floor((i + (row % 2) * (bw / 2)) / bw) + sd, row), 3) * 0.16 + (r1 - 0.5) * 0.06;
+      break;
+    }
+    case "tile": {                                                          // やねがわら：かまぼこ形のならび
+      const row = Math.floor(j / 4), t = (i + (row % 2) * 2) % 4;
+      f = t === 0 ? 0.8 : t === 1 ? 1.14 : t === 2 ? 1.02 : 0.92;
+      if (j % 4 === 3) f -= 0.14;
+      break;
+    }
+    case "glass":
+      a = 46; c = mixc(base, C_WHITE, 0.35);
+      if (i === 0 || j === 0 || i === N - 1 || j === N - 1) { a = 215; c = tint(base, 0.9); }   // わく
+      if (i - j === 3 || i - j === 4) { a = 120; c = C_WHITE; }                                 // 反射
+      break;
+    case "water": {
+      const w = Math.sin(i * 0.8 + j * 0.42 + ph * 2.1);
+      f = 1 + w * 0.09; a = 232;
+      if (w > 0.93 && r2 > 0.55) { c = mixc(base, C_WHITE, 0.6); a = 245; }
+      break;
+    }
+    case "gold":
+      f = 0.9 + stepq(r1, 3) * 0.16;
+      if ((i + j + sd) % 9 === 0) f += 0.16;
+      if (r2 > 0.95) c = mixc(base, [255, 255, 240], 0.7);
+      break;
+    case "glow": {
+      const d0 = Math.hypot(i - 7.5, j - 7.5);
+      f = 1.14 - d0 * 0.028 + (r1 - 0.5) * 0.05;
+      if (d0 < 2.6) c = mixc(base, [255, 255, 235], 0.55);
+      break;
+    }
+    case "neon":
+      f = 0.86 + stepq(r1, 3) * 0.1;
+      if ((i + j * 2) % 6 < 2) c = mixc(base, C_WHITE, 0.55);
+      break;
+    case "crystal":
+      f = (((i * 2 + j) % 8) < 4 ? 1.1 : 0.88) + stepq(r1, 3) * 0.06;
+      if ((i + j) % 11 === 0) c = mixc(base, C_WHITE, 0.7);
+      break;
+    case "rainbow": {
+      const RB = [[255, 138, 168], [255, 196, 120], [255, 240, 140], [150, 224, 150], [130, 196, 255], [190, 160, 240]];
+      c = tint(RB[(Math.floor((i + j) / 3) + sd) % 6], face === 0 ? 1 : face === 1 ? 0.76 : 0.9);
+      c = tint(c, 0.94 + stepq(r1, 3) * 0.1);
+      break;
+    }
+    default: f = 0.94 + stepq(r1, 4) * 0.12;
   }
+  const o = c || tint(base, f);
+  return [o[0], o[1], o[2], a];
+}
+function buildTex(id, face, ph) {
+  const b = BLOCKS[id], N = TEXN, cv = newCv(N, N), g = cv.getContext("2d");
+  const img = g.createImageData(N, N), d = img.data;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const c = texel(b, id, face, i, j, ph || 0), o = (j * N + i) * 4;
+    d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = c[3];
+  }
+  g.putImageData(img, 0, 0); return cv;
+}
+const tex = (id, face, ph) => { const k = id + "_" + face + "_" + (ph || 0); return TEXC[k] || (TEXC[k] = buildTex(id, face, ph)); };
+
+/* ひし形（平行四辺形）の面にテクセル画像をぴったり貼る。o=起点 a,b=2辺のベクトル */
+function paintFace(g, t, ox, oy, ax, ay, bx, by, path) {
+  g.save(); path(); g.clip();
+  g.imageSmoothingEnabled = false;
+  g.transform(ax / TEXN, ay / TEXN, bx / TEXN, by / TEXN, ox, oy);
+  g.drawImage(t, -0.6, -0.6, TEXN + 1.2, TEXN + 1.2);   // 面のつなぎ目に すきまが出ないよう少し大きめに
   g.restore();
 }
-function drawBlock(g, x, y, z, id, hi) {
-  const b = BLOCKS[id]; if (!b) return;
+/* 立方体。(0,0) がそのマスの基準点（上面の中心） */
+function drawCube(g, id, tw, th, bh, flat, ph) {
+  const hw = tw / 2, hh = th / 2;
+  const pTop = () => { g.beginPath(); g.moveTo(0, -hh); g.lineTo(hw, 0); g.lineTo(0, hh); g.lineTo(-hw, 0); g.closePath(); };
+  const pLf = () => { g.beginPath(); g.moveTo(-hw, 0); g.lineTo(0, hh); g.lineTo(0, hh + bh); g.lineTo(-hw, bh); g.closePath(); };
+  const pRt = () => { g.beginPath(); g.moveTo(hw, 0); g.lineTo(0, hh); g.lineTo(0, hh + bh); g.lineTo(hw, bh); g.closePath(); };
+  if (flat) { g.fillStyle = flat; pLf(); g.fill(); pRt(); g.fill(); pTop(); g.fill(); return; }
+  paintFace(g, tex(id, 1, ph), -hw, 0, hw, hh, 0, bh, pLf);
+  paintFace(g, tex(id, 2, ph), 0, hh, hw, -hh, 0, bh, pRt);
+  paintFace(g, tex(id, 0, ph), 0, -hh, hw, hh, -hw, hh, pTop);
+  // 足もとを暗くして、面のさかい目に光を入れる（角が立って見える）
+  const sh = g.createLinearGradient(0, hh, 0, hh + bh);
+  sh.addColorStop(0, "rgba(0,0,0,0)"); sh.addColorStop(1, "rgba(8,18,38,.32)");
+  g.save(); g.fillStyle = sh; pLf(); g.fill(); pRt(); g.fill(); g.restore();
+  g.save(); g.lineWidth = 1;
+  g.strokeStyle = "rgba(255,255,255,.4)";
+  g.beginPath(); g.moveTo(-hw, 0); g.lineTo(0, -hh); g.lineTo(hw, 0); g.stroke();
+  g.strokeStyle = "rgba(0,0,0,.18)";
+  g.beginPath(); g.moveTo(0, hh); g.lineTo(0, hh + bh); g.stroke();
+  g.restore();
+  g.strokeStyle = "rgba(18,28,48,.34)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, -hh); g.lineTo(hw, 0); g.lineTo(hw, bh); g.lineTo(0, hh + bh);
+  g.lineTo(-hw, bh); g.lineTo(-hw, 0); g.closePath(); g.stroke();
+}
+/* 葉のかたまり。ドットを1個ずつ置き、ふちを間引いて木らしいギザギザにする */
+function drawCanopy(g, id, flat) {
+  const b = BLOCKS[id], t = CTW / TEXN, cy = CTH / 2 + CBH * 0.22;
+  const rx = CTW * 0.72, ry = (CTH + CBH) * 0.58;
+  const base = hx2n(b.top), dark = hx2n(b.lf);
+  for (let py = -ry - t; py <= ry + t; py += t) {
+    for (let px = -rx - t; px <= rx + t; px += t) {
+      const gx = Math.round(px / t), gy = Math.round(py / t);
+      const n = hash2(gx * 7 + id, gy * 13 + id);
+      const d = (px / rx) * (px / rx) + (py / ry) * (py / ry) - (n - 0.5) * 0.24;
+      if (d > 1 || (d > 0.78 && n < 0.4)) continue;
+      if (flat) { g.fillStyle = flat; g.fillRect(px, cy + py, t + 0.6, t + 0.6); continue; }
+      let f = 1.12 - (py / ry) * 0.34 - (px / rx) * 0.07;                    // 上と左が明るい
+      f *= 0.86 + stepq(hash2(gx * 3 + id, gy * 5), 5) * 0.3;
+      if (n > 0.93) f *= 0.8;                                                // 影になる葉
+      g.fillStyle = css(tint(d > 0.62 ? mixc(base, dark, 0.4) : base, f));
+      g.fillRect(px, cy + py, t + 0.6, t + 0.6);
+    }
+  }
+}
+/* とがったクリスタル */
+function drawCrystal(g, id, flat, ph) {
+  drawCube(g, id, CTW * 0.68, CTH * 0.68, CBH * 0.8, flat, ph);
+  const b = BLOCKS[id], hw = CTW * 0.34, hh = CTH * 0.34, apex = -hh - 21;
+  const face = (x1, y1, x2, y2, col) => {
+    g.fillStyle = flat || css(col);
+    g.beginPath(); g.moveTo(0, apex); g.lineTo(x1, y1); g.lineTo(x2, y2); g.closePath(); g.fill();
+  };
+  face(-hw, 0, 0, hh, tint(hx2n(b.lf), 1.08));
+  face(0, hh, hw, 0, tint(hx2n(b.rt), 1.16));
+  face(hw, 0, 0, -hh, tint(hx2n(b.top), 1.18));
+  face(0, -hh, -hw, 0, tint(hx2n(b.top), 0.98));
+}
+/* 光るブロックのにじみ */
+function drawGlow(g, id) {
+  const c = hx2n(BLOCKS[id].top), cy = CTH / 2 + CBH * 0.4, r = CTW * 0.7;
+  const gr = g.createRadialGradient(0, cy, 2, 0, cy, r);
+  gr.addColorStop(0, "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",.55)");
+  gr.addColorStop(1, "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0)");
+  g.fillStyle = gr; g.beginPath(); g.arc(0, cy, r, 0, 7); g.fill();
+}
+/* 1個ぶんの絵を焼く。flat を渡すとその色1色のシルエットになる */
+function bakeOne(id, flat, ph, k) {
+  const sh = SHAPE[id] || "cube", P = sh === "glow" ? 18 : 0;   // 葉や光は マスからはみ出すので、そのぶんの余白をとる
+  let w = CTW, h = CTH + CBH, ox = CTW / 2, oy = CTH / 2;
+  if (sh === "canopy") { w = CTW * 1.8; h = CTH + CBH + 30; ox = w / 2; oy = CTH / 2 + 14; }
+  if (sh === "crystal") { h = CTH + CBH + 24; oy = CTH / 2 + 24; }
+  w += P * 2; h += P * 2; ox += P; oy += P;
+  const cv = newCv(w * k, h * k), g = cv.getContext("2d");
+  g.setTransform(k, 0, 0, k, ox * k, oy * k);
+  if (sh === "canopy") drawCanopy(g, id, flat);
+  else if (sh === "trunk") drawCube(g, id, CTW * 0.56, CTH * 0.56, CBH, flat, ph);
+  else if (sh === "crystal") drawCrystal(g, id, flat, ph);
+  else {
+    if (sh === "glow" && !flat) drawGlow(g, id);
+    drawCube(g, id, CTW, CTH, CBH, flat, ph);
+  }
+  return { cv: cv, ox: ox, oy: oy, w: w, h: h };
+}
+function bakeBlocks() {
+  for (const k in TEXC) delete TEXC[k];
+  const sk = Math.max(1, BAKE >> 1);
+  for (let id = 1; id < BLOCKS.length; id++) {
+    SPR[id] = bakeOne(id, null, 0, BAKE);
+    SIL[id] = bakeOne(id, "#ffffff", 0, sk);
+    CHIP[id] = chipURL(id);
+  }
+  WATER = [0, 1, 2].map((p) => bakeOne(B_WATER, null, p, BAKE));
+}
+// パレットの見本も、置いたときとまったく同じ絵にする
+function chipURL(id) {
+  const s = SPR[id], w = 36, sc = Math.min(w / s.w, w / s.h) * 0.96;
+  const cv = newCv(w, w), g = cv.getContext("2d");
+  g.drawImage(s.cv, (w - s.w * sc) / 2, (w - s.h * sc) / 2, s.w * sc, s.h * sc);
+  try { return cv.toDataURL(); } catch (e) { return ""; }
+}
+// 上に物があると、上面に影が落ちる（光は左うしろから）
+function topShade(x, y, z) {
+  let s = 0;
+  if (x > 0 && colTop(x - 1, y) > z) s += 0.12 + Math.min(0.12, (colTop(x - 1, y) - z) * 0.03);
+  if (y > 0 && colTop(x, y - 1) > z) s += 0.1;
+  if (x > 0 && y > 0 && colTop(x - 1, y - 1) > z + 1) s += 0.06;
+  return Math.min(0.32, s);
+}
+function drawBlockAt(g, x, y, z, id) {
+  const s = id === B_WATER ? (WATER[waterPhase] || SPR[id]) : SPR[id]; if (!s) return;
   const px = isoX(x, y), py = isoY(x, y, z);
-  g.fillStyle = b.lf;
-  g.beginPath(); g.moveTo(px - CTW / 2, py); g.lineTo(px, py + CTH / 2);
-  g.lineTo(px, py + CTH / 2 + CBH); g.lineTo(px - CTW / 2, py + CBH); g.closePath(); g.fill();
-  g.fillStyle = b.rt;
-  g.beginPath(); g.moveTo(px + CTW / 2, py); g.lineTo(px, py + CTH / 2);
-  g.lineTo(px, py + CTH / 2 + CBH); g.lineTo(px + CTW / 2, py + CBH); g.closePath(); g.fill();
-  g.fillStyle = hi ? "#ffffff" : b.top;
-  facePath(g, px, py); g.fill();
-  if (!hi) topPattern(g, b, px, py);
-  g.strokeStyle = "rgba(0,0,0,.2)"; g.lineWidth = 1; facePath(g, px, py); g.stroke();
+  g.drawImage(s.cv, px - s.ox, py - s.oy, s.w, s.h);
+  if (!SHAPE[id] && (z + 1 >= CD_ || !cGet(x, y, z + 1))) {          // 上面が見えている立方体だけ影をのせる
+    const sh = topShade(x, y, z);
+    if (sh > 0.02) { g.save(); g.globalAlpha = sh; g.fillStyle = "#16305c"; facePath(g, px, py); g.fill(); g.restore(); }
+  }
+  const fog = Math.min(0.15, Math.max(0, (30 - (x + y)) * 0.006));   // 遠くはうっすら空にとける
+  if (fog > 0.01 && SIL[id]) { g.save(); g.globalAlpha = fog; g.drawImage(SIL[id].cv, px - s.ox, py - s.oy, s.w, s.h); g.restore(); }
 }
 /* ---- キャラクター（オリジナル：まる顔＋王冠のたんけん家） ---- */
 function drawHero(g, x, y, z) {
@@ -1454,23 +1935,40 @@ function drawHero(g, x, y, z) {
   g.strokeStyle = "#b8912a"; g.lineWidth = 1; g.stroke();
   g.restore();
 }
+/* ---- 画面の大きさを、その端末の細かさ（Retina等）に合わせる ---- */
+function resizeCraftCanvas() {
+  const cv = $("#craftCanvas"); if (!cv || !cv.getBoundingClientRect) return false;
+  const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return false;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  const nb = Math.max(2, Math.min(4, Math.ceil(dpr * 1.8)));
+  if (cv.width === w && cv.height === h && nb === BAKE && SPR[1]) return false;
+  const ow = cv.width || w, oh = cv.height || h;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; camX += (w - ow) / 2; camY += (h - oh) / 2; }
+  craftDPR = dpr;
+  if (nb !== BAKE || !SPR[1]) { BAKE = nb; bakeBlocks(); }
+  return true;
+}
+const camScale = () => camS * craftDPR;
 /* ---- 世界を描く（見えている所だけ・奥から手前へ） ---- */
 function drawCraft() {
   const cv = $("#craftCanvas"); if (!cv || !cv.getContext) return;
   const g = cv.getContext("2d"); if (!g) return;
+  if (!SPR[1]) bakeBlocks();
   g.setTransform(1, 0, 0, 1, 0, 0);
   const sky = g.createLinearGradient(0, 0, 0, cv.height);
-  sky.addColorStop(0, "#a8d8ff"); sky.addColorStop(1, "#eaf7ff");
+  sky.addColorStop(0, "#8ec8f6"); sky.addColorStop(.55, "#bfe3ff"); sky.addColorStop(1, "#eef9ff");
   g.fillStyle = sky; g.fillRect(0, 0, cv.width, cv.height);
   if (!craftPick) craftPick = document.createElement("canvas");
   craftPick.width = cv.width; craftPick.height = cv.height;
   const pg = craftPick.getContext ? craftPick.getContext("2d") : null;
   if (pg) { pg.setTransform(1, 0, 0, 1, 0, 0); pg.clearRect(0, 0, craftPick.width, craftPick.height); }
-  g.setTransform(camS, 0, 0, camS, camX, camY);
-  if (pg) pg.setTransform(camS, 0, 0, camS, camX, camY);
+  const S = camScale();
+  g.setTransform(S, 0, 0, S, camX, camY);
+  if (pg) pg.setTransform(S, 0, 0, S, camX, camY);
   // 画面に入っている範囲だけ描く
-  const L = -camX / camS - CTW, R = (cv.width - camX) / camS + CTW;
-  const T = -camY / camS - CBH * CD_, B = (cv.height - camY) / camS + CTH + CBH;
+  const L = -camX / S - CTW, R = (cv.width - camX) / S + CTW;
+  const T = -camY / S - CBH * CD_, B = (cv.height - camY) / S + CTH + CBH;
   for (let s = 0; s <= (CW_ - 1) + (CH_ - 1); s++) {
     for (let x = 0; x < CW_; x++) {
       const y = s - x; if (y < 0 || y >= CH_) continue;
@@ -1478,18 +1976,30 @@ function drawCraft() {
       const pyBase = isoY(x, y, 0); if (pyBase < T || pyBase - CBH * CD_ > B) continue;
       for (let z = 0; z < CD_; z++) {
         const id = cGet(x, y, z);
-        if (id && !occluded(x, y, z)) drawBlock(g, x, y, z, id, false);
+        if (id && !occluded(x, y, z)) drawBlockAt(g, x, y, z, id);
       }
       const tz = colTop(x, y), col = x + y * CW_;
       if (pg) {
         pg.fillStyle = "rgb(" + ((col + 1) & 255) + "," + (((col + 1) >> 8) & 255) + ",7)";
         facePath(pg, px, isoY(x, y, tz < 0 ? 0 : tz)); pg.fill();
       }
-      if (craftHover === col && tz >= 0) { g.save(); g.globalAlpha = .38; drawBlock(g, x, y, tz, cGet(x, y, tz), true); g.restore(); }
+      if (craftHover === col && tz >= 0) {
+        const hid = cGet(x, y, tz), hs = SIL[hid], sp = SPR[hid];
+        if (hs && sp) { g.save(); g.globalAlpha = .34; g.drawImage(hs.cv, px - sp.ox, isoY(x, y, tz) - sp.oy, sp.w, sp.h); g.restore(); }
+      }
       if (craft.hx === x && craft.hy === y) drawHero(g, x, y, tz < 0 ? 0 : tz);
     }
   }
   g.setTransform(1, 0, 0, 1, 0, 0);
+}
+// 水面をゆっくり動かす（クラフト画面を見ているときだけ）
+function craftAnimStart() {
+  if (craftAnim) return;
+  craftAnim = setInterval(function () {
+    const v = $("#view-craft");
+    if (document.hidden || !v || v.classList.contains("hidden") || !craft) return;
+    waterPhase = (waterPhase + 1) % (WATER.length || 1); drawCraft();
+  }, 460);
 }
 function craftPickAt(ev) {
   const cv = $("#craftCanvas"); if (!cv || !cv.getBoundingClientRect) return null;
@@ -1500,7 +2010,7 @@ function craftPickAt(ev) {
   if (x < 0 || y < 0 || x >= cv.width || y >= cv.height) return null;
   pg.setTransform(1, 0, 0, 1, 0, 0);
   const d = pg.getImageData(x, y, 1, 1).data;
-  pg.setTransform(camS, 0, 0, camS, camX, camY);
+  pg.setTransform(camScale(), 0, 0, camScale(), camX, camY);
   if (d[2] !== 7) return null;
   const col = (d[0] | (d[1] << 8)) - 1; if (col < 0) return null;
   return { x: col % CW_, y: Math.floor(col / CW_), col: col };
@@ -1536,8 +2046,8 @@ function craftClick(ev) {
 }
 function craftCenterOnHero() {
   const cv = $("#craftCanvas"); if (!cv) return;
-  camX = cv.width / 2 - isoX(craft.hx, craft.hy) * camS;
-  camY = cv.height / 2 - isoY(craft.hx, craft.hy, 4) * camS;
+  camX = cv.width / 2 - isoX(craft.hx, craft.hy) * camScale();
+  camY = cv.height / 2 - isoY(craft.hx, craft.hy, 4) * camScale();
 }
 function renderCraftPalette() {
   const el = $("#craftPalette"); if (!el) return;
@@ -1549,7 +2059,7 @@ function renderCraftPalette() {
     for (let i = 1; i < BLOCKS.length; i++) {
       const bk = BLOCKS[i]; if (bk.era !== e) continue;
       html += '<button class="blk' + (i === craftSel ? " sel" : "") + (open ? "" : " lock") + '" data-b="' + i + '">' +
-        '<span class="blk-chip" style="--t:' + bk.top + ';--l:' + bk.lf + ';--r:' + bk.rt + '"></span>' +
+        '<span class="blk-chip" style="background-image:url(' + (CHIP[i] || "") + ')"></span>' +
         '<span class="blk-n">' + bk.n + '</span><span class="blk-c">' + (open ? bk.cost + "G" : "🔒") + '</span></button>';
     }
     html += '</div></div>';
@@ -1565,7 +2075,12 @@ function renderCraftPalette() {
 }
 function craftBuiltCount() { return (craft && craft.built) || 0; }  // 自分で置いた数（地形は数えない）
 function renderCraft() {
-  if (!craft) { craft = loadCraft(); craftCenterOnHero(); }
+  const fresh = !craft;
+  if (fresh) craft = loadCraft();
+  resizeCraftCanvas();
+  if (!SPR[1]) bakeBlocks();          // パレットの見本にも焼いた絵を使うので、先に用意しておく
+  if (fresh) craftCenterOnHero();
+  craftAnimStart();
   $("#craftGold").textContent = getGold().toLocaleString();
   $("#craftCount").textContent = craftBuiltCount().toLocaleString();
   const el2 = $("#craftEra"); if (el2) el2.textContent = ERAS[myEra()].n;
@@ -1581,7 +2096,7 @@ $("#craftCanvas").addEventListener("pointerdown", function (ev) { dragging = tru
 $("#craftCanvas").addEventListener("pointermove", function (ev) {
   if (dragging) {
     const dx = ev.clientX - dragSX, dy = ev.clientY - dragSY;
-    if (Math.abs(dx) + Math.abs(dy) > 4) { dragMoved = true; camX += dx; camY += dy; dragSX = ev.clientX; dragSY = ev.clientY; drawCraft(); }
+    if (Math.abs(dx) + Math.abs(dy) > 4) { dragMoved = true; camX += dx * craftDPR; camY += dy * craftDPR; dragSX = ev.clientX; dragSY = ev.clientY; drawCraft(); }
     return;
   }
   const p = craftPickAt(ev), c = p ? p.col : -1;
@@ -1604,6 +2119,13 @@ $("#craftReset").addEventListener("click", function () {
   if (!confirm("世界を つくりなおす？（つかったGOLDは もどりません）")) return;
   localStorage.removeItem(CRAFT_KEY); craft = null; craftHist = []; renderCraft(); craftCenterOnHero(); drawCraft();
 });
+// 画面の大きさが変わったら、canvasも作りなおす（ぼやけ防止）
+(function () {
+  const cv = $("#craftCanvas"); if (!cv) return;
+  const on = function () { if (craft && resizeCraftCanvas()) drawCraft(); };
+  window.addEventListener("resize", on);
+  if (window.ResizeObserver) new ResizeObserver(on).observe(cv);
+})();
 
 /* ---------- キーボード ---------- */
 document.addEventListener("keydown", (e) => {
@@ -1630,7 +2152,7 @@ document.addEventListener("keydown", (e) => {
 
 /* ---------- ホーム操作 ---------- */
 $("#homeStartBtn").addEventListener("click", () => startRoutine(homeGrade()));
-$("#homeToKingdom").addEventListener("click", () => { showView("kingdom"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); });
+$("#homeToKingdom").addEventListener("click", () => { showView("craft"); setActiveNav(document.querySelector('.nav[data-view="craft"]')); });
 $("#homeToRecords").addEventListener("click", () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); });
 
 /* ---------- 初期化 ---------- */

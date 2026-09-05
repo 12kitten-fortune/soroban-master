@@ -62,6 +62,7 @@
                 <div class="today-menu" id="homeMenu"></div>
                 <button id="homeStartBtn" class="big-cta">▶ 今日の練習を始める</button>
                 <div id="homeStatus" class="today-status"></div>
+                <div id="weakMenu" class="weak-menu"></div>
               </div>
             </div>
             <aside class="home-side">
@@ -90,6 +91,7 @@
               <div class="options">
                 <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> 制限時間タイマーを使う</label>
                 <label class="toggle"><input type="checkbox" id="examMode" /> 全問回答してから採点（検定方式）</label>
+                <label class="toggle"><input type="checkbox" id="mySoroban" /> 🧮 じぶんの そろばんを つかう（画面のそろばんを出さず、答えを数字で入力）</label>
                 <div id="gradeInfo" class="sub"></div>
                 <button id="startBtn">▶ はじめる（Enter）</button>
               </div>
@@ -149,9 +151,7 @@
               </div>
               <div class="btn-row">
                 <button id="answerBtn">✓ こたえる</button>
-                <button id="showSteps" class="ghost">🧮 解き方をみる</button>
               </div>
-              <div id="steps" class="steps hidden"></div>
             </div>
             <div id="anzanTip" class="anzan-tip hidden">
               <img class="tip-cat" src="assets/cat_wizard.png" alt="まほうつかいのネコ" />
@@ -171,6 +171,11 @@
               <input id="playInput" type="number" inputmode="numeric" placeholder="答え" autocomplete="off" />
               <button type="submit">こたえる</button>
             </form>
+            <!-- 解き方は「画面のそろばん」でも「じぶんのそろばん」でも使えるよう、外に出しておく -->
+            <div class="btn-row" id="stepsRow">
+              <button id="showSteps" class="ghost">🧮 解き方をみる</button>
+            </div>
+            <div id="steps" class="steps hidden"></div>
             <div id="playFlashWrap" class="hidden">
               <div id="flashInfo" class="sub"></div>
               <label class="toggle"><input type="checkbox" id="flashExamMode" /> 検定モード（20問・140/200点で合格）</label>
@@ -243,7 +248,7 @@
               <button id="craftIn" class="pill">🔍＋</button><button id="craftOut" class="pill">🔍－</button><button id="craftHome" class="pill">🧭 じぶんの所へ</button><button id="craftReset" class="ghost">世界を つくりなおす</button>
               <span id="craftMsg" class="craft-msg"></span>
             </div>
-            <div class="craft-stage"><canvas id="craftCanvas" width="720" height="560"></canvas></div>
+            <div class="craft-stage"><canvas id="craftCanvas"></canvas></div>
             <p class="sub">マスを クリックで ブロックを つむ。画面を ドラッグで 見わたす。GOLDは そろばんの れんしゅうで たまるよ。</p>
             <div id="craftPalette" class="craft-palette"></div>
           </div>
