@@ -308,8 +308,89 @@ function tone(freq, t0, dur, type = "sine", vol = 0.15) {
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   o.connect(g).connect(audioCtx.destination); o.start(t0); o.stop(t0 + dur + 0.02);
 }
+/* ============================================================ 音
+   ・音の材料（mp3）が assets/sfx/ にあれば それを鳴らす
+   ・無ければ その場で波形を作って鳴らす（今までどおり／材料が増えるほど良くなる）
+   ・音階は ペンタトニック（ヨナ抜き）に そろえるので、どう鳴らしても濁らない */
+const SFX_DIR = "assets/sfx/";
+const SFX_LIST = {
+  click: "click", correct: "correct", wrong: "wrong", coin: "coin",
+  pop: "pop", rocket: "rocket", clear: "clear", levelup: "levelup", star: "star",
+};
+const sfxBuf = {};                       // 読みこんだ音
+let sfxTried = false;
+function sfxPreload() {
+  if (sfxTried) return; sfxTried = true;
+  Object.values(SFX_LIST).forEach(function (n) {
+    try {
+      const a = new Audio(SFX_DIR + n + ".mp3");
+      a.preload = "auto";
+      a.addEventListener("canplaythrough", function () { sfxBuf[n] = a; }, { once: true });
+      a.addEventListener("error", function () { }, { once: true });
+      a.load();
+    } catch (e) { }
+  });
+}
+// 材料があれば それを、無ければ 合成音を鳴らす
+function sfx(name, fallback) {
+  if (!soundOn) return;
+  const a = sfxBuf[name];
+  if (a) { try { const c = a.cloneNode(); c.volume = sfxVol; c.play().catch(function () { }); return; } catch (e) { } }
+  if (fallback) { try { fallback(); } catch (e) { } }
+}
+let sfxVol = 0.8;
+/* ---- 音階（ペンタトニック）。どの段でも きれいに上がっていく ---- */
+const SCALE_PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
+const noteHz = (step, base) => (base || 523.25) * Math.pow(2, SCALE_PENTA[Math.max(0, Math.min(SCALE_PENTA.length - 1, step | 0))] / 12);
+/* ---- 合成音を すこし厚くする（2声＋やわらかい減衰） ---- */
+function tone2(freq, t0, dur, type, vol) {
+  tone(freq, t0, dur, type || "triangle", vol == null ? 0.14 : vol);
+  tone(freq * 2.005, t0 + 0.012, dur * 0.7, "sine", (vol == null ? 0.14 : vol) * 0.35);   // 倍音を すこし足す
+}
+function chord(t0, root, kind, dur, vol) {
+  const c = ensureAudio();
+  const set = kind === "maj7" ? [0, 4, 7, 11] : kind === "maj" ? [0, 4, 7] : [0, 3, 7];
+  set.forEach(function (semi, i) {
+    tone2(root * Math.pow(2, semi / 12), t0 + i * 0.012, dur, "triangle", (vol || 0.12) * (1 - i * 0.12));
+  });
+}
+
+/* ---- BGM（材料があれば鳴る。無ければ 何も起きない） ---- */
+const BGM_KEY = "soroban_bgm", VOL_KEY = "soroban_vol";
+let bgmOn = localStorage.getItem(BGM_KEY) === "on";
+let bgmEl = null, bgmName = "";
+sfxVol = (function () { const v = parseFloat(localStorage.getItem(VOL_KEY)); return isFinite(v) ? v : 0.8; })();
+function bgmPlay(name) {
+  if (!bgmOn || !soundOn) return bgmStop();
+  if (bgmName === name && bgmEl) return;
+  bgmStop();
+  try {
+    bgmEl = new Audio(SFX_DIR + name + ".mp3");
+    bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
+    bgmEl.addEventListener("error", function () { bgmEl = null; bgmName = ""; }, { once: true });
+    const pr = bgmEl.play();
+    if (pr && pr.catch) pr.catch(function () { });
+    let v = 0;                                  // そっと 音を上げる
+    const id = setInterval(function () {
+      if (!bgmEl) return clearInterval(id);
+      v = Math.min(sfxVol * 0.32, v + 0.02); bgmEl.volume = v;
+      if (v >= sfxVol * 0.32) clearInterval(id);
+    }, 90);
+  } catch (e) { bgmEl = null; }
+}
+function bgmStop() { if (bgmEl) { try { bgmEl.pause(); } catch (e) { } } bgmEl = null; bgmName = ""; }
+function setBgm(on) { bgmOn = !!on; localStorage.setItem(BGM_KEY, on ? "on" : "off"); if (!on) bgmStop(); }
+function setVol(v) { sfxVol = Math.max(0, Math.min(1, v)); localStorage.setItem(VOL_KEY, String(sfxVol)); if (bgmEl) bgmEl.volume = sfxVol * 0.32; }
+// 画面に合わせて BGM を切りかえる
+function bgmForView(v) {
+  if (v === "puzzle") bgmPlay("bgm_puzzle");
+  else if (v === "play" || v === "today") bgmPlay("bgm_study");
+  else bgmStop();
+}
+
 function clickSnd() { // 珠が弾く「パチ」
   if (!soundOn) return;
+  if (sfxBuf["click"]) return sfx("click");
   try {
     const c = ensureAudio(), t = c.currentTime;
     const o = c.createOscillator(), g = c.createGain();
@@ -321,28 +402,52 @@ function clickSnd() { // 珠が弾く「パチ」
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.07);
   } catch {}
 }
-function correctSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(880, t, 0.12, "sine", 0.2); tone(1174, t + 0.12, 0.2, "sine", 0.2); } catch {} } // ピンポン♪
-function wrongSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(196, t, 0.3, "square", 0.13); tone(184, t, 0.3, "square", 0.1); } catch {} } // ブブー
+// ピンポン♪（ドとソ→高いド：長調で 明るく）
+function correctSnd() {
+  sfx("correct", function () {
+    const c = ensureAudio(), t = c.currentTime;
+    tone2(783.99, t, 0.12, "triangle", 0.16);
+    tone2(1046.5, t + 0.1, 0.24, "triangle", 0.18);
+  });
+}
+// ブー（責めすぎない やわらかい低音。2音下がるだけ）
+function wrongSnd() {
+  sfx("wrong", function () {
+    const c = ensureAudio(), t = c.currentTime;
+    tone2(311.13, t, 0.16, "triangle", 0.12);
+    tone2(261.63, t + 0.13, 0.26, "triangle", 0.12);
+  });
+}
 function neutralSnd() { try { const c = ensureAudio(), t = c.currentTime; tone(680, t, 0.08, "triangle", 0.1); } catch {} }
-function fanfareSnd() { try { const c = ensureAudio(), t = c.currentTime;[523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.1, 0.18, "sine", 0.17)); } catch {} }
+// 小さいファンファーレ（ドミソド → 最後に和音）
+function fanfareSnd() {
+  sfx("clear", function () {
+    const c = ensureAudio(), t = c.currentTime;
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone2(f, t + i * 0.09, 0.2, "triangle", 0.16));
+    chord(t + 0.38, 523.25, "maj", 0.5, 0.11);
+  });
+}
 // GOLDをもらったとき「チャリーン♪」
 function coinSnd(delay = 0) {
-  try {
-    const c = ensureAudio(), t = c.currentTime + delay;
+  if (delay > 0) { setTimeout(function () { coinSnd(0); }, delay * 1000); return; }
+  sfx("coin", function () {
+    const c = ensureAudio(), t = c.currentTime;
     [1568, 2093, 2637].forEach((f, i) => tone(f, t + i * 0.045, 0.20, "triangle", 0.12));
     tone(3136, t + 0.10, 0.34, "sine", 0.06); // きらめきの余韻
-  } catch {}
+  });
 }
 // 大きな達成のとき「タタタ ターン！」
 function bigFanfareSnd() {
-  try {
+  sfx("levelup", function () {
     const c = ensureAudio(), t = c.currentTime;
-    [[523, 0], [523, 0.13], [523, 0.26], [659, 0.40], [784, 0.58]].forEach(([f, d]) => tone(f, t + d, 0.15, "triangle", 0.16));
-    tone(1047, t + 0.76, 0.55, "triangle", 0.18);
-    tone(784, t + 0.76, 0.55, "sine", 0.10);  // 和音でぶ厚く
-    tone(659, t + 0.76, 0.55, "sine", 0.08);
-  } catch {}
+    // タタタ ターン！（ド・ド・ド → ミ → ソ → 高いドの和音）
+    [[523.25, 0], [523.25, 0.12], [523.25, 0.24], [659.25, 0.38], [783.99, 0.54]]
+      .forEach(function (p) { tone2(p[0], t + p[1], 0.16, "triangle", 0.16); });
+    chord(t + 0.72, 1046.5, "maj", 0.7, 0.13);
+    chord(t + 0.72, 523.25, "maj", 0.9, 0.08);
+  });
 }
+
 function makeSoroban(root, onChange) {
   const state = Array.from({ length: COLS }, () => ({ heaven: false, earth: 0 }));
   const refs = []; let typed = ""; root.innerHTML = "";
@@ -413,6 +518,7 @@ const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battlePar
 /* ============================================================ 画面ルーティング */
 const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", craft: "クラフト王国", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "検定内容・解き方" };
 function showView(v) {
+  sfxPreload(); bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
   if (v === "home") renderHome();
@@ -447,6 +553,14 @@ $("#startBtn").addEventListener("click", () => startSession(subject));
 $("#quitBtn").addEventListener("click", quitSession);
 // 効果音のON/OFF
 function renderSound() { $("#soundToggle").textContent = soundOn ? "🔊 音あり" : "🔇 音なし"; }
+(function () {
+  const a = $("#sndToggle2"), b = $("#bgmToggle"), v = $("#volRange");
+  if (!a) return;
+  a.addEventListener("change", function () { soundOn = a.checked; localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); renderSound(); if (!soundOn) bgmStop(); else bgmForView("settings"); });
+  b.addEventListener("change", function () { setBgm(b.checked); if (b.checked) { sfxPreload(); bgmPlay("bgm_study"); } });
+  v.addEventListener("input", function () { setVol(+v.value / 100); });
+  v.addEventListener("change", function () { sfx("coin", function () { coinSnd(0); }); });
+})();
 $("#soundToggle").addEventListener("click", () => {
   soundOn = !soundOn;
   localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
@@ -629,7 +743,18 @@ function renderToday() {
 }
 $("#todayStart").addEventListener("click", () => startRoutine(GRADES[+$("#todayGrade").value]));
 const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
+// 音の設定（効果音・BGM・音量）
+function renderSound2() {
+  const a = $("#sndToggle2"), b = $("#bgmToggle"), v = $("#volRange"), n = $("#sfxNote");
+  if (!a) return;
+  a.checked = soundOn; b.checked = bgmOn; v.value = Math.round(sfxVol * 100);
+  const have = Object.keys(sfxBuf).length;
+  n.innerHTML = have
+    ? "音の材料を " + have + " 個 よみこみ ました。"
+    : "いまは アプリが その場で音を作っています。<b>assets/sfx/</b> に mp3 を置くと、そちらが鳴ります（correct / wrong / clear / coin / pop / rocket / levelup / star / bgm_study / bgm_puzzle）。";
+}
 function renderSettings() {
+  renderSound2();
   const p = profile();
   $("#nameInput").value = p.name;
   $("#avatarPicker").innerHTML = AVATARS.map((a) => `<button data-a="${a}" class="${a === p.avatar ? "sel" : ""}">${a}</button>`).join("");
@@ -3279,12 +3404,15 @@ function pzBurst(i, kind, n) {
   }
 }
 // 連鎖が進むほど 音が上がる（うれしさが積み上がる）
+// 連鎖の音。半音ではなく ペンタトニック（ヨナ抜き）で上げるので、何段でも濁らない
 function pzTone(step, big) {
+  if (!soundOn) return;
+  if (sfxBuf["pop"] && !big) return sfx("pop");
   try {
     const c = ensureAudio(), t = c.currentTime;
-    const f = 523 * Math.pow(2, Math.min(step, 12) / 12);
-    tone(f, t, big ? 0.22 : 0.12, "triangle", big ? 0.2 : 0.14);
-    if (big) tone(f * 1.5, t + 0.06, 0.2, "sine", 0.12);
+    const f = noteHz(step);
+    tone2(f, t, big ? 0.24 : 0.13, "triangle", big ? 0.18 : 0.13);
+    if (big) tone2(f * 1.5, t + 0.05, 0.22, "sine", 0.1);
   } catch (e) { }
 }
 function pzGoalPop() {
