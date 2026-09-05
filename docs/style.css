@@ -801,3 +801,47 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .pz-mini { display: inline-block; width: 26px; height: 26px; vertical-align: -6px; }
 .pz-mini .pz-svg { width: 100%; height: 100%; }
 .pz-ok { color: var(--ok); font-size: 20px; }
+
+/* ============================================================ パズルの画面づくり（城の広間） */
+.pz-top { display: flex; align-items: flex-end; justify-content: center; gap: 12px; margin-bottom: 6px; }
+.pz-panel { position: relative; padding-top: 12px; }
+.pz-ribbon { position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(180deg,#e8542f,#b8331a); color: #fff; font-size: 11px; font-weight: 800;
+  padding: 2px 14px; border-radius: 8px; border: 2px solid #8a2410; white-space: nowrap; z-index: 2;
+  box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+.pz-panel .pz-goal, .pz-panel .pz-moves { min-width: 118px; text-align: center; padding: 14px 14px 8px; margin: 0; }
+.pz-king-wrap { width: 92px; height: 92px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: radial-gradient(circle at 50% 30%, #ffe9a8, #d99a2b);
+  border: 4px solid #c9a227; box-shadow: 0 4px 0 #8a6d14, inset 0 -6px 12px rgba(0,0,0,.25); }
+.pz-king { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; transition: transform .2s; }
+.pz-king.worry { animation: pzworry .8s ease-in-out infinite alternate; }
+@keyframes pzworry { to { transform: scale(1.06) rotate(-3deg); } }
+.pz-scoreline { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 4px; }
+.pz-scoreline .ghost { margin-left: auto; }
+/* 城の広間（盤のうしろの情景） */
+.pz-hall { position: relative; padding: 16px 8px 10px; border-radius: 18px; overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.25), transparent 22%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 3px, transparent 3px 34px),
+    linear-gradient(180deg, #8d2a3d 0 14%, #6f1f30 14% 20%, #b9a48a 20% 78%, #8a765d 78% 100%); }
+/* 左右の柱 */
+.pz-hall::before, .pz-hall::after { content: ""; position: absolute; top: 8%; bottom: 6%; width: 26px; border-radius: 6px;
+  background: linear-gradient(90deg, #6f5c45, #e6d7bd 35%, #fffaf0 50%, #d9c8ab 65%, #6f5c45);
+  box-shadow: 0 0 0 2px rgba(80,60,35,.4); }
+.pz-hall::before { left: 4px; } .pz-hall::after { right: 4px; }
+.pz-stage { position: relative; z-index: 1; background: none; box-shadow: none; padding: 0; }
+.pz-stage::before { display: none; }
+/* 下の道具バー */
+.pz-tools { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
+.pz-tool { position: relative; width: 62px; height: 62px; border-radius: 50%; padding: 0;
+  background: radial-gradient(circle at 50% 30%, #6fbf63, #2f7d33);
+  border: 4px solid #c9a227; box-shadow: 0 4px 0 #8a6d14, inset 0 -6px 10px rgba(0,0,0,.3);
+  display: flex; align-items: center; justify-content: center; transition: transform .12s; }
+.pz-tool:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a6d14, inset 0 -6px 10px rgba(0,0,0,.3); }
+.pz-tool.on { background: radial-gradient(circle at 50% 30%, #ffe08a, #e0a92b); animation: pzToolOn .7s ease-in-out infinite alternate; }
+@keyframes pzToolOn { to { transform: scale(1.09); } }
+.pz-tool-em { font-size: 30px; filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)); }
+.pz-tool-n { position: absolute; right: -6px; bottom: -4px; min-width: 24px; padding: 1px 5px;
+  background: linear-gradient(180deg,#e8542f,#b8331a); color: #fff; font-size: 12px; font-weight: 800;
+  border: 2px solid #fff; border-radius: 999px; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+.pz-tool-tip { width: 100%; text-align: center; font-size: 13px; color: #8a7560; min-height: 18px; }

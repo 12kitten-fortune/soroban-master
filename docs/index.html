@@ -264,27 +264,23 @@
           <div class="card">
             <div id="pzLobby" class="pz-lobby"></div>
             <div id="pzPlay" class="hidden">
-              <div class="pz-hud">
-                <span id="pzGoal" class="pz-goal"></span>
-                <span id="pzMoves" class="pz-moves"></span>
-                <span class="pz-score-w">スコア <b id="pzScore">0</b></span>
-                <button id="pzQuit" class="ghost">やめる</button>
+              <div class="pz-top">
+                <div class="pz-panel">
+                  <span class="pz-ribbon">ターゲット</span>
+                  <div id="pzGoal" class="pz-goal"></div>
+                </div>
+                <div class="pz-king-wrap"><img id="pzKing" class="pz-king" src="assets/king_wave.png" alt="レオ王" /></div>
+                <div class="pz-panel">
+                  <span class="pz-ribbon">ムーブ数</span>
+                  <div id="pzMoves" class="pz-moves"></div>
+                </div>
               </div>
+              <div class="pz-scoreline"><span class="pz-score-w">スコア <b id="pzScore">0</b></span><span id="pzMsg" class="pz-msg"></span><button id="pzQuit" class="ghost">やめる</button></div>
               <div class="pz-barwrap"><i id="pzBar"></i></div>
-              <div id="pzMsg" class="pz-msg"></div>
-              <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-                <linearGradient id="g-spade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a9ab5"/><stop offset=".35" stop-color="#61617d"/><stop offset=".75" stop-color="#3a3a4e"/><stop offset="1" stop-color="#22222e"/></linearGradient>
-                <linearGradient id="g-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb3a6"/><stop offset=".35" stop-color="#f05a49"/><stop offset=".75" stop-color="#c22a1e"/><stop offset="1" stop-color="#8a1109"/></linearGradient>
-                <linearGradient id="g-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3dcff"/><stop offset=".35" stop-color="#4b97ee"/><stop offset=".75" stop-color="#2263bd"/><stop offset="1" stop-color="#12407e"/></linearGradient>
-                <linearGradient id="g-club" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b0f0b0"/><stop offset=".35" stop-color="#4cc478"/><stop offset=".75" stop-color="#1f8047"/><stop offset="1" stop-color="#0c4a28"/></linearGradient>
-                <linearGradient id="g-bead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3ca"/><stop offset=".35" stop-color="#f2c451"/><stop offset=".75" stop-color="#c98c1c"/><stop offset="1" stop-color="#8a5c0c"/></linearGradient>
-                <linearGradient id="s-spade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22222e"/><stop offset="1" stop-color="#0e0e16"/></linearGradient>
-                <linearGradient id="s-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9c1a12"/><stop offset="1" stop-color="#4d0805"/></linearGradient>
-                <linearGradient id="s-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#124a95"/><stop offset="1" stop-color="#06264f"/></linearGradient>
-                <linearGradient id="s-club" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#146637"/><stop offset="1" stop-color="#06301a"/></linearGradient>
-                <linearGradient id="s-bead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a6a10"/><stop offset="1" stop-color="#4a3205"/></linearGradient>
-              </defs></svg>
-              <div class="pz-stage"><div id="pzBoard" class="pz-board"></div></div>
+              <div class="pz-hall">
+                <div class="pz-stage"><div id="pzBoard" class="pz-board"></div></div>
+              </div>
+              <div id="pzTools" class="pz-tools"></div>
             </div>
             <div id="pzOver" class="pz-over hidden"></div>
           </div>

@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-41"; // 最新反映の確認用
+const BUILD = "2026-09-05-42"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -3115,6 +3115,7 @@ function pzRenderHud() {
   $("#pzGoal").innerHTML = pzGoalIcon() + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>" + (done ? ' <span class="pz-ok">✓</span>' : "");
   $("#pzMoves").innerHTML = "のこり <b>" + Math.max(0, pz.moves) + "</b> 手";
   const sc = $("#pzScore"); if (sc) sc.textContent = (pz.score || 0).toLocaleString();
+  pzKingFace();
   $("#pzLv").textContent = "レベル " + pz.lv.n;
   const bar = $("#pzBar"); if (bar) bar.style.width = Math.min(100, Math.round(pz.got / pz.lv.need * 100)) + "%";
 }
@@ -3250,6 +3251,83 @@ async function pzFinale() {
     pzSync(); await pzWait(160);
   }
 }
+/* ---------- あそび中に使える道具バー（画面の下・ロイヤルマッチと同じ位置） ---------- */
+const PZ_TOOLS = [
+  { id: "hammer", n: "ハンマー", em: "🔨", cost: 25, tip: "すきな玉を 1つ こわす" },
+  { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "その場所を ロケットにして 発射" },
+  { id: "prop", n: "プロペラ", em: "🚁", cost: 50, tip: "その場所を プロペラにして 発射" },
+  { id: "tnt", n: "TNT", em: "💣", cost: 60, tip: "その場所を TNTにして ばくはつ" },
+];
+let pzArmed = null;                    // いま かまえている道具
+function pzToolStock(id) { const d = pzLoad(); return (d.items && d.items[id]) || 0; }
+function pzRenderTools() {
+  const el = $("#pzTools"); if (!el) return;
+  el.innerHTML = PZ_TOOLS.map(function (t) {
+    const n = pzToolStock(t.id);
+    return '<button class="pz-tool' + (pzArmed === t.id ? " on" : "") + '" data-t="' + t.id + '" title="' + t.tip + '">' +
+      '<span class="pz-tool-em">' + t.em + "</span>" +
+      '<span class="pz-tool-n">' + (n ? n : t.cost + "G") + "</span></button>";
+  }).join("") + '<div class="pz-tool-tip" id="pzToolTip"></div>';
+  $$("#pzTools .pz-tool").forEach(function (b) { b.onclick = function () { pzArm(b.dataset.t); }; });
+}
+function pzArm(id) {
+  if (!pz || pz.busy || pz.done) return;
+  const t = PZ_TOOLS.find((x) => x.id === id);
+  if (pzArmed === id) { pzArmed = null; pzRenderTools(); $("#pzToolTip").textContent = ""; return; }
+  if (!pzToolStock(id) && getGold() < t.cost) { pzMsg("GOLDが たりない。そろばんで かせごう！", "ng"); return; }
+  pzArmed = id;
+  pzRenderTools();
+  $("#pzToolTip").textContent = t.n + "：" + t.tip + (pzToolStock(id) ? "" : "（つかうと " + t.cost + "G）");
+}
+// 道具をつかう（手数は へらない）
+async function pzUseTool(i) {
+  const id = pzArmed, t = PZ_TOOLS.find((x) => x.id === id);
+  if (!t || !pz || pz.busy || pz.done) return false;
+  if (!pz.cells[i]) { pzMsg("そこには つかえないよ", "ng"); return true; }
+  const stock = pzToolStock(id);
+  if (!stock) {
+    if (getGold() < t.cost) { pzMsg("GOLDが たりないよ", "ng"); return true; }
+    addGold(-t.cost);
+  } else { const d = pzLoad(); d.items[id] = stock - 1; pzSave(d); }
+  pzArmed = null;
+  pz.busy = true;
+  pzRenderTools(); $("#pzToolTip").textContent = "";
+  pzDelay = new Map(); pzFxQ = [];
+  const gone = new Set();
+  if (id === "hammer") { gone.add(i); pzDelay.set(i, 0); pzFxQ.push({ fx: "ring", x: i % PZ_W, y: (i / PZ_W) | 0, r: 1, at: 0 }); }
+  else {
+    pz.cells[i].sp = id === "rocket" ? (Math.random() < 0.5 ? "rh" : "rv") : id;
+    pzSync();
+    await pzWait(180);
+    pzBlast(pz.cells, i, gone, null, {});
+  }
+  const plan = { gone: Array.from(gone), delay: pzDelay, fx: pzFxQ };
+  pzDelay = null; pzFxQ = [];
+  try { bigFanfareSnd(); } catch (e) { }
+  await pzPlayBlast(plan.gone, plan.delay, plan.fx);
+  pzApplyPlan(plan);
+  pzScoreAdd(plan.gone.length * 15);
+  pzSync(); pzRenderHud();
+  await pzWait(150);
+  let chain = 0;
+  while (await pzCascadeAnim(i, ++chain)) { if (chain > 30) break; }
+  const win = pz.got >= pz.lv.need;
+  if (win) pz.done = "win";
+  pz.busy = false;
+  pzSync(); pzRenderHud(); pzRenderTools();
+  if (pz.done) setTimeout(() => pzFinish(pz.done), 260);
+  return true;
+}
+/* ---- レオ王の顔（のこり手数で 表情が変わる） ---- */
+function pzKingFace() {
+  const k = $("#pzKing"); if (!k || !pz) return;
+  const src = pz.done === "win" ? "assets/king_celebrate.png"
+    : pz.moves <= 3 ? "assets/king_staff.png"
+      : pz.got >= pz.lv.need ? "assets/king_celebrate.png" : "assets/king_wave.png";
+  if (!k.src.endsWith(src)) k.src = src;
+  k.classList.toggle("worry", pz.moves <= 3 && !pz.done);
+}
+
 /* ---- 玉をえらぶ・入れかえる ---- */
 async function pzTry(a, b) {
   if (!pz || pz.busy || pz.done) return;
@@ -3470,7 +3548,8 @@ function renderPuzzle() {
     pzRenderLobby();
   } else {
     lob.classList.add("hidden"); brd.classList.remove("hidden");
-    pzResetBoard(); pzRenderHud();
+    pzArmed = null;
+    pzResetBoard(); pzRenderHud(); pzRenderTools();
   }
   renderGoldPill();
 }
@@ -3482,6 +3561,7 @@ function renderPuzzle() {
   el.addEventListener("pointerdown", (ev) => {
     if (!pz || pz.busy || pz.done) return;
     const i = cellOf(ev); if (i < 0) return;
+    if (pzArmed) { from = -1; prev = -1; pzUseTool(i); return; }      // 道具をかまえているとき
     prev = pz.sel; from = i; sx = ev.clientX; sy = ev.clientY; moved = false;
     pz.sel = i; pzSync();
   });
