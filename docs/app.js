@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-32"; // 最新反映の確認用
+const BUILD = "2026-09-05-33"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1361,8 +1361,9 @@ $("#showSteps").addEventListener("click", () => {
 
 /* ============================================================ フラッシュ暗算 */
 let flashAnswer = null, flashBusy = false, flashSpec = null, flashGrade = null;
-let flashExam = { on: false, idx: 0, N: 20, correct: 0 };
-let flashRun = 0;   // ふつうの練習での連続正解
+let flashExam = { on: false, idx: 0, N: 10, correct: 0, times: [] };
+let flashAskAt = 0;   // 数字が消えてから答えるまでの時間をはかる
+const FLASH_SET = 10;  // ふつうの練習の1セット（検定は20問）
 function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
   hidePauseUI();
@@ -1376,10 +1377,14 @@ function startFlash(grade) {
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
   $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display"; $("#flashForm").classList.add("hidden");
-  flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
-  flashRun = 0;
+  const ex = $("#flashExamMode").checked;
+  flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
 }
-$("#flashStart").addEventListener("click", () => { flashExam.on = $("#flashExamMode").checked; runFlash(); });
+$("#flashStart").addEventListener("click", () => {
+  const ex = $("#flashExamMode").checked;
+  if (ex !== flashExam.on || flashExam.idx >= flashExam.N) flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
+  runFlash();
+});
 // 数字1個ごとの音（1個目・2個目…とドレミで上がっていく＝リズムが分かる）
 const FLASH_SCALE = [523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319];
 function flashBeep(i) { if (!soundOn) return; try { const c = ensureAudio(); tone(FLASH_SCALE[i % FLASH_SCALE.length], c.currentTime, 0.1, "triangle", 0.18); } catch {} }
@@ -1399,7 +1404,7 @@ function flashScheduleTone(ctx, t0, freq, dur = 0.1, type = "triangle", vol = 0.
 async function runFlash() {
   if (flashBusy || !flashSpec) return; flashBusy = true;
   $("#flashStart").disabled = true; $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
-  $("#flashProgress").textContent = flashExam.on ? `検定 ${flashExam.idx + 1} / ${flashExam.N}　正解 ${flashExam.correct}` : "";
+  $("#flashProgress").textContent = `${flashExam.on ? "検定" : "れんしゅう"} ${Math.min(flashExam.idx + 1, flashExam.N)} / ${flashExam.N}　正解 ${flashExam.correct}`;
 
   const ctx = ensureAudio();
   try { if (ctx.state !== "running") await ctx.resume(); } catch {}
@@ -1470,50 +1475,75 @@ async function runFlash() {
     $("#flashMeasure").textContent = `実測間隔：平均${(avg / 1000).toFixed(2)}秒（最短${(mn / 1000).toFixed(2)}〜最長${(mx / 1000).toFixed(2)}秒）／ build ${BUILD}`;
   }
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
+  flashAskAt = performance.now();   // ここから「考えている時間」
   $("#flashStart").disabled = false; flashBusy = false;
 }
 $("#flashForm").addEventListener("submit", (e) => {
   e.preventDefault(); if (flashAnswer === null) return;
-  const ok = parseInt($("#flashInput").value, 10) === flashAnswer; const res = $("#playResult"); $("#flashForm").classList.add("hidden");
+  const ok = parseInt($("#flashInput").value, 10) === flashAnswer, res = $("#playResult");
+  $("#flashForm").classList.add("hidden");
   // 上の「= ?」を消して、大きく○×＋音（達成感）
   $("#flashDisplay").textContent = ok ? "⭕" : "❌";
   $("#flashDisplay").className = "flash-display " + (ok ? "ok" : "ng");
   ok ? correctSnd() : wrongSnd();
-  if (flashExam.on) {
-    if (ok) flashExam.correct++; flashExam.idx++;
-    if (flashExam.idx < flashExam.N) { res.textContent = ok ? "正解！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); setTimeout(runFlash, 900); }
-    else {
-      const score = flashExam.correct * 10, pass = score >= 140;
-      let msg = `検定結果：${flashExam.correct}/20 正解　<b>${score}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
-      if (pass) { touchStreak(); certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; bigFanfareSnd(); }
-      logSession("flash", 20, flashExam.correct, 0);
-      const { g } = goldForSection({ correct: flashExam.correct, N: 20, bestUpdated: false, completed: true, grade: flashGrade });
-      let earned = g + (pass ? 50 : 0); const daily = dailyBonusOnce(); if (daily) earned += daily.amt;
-      addGold(earned);
-      msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="goal">${nextGoalHint()}</div></div>`;
-      renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = "";
-    }
-  } else {
-    // ふつうの練習でも、正解1問ごとにGOLDが出る（他の種目と同じ「学習の成果」あつかい）
-    if (ok) {
-      touchStreak();
-      flashRun = (flashRun || 0) + 1;
-      const m = gradeGoldMult(flashGrade);
-      let earned = Math.round(2 * m), lines = [`正解 ＋${Math.round(2 * m)}`];
-      if (flashRun % 5 === 0) { const b = Math.round(10 * m); earned += b; lines.push(`${flashRun}問れんぞく正解 ＋${b}`); }
-      const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
-      addGold(earned); coinSnd(0.25);
-      logSession("flash", 1, 1, 0);   // 学習の記録にも1問ぶん残す
-      res.innerHTML = `正解！すごい！<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div></div>`;
-      res.className = "result ok";
-      renderProfile();
-    } else {
-      flashRun = 0;
-      logSession("flash", 1, 0, 0);
-      res.textContent = `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result ng";
-    }
+  const th = flashAskAt ? (performance.now() - flashAskAt) / 1000 : null;   // 考えていた時間
+  if (th != null) flashExam.times.push({ ok, t: th });
+  if (ok) flashExam.correct++;
+  flashExam.idx++;
+  if (flashExam.idx < flashExam.N) {
+    res.innerHTML = (ok ? "正解！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`) +
+      `<span class="sub">　${th != null ? th.toFixed(1) + "秒" : ""}</span>`;
+    res.className = "result " + (ok ? "ok" : "ng");
+    setTimeout(runFlash, 900);
+    return;
   }
+  finishFlashSet(res);
 });
+// 1セット（ふつうの練習10問／検定20問）が終わったときの成績と報酬
+function finishFlashSet(res) {
+  const N = flashExam.N, correct = flashExam.correct, acc = Math.round(correct / N * 100);
+  const ts = flashExam.times.map((x) => x.t), sum = ts.reduce((a, b) => a + b, 0);
+  const avg = ts.length ? sum / ts.length : 0, fast = ts.length ? Math.min(...ts) : 0;
+  const okTs = flashExam.times.filter((x) => x.ok).map((x) => x.t);
+  const okAvg = okTs.length ? okTs.reduce((a, b) => a + b, 0) / okTs.length : 0;
+  // 自己ベストは「1問あたりの考えた時間」で見る（練習10問と検定20問を同じものさしで比べるため）。
+  // ただし わざと速く まちがえて記録を作れないよう、正答率70%以上のときだけ更新する。
+  const okRate = N ? correct / N : 0;
+  const r = okRate >= 0.7 ? saveTime(flashGrade.key, "flash", avg)
+    : { improved: false, prev: bestTime(flashGrade.key, "flash") };
+  const pass = flashExam.on && correct * 10 >= 140;
+  let msg = "";
+  if (flashExam.on) {
+    msg += `検定結果：${correct}/${N} 正解　<b>${correct * 10}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
+    if (pass) { certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; }
+  } else {
+    msg += `⚡ ${N}問 おわり！`;
+  }
+  touchStreak();
+  msg += `<div class="fs-stats"><div class="fs-acc">正答率 <b>${acc}%</b> <span class="sub">(${correct} / ${N})</span></div>` +
+    `<div class="fs-row"><span>1問の 平均</span><b>${avg.toFixed(1)}秒</b></div>` +
+    `<div class="fs-row"><span>いちばん速かった</span><b>${fast.toFixed(1)}秒</b></div>` +
+    (okTs.length ? `<div class="fs-row"><span>正解できた問題の平均</span><b>${okAvg.toFixed(1)}秒</b></div>` : "") +
+    `<div class="fs-row"><span>合計の 考えた時間</span><b>${sum.toFixed(1)}秒</b></div>` +
+    (r.improved ? `<div class="fs-best">✨ 1問の平均で 自己ベスト更新！（${flashGrade.key}）</div>`
+      : (r.prev != null ? `<div class="fs-best sub">${flashGrade.key}の 自己ベスト ${r.prev.toFixed(1)}秒／問　あと ${(avg - r.prev).toFixed(1)}秒 はやく</div>`
+        : `<div class="fs-best sub">正答率70%以上で 自己ベストに 記録されるよ</div>`)) +
+    `</div>`;
+  // 報酬は他の種目とまったく同じ計算（正解・正答率・自己ベスト・完走 × 級の倍率）
+  const { g, lines } = goldForSection({ correct, N, bestUpdated: r.improved, completed: true, grade: flashGrade });
+  let earned = g;
+  if (pass) { earned += 50; lines.push("🎓 検定合格 ＋50"); }
+  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+  addGold(earned);
+  logSession("flash", N, correct, sum, 0);   // 記録に残す（保護者画面のグラフに乗る）
+  msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : FLASH_SET + "問"} が はじまるよ</div>`;
+  (pass || (!flashExam.on && acc >= 90)) ? bigFanfareSnd() : fanfareSnd();
+  coinSnd(1.0);
+  renderProfile();
+  res.innerHTML = msg; res.className = "result " + (flashExam.on && !pass ? "ng" : "ok");
+  $("#flashProgress").textContent = "";
+}
 
 /* ============================================================ たいせん（CPU対戦ゲーム／レオ王） */
 let battle = null, battleTimer = null;

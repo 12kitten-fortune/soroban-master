@@ -539,3 +539,13 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .as-time { font-size: 13px; color: #8a7560; margin-top: 6px; }
 .as-tips { margin: 6px 0 0 20px; font-size: 14px; line-height: 1.8; }
 .as-tips li { margin-bottom: 4px; }
+
+/* ============================================================ フラッシュ暗算 1セットの成績 */
+.fs-stats { text-align: left; background: #f7f9fd; border: 2px solid #cbd8ea; border-radius: 12px; padding: 10px 14px; margin: 10px 0; font-size: 15px; }
+.fs-acc { font-size: 17px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+.fs-acc b { font-size: 26px; }
+.fs-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed #dfe6f0; }
+.fs-row:last-of-type { border-bottom: none; }
+.fs-row b { font-variant-numeric: tabular-nums; }
+.fs-best { margin-top: 6px; font-weight: 700; color: var(--ok); }
+.fs-best.sub { font-weight: 400; }
