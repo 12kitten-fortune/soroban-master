@@ -475,6 +475,7 @@ const BGM_LIST = [
   { f: "bgm4", n: "アコースティック2" },
   { f: "bgm_study", n: "ピアノ" },
 ];
+const BGM_BATTLE = { f: "bgm_battle", n: "たいせん（サイバー）" };   // ⚔️たいせん 専用
 const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
 let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm_study";      // メインの曲（設定で えらべる）
 const bgmName2 = (f) => (BGM_LIST.find((b) => b.f === f) || {}).n || f;
@@ -497,6 +498,7 @@ function bgmNextStage() {
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v, next) {
   if (v === "puzzle") bgmPlay(next ? bgmNextStage() : (bgmName || bgmMain));
+  else if (v === "battle") bgmPlay(BGM_BATTLE.f);                   // たいせんは 専用の曲
   else if (v === "play" || v === "today") bgmPlay(bgmMain);         // 練習中は メインの曲
   else bgmStop();
 }
@@ -857,13 +859,14 @@ function renderSound2() {
   renderVolSegs();
   const songs = $("#bgmSongs"), n = $("#sfxNote");
   if (songs) {
-    songs.innerHTML = BGM_LIST.map(function (b) {
+    songs.innerHTML = BGM_LIST.concat([BGM_BATTLE]).map(function (b) {
       const main = b.f === bgmMain, now = b.f === bgmName;
       return '<div class="song' + (main ? " main" : "") + '">' +
         '<button class="song-play" data-f="' + b.f + '">▶</button>' +
         '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + "</span>" +
-        (main ? '<span class="song-badge">メイン</span>'
-          : '<button class="song-main" data-f="' + b.f + '">メインにする</button>') +
+        (b.f === BGM_BATTLE.f ? '<span class="song-badge fixed">たいせん専用</span>'
+          : main ? '<span class="song-badge">メイン</span>'
+            : '<button class="song-main" data-f="' + b.f + '">メインにする</button>') +
         "</div>";
     }).join("");
   }
