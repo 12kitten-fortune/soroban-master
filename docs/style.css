@@ -567,3 +567,72 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .cq-people { font-size: 12px; color: #8a7560; margin-top: 6px; }
 .blk.need { border-color: var(--royal-gold); background: #fffaf0; }
 .blk-need { font-size: 10px; color: #b5651d; font-weight: 700; }
+
+/* ============================================================ そろばんパズル */
+.pz-lobby { text-align: center; }
+.pz-lv-big { font-size: 15px; color: #8a7560; }
+.pz-lv-big b { font-size: 30px; color: var(--navy); }
+.pz-goal-big { font-size: 18px; margin: 6px 0 12px; }
+.pz-goal-big b { color: var(--accent); font-size: 22px; }
+.pz-past-row { display: flex; gap: 10px; justify-content: center; font-size: 12px; color: #b58a2b; margin-bottom: 10px; flex-wrap: wrap; }
+.pz-items-h { text-align: left; font-weight: 700; color: var(--navy); font-size: 14px; margin: 10px 0 6px; }
+.pz-item { display: flex; align-items: center; gap: 10px; text-align: left; border: 2px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 8px; background: #fff; }
+.pz-em { font-size: 26px; }
+.pz-in { flex: 1; display: flex; flex-direction: column; }
+.pz-in small { color: #8a7560; font-size: 12px; }
+.pz-ic { font-weight: 700; color: #b58a2b; }
+.pz-buy { padding: 4px 14px; font-size: 18px; line-height: 1; }
+.pz-have { min-width: 26px; font-weight: 700; color: var(--ok); }
+.pz-total { margin: 10px 0; font-size: 15px; }
+.pz-total b { font-size: 20px; color: var(--accent); }
+.pz-need { color: var(--accent); font-weight: 700; margin: 10px 0; }
+/* 盤面 */
+.pz-hud { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.pz-goal, .pz-moves { font-size: 17px; }
+.pz-goal b, .pz-moves b { font-size: 22px; color: var(--navy); }
+.pz-hud .ghost { margin-left: auto; }
+.pz-barwrap { height: 10px; background: #ece3d2; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
+.pz-barwrap i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#e0b84a,#d4af37); transition: width .25s; }
+.pz-msg { min-height: 22px; font-weight: 700; text-align: center; font-size: 15px; }
+.pz-msg.ok { color: var(--ok); } .pz-msg.ng { color: var(--accent); }
+.pz-board {
+  --pzt: min(52px, calc((100vw - 120px) / 8));
+  position: relative; width: calc(var(--pzt) * 8); height: calc(var(--pzt) * 8);
+  margin: 0 auto; background: #efe7d6; border: 3px solid var(--line); border-radius: 14px; overflow: hidden;
+  touch-action: none; user-select: none;
+}
+.pz-t {
+  position: absolute; width: var(--pzt); height: var(--pzt);
+  transform: translate(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)));
+  transition: transform .16s ease; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.pz-t::before {
+  content: ""; position: absolute; inset: 3px; border-radius: 10px;
+  background: linear-gradient(160deg, var(--g), var(--c)); box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.15);
+}
+.pz-t.k-spade { --c: #3a3a46; --g: #5b5b6b; }
+.pz-t.k-heart { --c: #d0342c; --g: #e8695f; }
+.pz-t.k-dia { --c: #2b6fd0; --g: #5d9ae8; }
+.pz-t.k-club { --c: #2e7d5b; --g: #54a97f; }
+.pz-t.k-bead { --c: #d99a2b; --g: #f0c364; }
+.pz-mark { position: relative; color: #fff; font-size: calc(var(--pzt) * .5); font-style: normal; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.pz-mark.sm { font-size: 20px; }
+.pz-mark.sm.k-spade { color: #3a3a46; } .pz-mark.sm.k-heart { color: #d0342c; }
+.pz-mark.sm.k-dia { color: #2b6fd0; } .pz-mark.sm.k-club { color: #2e7d5b; }
+/* そろばん玉：五角形（ひし形をつぶした形） */
+.pz-bead { position: relative; width: calc(var(--pzt) * .56); height: calc(var(--pzt) * .42);
+  background: linear-gradient(180deg,#fff3cf,#c98b1e); clip-path: polygon(50% 0, 100% 38%, 78% 100%, 22% 100%, 0 38%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.pz-bead.sm { width: 20px; height: 15px; display: inline-block; vertical-align: -2px; }
+.pz-t.sel::after { content: ""; position: absolute; inset: 0; border: 3px solid #fff; border-radius: 12px; box-shadow: 0 0 0 3px var(--royal-gold); }
+.pz-t.sp::before { box-shadow: inset 0 0 0 3px #fff8d8, inset 0 -3px 0 rgba(0,0,0,.18); }
+.pz-sp { position: absolute; font-size: calc(var(--pzt) * .42); filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+.pz-sp.pz-v { transform: rotate(-90deg); }
+.pz-t.pop { animation: pzpop .22s ease forwards; }
+@keyframes pzpop { to { transform: translate(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt))) scale(1.35); opacity: 0; } }
+/* 結果 */
+.pz-over { margin-top: 14px; text-align: center; background: #fffdf6; border: 2px solid var(--royal-gold); border-radius: 14px; padding: 16px; }
+.pz-res-h { font-size: 22px; font-weight: 800; }
+.pz-res-h.ok { color: var(--ok); } .pz-res-h.ng { color: var(--accent); }
+.pz-stars { font-size: 34px; color: var(--royal-gold); letter-spacing: 4px; }
+.pz-res-btns { margin-top: 10px; }

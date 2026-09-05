@@ -20,7 +20,7 @@
           <button class="nav active" data-view="home">🏠 ホーム</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
           <button class="nav" data-view="battle">⚔️ たいせん</button>
-          <button class="nav" data-view="craft">🧱 クラフト</button>
+          <button class="nav" data-view="puzzle">🧩 パズル</button>
           <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
           <div class="nav-sec">学習する</div>
           <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
@@ -70,7 +70,7 @@
               <div class="card stat-tile"><span><img class="ico-crown" src="assets/crown.png" alt="" /> 王国レベル</span><b id="homeKingdomLv">1</b></div>
               <div class="card stat-tile"><span>🔥 連続学習</span><b id="homeStreak">0日</b></div>
               <div class="card stat-tile"><span>📅 今月の学習</span><b id="homeMonth">0日</b></div>
-              <button id="homeToKingdom" class="wide-btn">🧱 クラフトへ</button>
+              <button id="homeToKingdom" class="wide-btn">🧩 パズルで あそぶ</button>
               <button id="homeToRecords" class="wide-btn ghost">📊 成績を見る</button>
             </aside>
           </div>
@@ -252,6 +252,28 @@
             <div class="craft-stage"><canvas id="craftCanvas"></canvas></div>
             <p class="sub">設計図を えらぶ → <b>ひかっている マス</b>を クリックすると 部品が はまる。ぜんぶ はまると 建物が 完成して、住民が ひっこして くるよ。部品を買う GOLDは そろばんの れんしゅうで たまる。</p>
             <div id="craftPalette" class="craft-palette"></div>
+          </div>
+        </div>
+
+        <!-- そろばんパズル（GOLDをつかって あそぶ） -->
+        <div id="view-puzzle" class="view hidden">
+          <div class="card kingdom-head">
+            <div class="kd-title">🧩 そろばんパズル　<span class="kd-lv" id="pzLv"></span></div>
+            <div class="gold-badge"><img class="ico-coin" src="assets/coin.png" alt="" /> <span id="pzGold">0</span> GOLD</div>
+          </div>
+          <div class="card">
+            <div id="pzLobby" class="pz-lobby"></div>
+            <div id="pzPlay" class="hidden">
+              <div class="pz-hud">
+                <span id="pzGoal" class="pz-goal"></span>
+                <span id="pzMoves" class="pz-moves"></span>
+                <button id="pzQuit" class="ghost">やめる</button>
+              </div>
+              <div class="pz-barwrap"><i id="pzBar"></i></div>
+              <div id="pzMsg" class="pz-msg"></div>
+              <div id="pzBoard" class="pz-board"></div>
+            </div>
+            <div id="pzOver" class="pz-over hidden"></div>
           </div>
         </div>
 
