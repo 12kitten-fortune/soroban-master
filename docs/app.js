@@ -351,11 +351,15 @@ function sfx(name, fallback, rate) {
       c.volume = sfxVol;
       if (rate) c.playbackRate = Math.max(0.5, Math.min(2.4, rate));   // 高さを変える（連鎖で上がる）
       c.play().catch(function () { });
+      const lim = SFX_MAX[name];
+      if (lim) setTimeout(function () { try { c.pause(); } catch (e) { } }, lim * 1000);
       return;
     } catch (e) { }
   }
   if (fallback) { try { fallback(); } catch (e) { } }
 }
+// 長い音は 途中で止める（玉が消えるたびに 数秒鳴ると 音が重なって濁るため）
+const SFX_MAX = { tile_red: 0.7, tile_purple: 0.6, tile_green: 0.6, drop: 0.6, sparkle: 0.9 };
 // 音量を 指定して鳴らす（下じきの音を 小さくするため）
 function sfxAt(name, vol, rate) {
   if (!soundOn) return;
@@ -366,6 +370,8 @@ function sfxAt(name, vol, rate) {
     c.volume = Math.max(0, Math.min(1, sfxVol * vol));
     if (rate) c.playbackRate = Math.max(0.5, Math.min(2.4, rate));
     c.play().catch(function () { });
+    const lim = SFX_MAX[name];
+    if (lim) setTimeout(function () { try { c.pause(); } catch (e) { } }, lim * 1000);
   } catch (e) { }
 }
 // ペンタトニックの音程ぶんだけ 再生速度を上げる＝音が階段状に上がる
