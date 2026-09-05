@@ -316,10 +316,9 @@ function dailyBonusOnce() {
 // 次に買える建物までの目標（モチベーション表示）
 function nextGoalHint() {
   const gold = getGold();
-  let best = null;
-  for (let i = 1; i < BLOCKS.length; i++) if (BLOCKS[i].cost > gold && (!best || BLOCKS[i].cost < best.cost)) best = BLOCKS[i];
-  if (!best) return "🧱 クラフトで 世界を つくろう！";
-  return "あと " + (best.cost - gold) + " GOLD で「" + best.n + "」が おけるよ！";
+  if (gold >= 100) return "🧩 パズルで あそべるよ！（1回 30 GOLD）";
+  if (gold >= 30) return "🧩 あと " + Math.floor(gold / 30) + " 回 パズルが あそべる";
+  return "あと " + (30 - gold) + " GOLD で パズルが 1回 あそべる！";
 }
 
 /* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
@@ -475,13 +474,15 @@ function bgmPlay(name) {
   const tryNext = function () {
     if (ext >= SFX_EXT.length) {
       bgmEl = null; bgmName = "";
-      if (name !== "bgm_study") bgmPlay("bgm_study");     // その曲が無ければ 練習用を流す
+      bgmLoaded[name] = false;
+      const use = bgmUsable().map((b) => b.f).filter((f) => f !== name && bgmLoaded[f] !== false);
+      if (use.length) bgmPlay(use[0]);                    // その曲が読めなければ 次の曲へ
       return;
     }
     bgmEl = new Audio(SFX_DIR + name + "." + SFX_EXT[ext++]);
     bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
     bgmEl.addEventListener("error", tryNext, { once: true });
-    bgmEl.addEventListener("canplay", function () { bgmCache[name] = bgmEl; }, { once: true });
+    bgmEl.addEventListener("canplay", function () { bgmCache[name] = bgmEl; bgmLoaded[name] = true; }, { once: true });
     const p2 = bgmEl.play(); if (p2 && p2.catch) p2.catch(function () { });
   };
   tryNext();
@@ -519,6 +520,15 @@ const BGM_LIST = [
 const BGM_BATTLE = { f: "bgm_battle", n: "たいせん（サイバー）" };   // ⚔️たいせん 専用
 const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
 let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm_study";      // メインの曲（設定で えらべる）
+const OFF_KEY = "soroban_bgmoff";
+let bgmOff = (function () { try { return JSON.parse(localStorage.getItem(OFF_KEY) || "{}"); } catch (e) { return {}; } })();
+const bgmUsable = () => BGM_LIST.filter((b) => !bgmOff[b.f]);
+function toggleBgmUse(f) {
+  bgmOff[f] = !bgmOff[f];
+  if (bgmUsable().length === 0) bgmOff[f] = false;                 // ぜんぶ外すのは できない
+  try { localStorage.setItem(OFF_KEY, JSON.stringify(bgmOff)); } catch (e) { }
+}
+const bgmLoaded = {};                                              // 読めた曲の記録
 const bgmName2 = (f) => (BGM_LIST.find((b) => b.f === f) || {}).n || f;
 function setBgmMain(f) {
   bgmMain = f;
@@ -531,8 +541,9 @@ function bgmNextStage() {
   let t = parseInt(localStorage.getItem(TURN_KEY), 10); if (!isFinite(t)) t = 0;
   try { localStorage.setItem(TURN_KEY, String(t + 1)); } catch (e) { }
   // メインの曲から はじめて、ぜんぶ 一巡してから もどる＝毎ステージ ちがう曲
-  const order = [bgmMain].concat(BGM_LIST.filter((b) => b.f !== bgmMain).map((b) => b.f));
-  return order[t % order.length];
+  const use = bgmUsable().map((b) => b.f);
+  const order = use.indexOf(bgmMain) >= 0 ? [bgmMain].concat(use.filter((f) => f !== bgmMain)) : use;
+  return order[t % order.length] || bgmMain;
 }
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v, next) {
@@ -899,13 +910,15 @@ function renderSound2() {
   const songs = $("#bgmSongs"), n = $("#sfxNote");
   if (songs) {
     songs.innerHTML = BGM_LIST.concat([BGM_BATTLE]).map(function (b) {
-      const main = b.f === bgmMain, now = b.f === bgmName;
-      return '<div class="song' + (main ? " main" : "") + '">' +
+      const main = b.f === bgmMain, now = b.f === bgmName, off = !!bgmOff[b.f], batt = b.f === BGM_BATTLE.f;
+      const st = bgmLoaded[b.f] === false ? ' <small class="ng">読めない</small>' : "";
+      return '<div class="song' + (main ? " main" : "") + (off ? " off" : "") + '">' +
         '<button class="song-play" data-f="' + b.f + '">▶</button>' +
-        '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + "</span>" +
-        (b.f === BGM_BATTLE.f ? '<span class="song-badge fixed">たいせん専用</span>'
-          : main ? '<span class="song-badge">メイン</span>'
-            : '<button class="song-main" data-f="' + b.f + '">メインにする</button>') +
+        '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + st + "</span>" +
+        (batt ? '<span class="song-badge fixed">たいせん専用</span>'
+          : '<button class="song-use" data-f="' + b.f + '">' + (off ? "つかわない" : "つかう") + "</button>" +
+            (main ? '<span class="song-badge">メイン</span>'
+              : '<button class="song-main" data-f="' + b.f + '">メインに</button>')) +
         "</div>";
     }).join("");
   }
@@ -917,6 +930,8 @@ document.addEventListener("click", function (e) {
   if (!e.target.closest) return;
   const p = e.target.closest(".song-play");
   if (p) { bgmStop(); bgmPlay(p.dataset.f); renderSound2(); return; }
+  const u = e.target.closest(".song-use");
+  if (u) { toggleBgmUse(u.dataset.f); renderSound2(); return; }
   const m = e.target.closest(".song-main");
   if (m) { setBgmMain(m.dataset.f); renderSound2(); }
 });

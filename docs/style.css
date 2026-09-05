@@ -917,3 +917,7 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .song-main { font-size: 12px; padding: 6px 12px; background: transparent; color: var(--frame); border: 1px solid var(--line); }
 .song-badge.fixed { background: #e3ecff; border-color: #7ba0e0; color: #24487a; }
 .pz-cont { margin-top: 10px; background: linear-gradient(180deg,#e0b84a,#c9a227); color: #3a2a00; }
+.song.off { opacity: .5; background: #f2efe8; }
+.song.off .song-use { background: var(--accent); color: #fff; border-color: var(--accent); }
+.song-use { font-size: 12px; padding: 6px 12px; background: transparent; color: var(--ok); border: 1px solid var(--ok); }
+.song-n small.ng { color: var(--accent); }
