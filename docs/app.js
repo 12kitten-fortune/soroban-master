@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-29"; // 最新反映の確認用
+const BUILD = "2026-09-05-30"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -746,7 +746,7 @@ function submitAnswer(val) {
   if (ok) session.correct++;
   const qt = session.qStart ? (performance.now() - session.qStart) / 1000 : null;
   // 1問ごとに「何を出して・何と答えて・正解は何か」を残す（まちがえ方のクセを調べるため）
-  session.results.push({ ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer, t: qt, nums: session.cur.nums || null, subj: session.subj });
+  session.results.push({ no: session.idx + 1, ok, compact: session.cur.compact || "", user: Number.isFinite(val) ? val : "—", ans: session.cur.answer, t: qt, nums: session.cur.nums || null, subj: session.subj });
   if (session.mode === "end") {
     neutralSnd(); // 検定方式：正誤を明かさず最後にまとめて採点
     advance();
@@ -1054,6 +1054,8 @@ function missKind(r) {
   const u = Number(r.user), a = Number(r.ans);
   if (!Number.isFinite(u) || !Number.isFinite(a) || u === a) return "other";
   const diff = u - a, nums = r.nums;
+  // 1手ずつ調べて「どこで玉を動かし間違えたか」が特定できたら、それを採用する（いちばん確か）
+  if (nums) { const dg = diagnose(nums, u); if (dg && dg.kind !== "other") return dg.kind; }
   if (a !== 0 && (u === a * 10 || a === u * 10)) return "keta";                 // 桁ずれ
   // ちょうど10ずれていて、その問題にくり上がりがあるなら、まず「くり上がり忘れ」を疑う
   if (Math.abs(diff) % 10 === 0 && needsTech(nums, "10の友")) return "ten";
@@ -1084,6 +1086,146 @@ function techFigHTML(kind, nums) {
     `<div class="mr-fig-1"><div class="mr-cap">${hit.after.toLocaleString()}</div>${sorobanSVG(hit.after, cols, changedCols(hit.before, hit.after, cols))}</div>` +
     `</div><div class="mr-moves">${hit.moves.map((m) => `<div class="move">${m}</div>`).join("")}</div>`;
 }
+/* ============================================================ まちがえた1手を つきとめる
+   1手ずつ「どの位で・いくつを・どの技で」動かしたかを記録し、
+   そこで起こりうる まちがい（五玉の入れ忘れ・くり上がり忘れ など）が
+   その子の答えとぴったり一致するかを調べる。＝どこで玉を動かし間違えたかの特定。 */
+function addStep2(board, place, d, out) {
+  const s = { place, d, op: "+", before: boardValue(board) }, cur = board[place] || 0;
+  if (cur + d <= 9) {
+    s.tech = (d <= 4 && (cur % 5) + d <= 4) ? "one" : d === 5 ? "fiveBead" : d < 5 ? "five" : "both";
+    board[place] = cur + d;
+  } else { s.tech = "carry"; board[place] = cur - (10 - d); addToPlace(board, place + 1, 1, []); }
+  s.after = boardValue(board); out.push(s);
+}
+function subStep2(board, place, d, out) {
+  const s = { place, d, op: "-", before: boardValue(board) }, cur = board[place] || 0;
+  if (cur - d >= 0) {
+    s.tech = (d <= 4 && cur % 5 >= d) ? "one" : d === 5 ? "fiveBead" : d < 5 ? "five" : "both";
+    board[place] = cur - d;
+  } else { s.tech = "carry"; board[place] = cur + (10 - d); subToPlace(board, place + 1, 1, []); }
+  s.after = boardValue(board); out.push(s);
+}
+// 各項を「1手ずつ」に分解する
+function termMoves(nums) {
+  const board = new Array(14).fill(0), terms = [];
+  nums.forEach((v, i) => {
+    const steps = [], abs = Math.abs(v), ds = String(abs).split("").reverse().map(Number);
+    const before = boardValue(board);
+    for (let p = 0; p < ds.length; p++) { if (!ds[p]) continue; v < 0 ? subStep2(board, p, ds[p], steps) : addStep2(board, p, ds[p], steps); }
+    terms.push({ i, v, steps, before, after: boardValue(board) });
+  });
+  return terms;
+}
+const placeUnit = (p) => Math.pow(10, p);
+// その1手で起こりうる「玉の動かしまちがい」を並べる（答えのズレ＝delta）
+function stepMistakes(t, s) {
+  const u = placeUnit(s.place), pn = placeName(s.place), d = s.d, out = [];
+  if (s.tech === "five" && s.op === "+") {
+    const comp = 5 - d, right = `${pn}で 五玉を 入れて ${comp} を 払う（5の友：${d}は${comp}）`;
+    out.push({ kind: "five", delta: -5 * u, wrong: `${pn}で <b>五玉を 入れないで</b>、${comp} を 払ってしまった`, right });
+    out.push({ kind: "five", delta: comp * u, wrong: `${pn}で 五玉は 入れたけど、<b>${comp} を 払いわすれた</b>`, right });
+    // 友だちの数をまちがえる（4の友は1なのに2を払う、など）
+    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (comp - c) * u, wrong: `<b>5の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}で ${c} を 払ってしまった`, right });
+  } else if (s.tech === "five" && s.op === "-") {
+    const comp = 5 - d, right = `${pn}で 五玉を 払って ${comp} を 入れる（5の友：${d}は${comp}）`;
+    out.push({ kind: "five", delta: 5 * u, wrong: `${pn}で <b>五玉を 払わないで</b>、${comp} を 入れてしまった`, right });
+    out.push({ kind: "five", delta: -comp * u, wrong: `${pn}で 五玉は 払ったけど、<b>${comp} を 入れわすれた</b>`, right });
+    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (c - comp) * u, wrong: `<b>5の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}に ${c} を 入れてしまった`, right });
+  } else if (s.tech === "carry" && s.op === "+") {
+    const comp = 10 - d, nx = placeName(s.place + 1), right = `${nx}に 1を 入れて、${pn}から ${comp} を 払う（10の友：${d}は${comp}）`;
+    out.push({ kind: "ten", delta: -10 * u, wrong: `<b>となりの ${nx}に 1を 入れわすれた</b>（くり上がり忘れ）`, right });
+    out.push({ kind: "ten", delta: comp * u, wrong: `となりに 1は 入れたけど、<b>${pn}の ${comp} を 払いわすれた</b>`, right });
+    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (comp - c) * u, wrong: `<b>10の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}で ${c} を 払ってしまった`, right });
+  } else if (s.tech === "carry" && s.op === "-") {
+    const comp = 10 - d, nx = placeName(s.place + 1), right = `${nx}から 1を 払って、${pn}に ${comp} を 入れる（10の友：${d}は${comp}）`;
+    out.push({ kind: "ten", delta: 10 * u, wrong: `<b>となりの ${nx}から 1を 借りわすれた</b>（くり下がり忘れ）`, right });
+    out.push({ kind: "ten", delta: -comp * u, wrong: `1は 借りたけど、<b>${pn}に ${comp} を 入れわすれた</b>`, right });
+    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (c - comp) * u, wrong: `<b>10の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}に ${c} を 入れてしまった`, right });
+  } else {
+    out.push({ kind: "other", delta: -d * u, wrong: `${pn}の ${d} を <b>動かしわすれた</b>`, right: `${pn}に ${d} を ${s.op === "+" ? "入れる" : "払う"}` });
+  }
+  return out;
+}
+// その子の答えになる「1か所だけのまちがい」を探す
+function diagnose(nums, userAns) {
+  if (!nums || !Number.isFinite(userAns)) return null;
+  const terms = termMoves(nums), S = nums.reduce((a, b) => a + b, 0), need = userAns - S;
+  if (need === 0) return null;
+  const cands = [];
+  terms.forEach((t) => {
+    t.steps.forEach((s) => {
+      stepMistakes(t, s).forEach((mk) => {
+        // そろばんで起こりえない（途中でマイナスになる）動きは候補にしない
+        if (mk.delta === need && s.after + need >= 0) {
+          cands.push({ t, s, kind: mk.kind, wrong: mk.wrong, right: mk.right, rank: mk.rank || (mk.kind === "other" ? 3 : 1) });
+        }
+      });
+    });
+    // 項まるごとのまちがい
+    if (-t.v === need) cands.push({ t, s: null, kind: "skip", rank: 2, wrong: `この <b>${Math.abs(t.v)}</b> を まるごと たしわすれた（読みとばし）`, right: `${Math.abs(t.v)} を ${t.v < 0 ? "ひく" : "たす"}` });
+    // 1つめは「置く」なので、たす・ひくの取りちがえは2つめ以降だけ。盤面がマイナスになる動きも除く
+    if (t.i > 0 && -2 * t.v === need && t.before - t.v >= 0) cands.push({ t, s: null, kind: "minus", rank: 2, wrong: `<b>${t.v < 0 ? "ひくところを たして" : "たすところを ひいて"}</b> しまった`, right: `${Math.abs(t.v)} を ${t.v < 0 ? "ひく" : "たす"}` });
+    if (9 * t.v === need) cands.push({ t, s: null, kind: "keta", rank: 2, wrong: `<b>${Math.abs(t.v)} を ひとつ上の位に 置いてしまった</b>（位のずれ）`, right: `${Math.abs(t.v)} の 一の位を 定位点に そろえて 置く` });
+  });
+  if (!cands.length) return null;
+  cands.sort((a, b) => (a.rank - b.rank) || (a.t.i - b.t.i));
+  const c = cands[0];
+  const before = c.s ? c.s.before : c.t.before;
+  const right = c.s ? c.s.after : c.t.after;
+  return { kind: c.kind, termNo: c.t.i + 1, term: c.t.v, before, right, wrong: right + need, wrongText: c.wrong, rightText: c.right, terms };
+}
+/* 1問ぶんの「ていねいな解説」＝ 問題文・正しい玉の動き・その子の玉の動き・直しかた */
+function twoBoards(before, right, wrong) {
+  const cols = Math.max(2, String(Math.abs(right)).length, String(Math.abs(wrong)).length);
+  const fig = (v, base) => `<div class="tb-1"><div class="tb-cap">${v.toLocaleString()}</div>${sorobanSVG(v, cols, changedCols(base, v, cols))}</div>`;
+  return `<div class="tb"><div class="tb-side ok"><div class="tb-h">◎ 正しい 玉の動き</div><div class="tb-row">` +
+    `<div class="tb-1"><div class="tb-cap">${before.toLocaleString()}</div>${sorobanSVG(before, cols)}</div><span class="tb-ar">▶</span>${fig(right, before)}</div></div>` +
+    `<div class="tb-side ng"><div class="tb-h">✗ きみの 玉の動き（たぶん）</div><div class="tb-row">` +
+    `<div class="tb-1"><div class="tb-cap">${before.toLocaleString()}</div>${sorobanSVG(before, cols)}</div><span class="tb-ar">▶</span>${fig(wrong, before)}</div></div></div>`;
+}
+function explainOneHTML(r, no) {
+  const K = MISS_KINDS[r.k || missKind(r)] || MISS_KINDS.other;
+  const head = `<div class="ex-head"><span class="ex-no">${no}問目</span><span class="ex-q">${r.compact}</span>` +
+    `<span class="ex-a">きみの答え <b class="ng">${r.user}</b> ／ 正解 <b class="ok">${r.ans}</b></span></div>`;
+  if (!r.nums) return `<div class="ex-card">${head}<div class="ex-diag">${K.em} ${K.n}：${K.tip}</div></div>`;
+  const dg = diagnose(r.nums, Number(r.user));
+  let body = "";
+  if (dg) {
+    body += `<div class="ex-diag">🔍 <b>${dg.termNo}つめの「${dg.term < 0 ? "−" : "+"}${Math.abs(dg.term)}」</b> で つまずいたよ<br>` +
+      `<span class="ex-wrong">✗ ${dg.wrongText}</span><br><span class="ex-right">◎ ${dg.rightText}</span></div>` +
+      twoBoards(dg.before, dg.right, dg.wrong) +
+      `<div class="ex-fix">💡 ${(MISS_KINDS[dg.kind] || MISS_KINDS.other).tip}</div>`;
+  } else {
+    body += `<div class="ex-diag">🔍 どの1手で ずれたかは 見つけられなかったよ。下の 手順を 上から 声に出して たしかめよう。<br>` +
+      `<span class="ex-wrong">答えの ちがい：${Number(r.user) - Number(r.ans) > 0 ? "＋" : "−"}${Math.abs(Number(r.user) - Number(r.ans))}</span></div>`;
+  }
+  body += `<div class="ex-all"><div class="ex-all-h">この問題の 玉の動き（ぜんぶ）</div><div class="steps">${mitoriStepsHTML(r.nums)}</div></div>`;
+  return `<div class="ex-card">${head}${body}</div>`;
+}
+/* まとめの見立て（アセスメント）と、次にやることの提案 */
+function assessmentHTML(items) {
+  const all = items || [], wrong = all.filter((x) => !x.ok), right = all.filter((x) => x.ok);
+  const avg = (a) => { const t = a.map((x) => x.t).filter((x) => x != null); return t.length ? t.reduce((p, c) => p + c, 0) / t.length : null; };
+  const wt = avg(wrong), rt = avg(right);
+  const tally = {}; wrong.forEach((r) => { const k = r.k || missKind(r); tally[k] = (tally[k] || 0) + 1; });
+  const order = Object.keys(tally).sort((a, b) => tally[b] - tally[a]);
+  const rows = order.map((k) => { const K = MISS_KINDS[k] || MISS_KINDS.other; return `<li>${K.em} <b>${K.n}</b> … ${tally[k]}回</li>`; }).join("");
+  const tips = [];
+  const top = order[0];
+  if (top && top !== "other") tips.push(`いちばん多いのは <b>${(MISS_KINDS[top] || MISS_KINDS.other).n}</b>。下の 🎯ボタンで、この技だけの問題を 5問 やろう。`);
+  if (wt != null && rt != null) {
+    if (wt > rt * 1.6) tips.push(`まちがえた問題は 正解した問題より <b>${(wt / rt).toFixed(1)}倍 時間が かかっている</b>。手が止まる＝技を 思い出せていないサイン。あわてず、口に出して 玉を動かそう。`);
+    else if (wt < rt * 0.7) tips.push(`まちがえた問題の方が <b>速い</b>。あわてて 手が先に 動いているかも。1つ 息を ついてから 始めよう。`);
+  }
+  const one = wrong.filter((r) => { const d = diagnose(r.nums, Number(r.user)); return d && d.termNo === 1; }).length;
+  if (one >= 2) tips.push(`さいしょの 数で つまずくことが ${one}回。<b>始める前に 0（ご破算）</b>に なっているか たしかめよう。`);
+  if (!tips.length) tips.push(`まちがえ方が バラバラだよ。まずは ゆっくり、1手ずつ 声に出して やってみよう。`);
+  return `<div class="as-box"><div class="as-h">📋 きょうの 見立て</div>` +
+    `<ul class="as-list">${rows}</ul>` +
+    `<div class="as-time">1問の 平均：正解 ${rt != null ? rt.toFixed(1) + "秒" : "—"} ／ まちがい ${wt != null ? wt.toFixed(1) + "秒" : "—"}</div>` +
+    `<div class="as-h2">つぎに やること</div><ol class="as-tips">${tips.map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
+}
 /* 1セット終わったときに出す「正答率＋クセの図解」 */
 function missReportHTML(items) {
   const list = (items || []).filter((x) => x && !x.ok);
@@ -1096,17 +1238,17 @@ function missReportHTML(items) {
   const order = Object.keys(tally).sort((a, b) => tally[b].length - tally[a].length);
   const top = order[0], K = MISS_KINDS[top] || MISS_KINDS.other, sample = tally[top][0];
   const others = order.slice(1).map((k) => `${(MISS_KINDS[k] || MISS_KINDS.other).n} ${tally[k].length}回`).join("　");
-  const wrongs = list.map((r) => `<div class="qrow"><span class="qq">${r.compact}</span><span class="qa">きみ ${r.user} ／ 正解 <b>${r.ans}</b></span><span class="qk">${(MISS_KINDS[r.k || missKind(r)] || MISS_KINDS.other).n}</span></div>`).join("");
-  const steps = sample.nums ? mitoriStepsHTML(sample.nums) : "";
+  // まちがえた問題は「全問」ていねいに解説する（1問ずつ、正しい動きと きみの動きを並べて）
+  const details = list.map((r, i) => explainOneHTML(r, r.no || (i + 1))).join("");
   return `<div class="miss-report">${head}` +
     `<div class="mr-h">🔍 きみの まちがえ方の クセ</div>` +
     `<div class="mr-top">${K.em} <b>${K.n}</b> で <b>${tally[top].length}回</b> まちがえたよ</div>` +
     `<div class="mr-tip">${K.tip}</div>` +
     techFigHTML(top, sample.nums) +
     (others ? `<div class="mr-others">ほかに：${others}</div>` : "") +
-    `<div class="mr-wrongs">${wrongs}</div>` +
+    assessmentHTML(items) +
     `<button type="button" class="mr-drill" data-k="${top}">🎯 この クセの もんだいを 5問 やる</button>` +
-    (steps ? `<button type="button" class="ghost mr-more">この問題の 解き方を ぜんぶ見る</button><div class="mr-steps steps hidden">${steps}</div>` : "") +
+    `<div class="ex-h">📖 まちがえた ${list.length}問の 解説（ぜんぶ）</div>${details}` +
     `</div>`;
 }
 /* ============================================================ にがて克服の問題づくり

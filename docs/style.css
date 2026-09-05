@@ -504,3 +504,38 @@ body.craft-full .blk { padding: 4px 8px 3px; }
 body.craft-full .blk-chip { width: 28px; height: 28px; }
 /* ブラウザの全画面のときは、まわりが黒くならないように背景を塗る */
 #view-craft:fullscreen { background: var(--bg); overflow: auto; }
+
+/* ============================================================ まちがえた問題の ていねいな解説（全問） */
+.ex-h { font-weight: 800; color: var(--navy); font-size: 16px; margin: 16px 0 8px; border-top: 2px solid var(--line); padding-top: 12px; }
+.ex-card { border: 2px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; background: #fff; }
+.ex-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; border-bottom: 1px dashed var(--line); padding-bottom: 8px; margin-bottom: 10px; }
+.ex-no { font-size: 12px; font-weight: 700; color: #fff; background: var(--navy); border-radius: 999px; padding: 2px 10px; }
+.ex-head .ex-q { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ex-a { font-size: 14px; color: #666; }
+.ex-a .ng { color: var(--accent); } .ex-a .ok { color: var(--ok); }
+.ex-diag { background: #fff6e0; border-left: 5px solid var(--royal-gold); border-radius: 8px; padding: 8px 12px; font-size: 15px; line-height: 1.8; }
+.ex-wrong { color: var(--accent); font-weight: 700; }
+.ex-right { color: var(--ok); font-weight: 700; }
+.ex-fix { font-size: 14px; background: #f2f8f4; border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+.ex-all { margin-top: 10px; }
+.ex-all-h { font-size: 13px; font-weight: 700; color: #8a7560; margin-bottom: 4px; }
+.ex-all .steps { margin-top: 0; font-size: 14px; }
+/* 正しい動き ／ きみの動き を左右に並べる */
+.tb { display: flex; gap: 12px; flex-wrap: wrap; margin: 10px 0 0; }
+.tb-side { flex: 1 1 300px; border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.tb-side.ok { border-color: #8dc98d; background: #f4fbf4; }
+.tb-side.ng { border-color: #e2a79e; background: #fdf5f3; }
+.tb-h { font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+.tb-side.ok .tb-h { color: var(--ok); } .tb-side.ng .tb-h { color: var(--accent); }
+.tb-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tb-1 { text-align: center; }
+.tb-cap { font-size: 12px; font-weight: 700; color: #8a7560; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.tb-ar { font-size: 20px; color: var(--bead-hi); }
+/* きょうの見立て */
+.as-box { background: #f7f9fd; border: 2px solid #cbd8ea; border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+.as-h, .as-h2 { font-weight: 800; color: var(--navy); }
+.as-h2 { margin-top: 10px; }
+.as-list { margin: 6px 0 0 20px; font-size: 14px; }
+.as-time { font-size: 13px; color: #8a7560; margin-top: 6px; }
+.as-tips { margin: 6px 0 0 20px; font-size: 14px; line-height: 1.8; }
+.as-tips li { margin-bottom: 4px; }
