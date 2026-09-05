@@ -843,3 +843,45 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   background: linear-gradient(180deg,#e8542f,#b8331a); color: #fff; font-size: 12px; font-weight: 800;
   border: 2px solid #fff; border-radius: 999px; box-shadow: 0 2px 3px rgba(0,0,0,.3); }
 .pz-tool-tip { width: 100%; text-align: center; font-size: 13px; color: #8a7560; min-height: 18px; }
+
+/* ============================================================ 祝福とねぎらい（全画面の演出） */
+#fxLayer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; overflow: hidden; }
+.fx-banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; animation: fxban 2.2s cubic-bezier(.2,1.6,.4,1) forwards; }
+.fx-main { font-size: clamp(32px, 8vw, 64px); font-weight: 900; letter-spacing: 1px;
+  -webkit-text-stroke: 8px #3a1f00; paint-order: stroke fill; color: #ffd35b;
+  text-shadow: 0 8px 0 rgba(0,0,0,.25); }
+.fx-banner.ng .fx-main { color: #ffd9d2; -webkit-text-stroke: 8px #7a2318; }
+.fx-sub { margin-top: 6px; font-size: clamp(14px, 3.6vw, 22px); font-weight: 800; color: #fff;
+  -webkit-text-stroke: 5px #3a1f00; paint-order: stroke fill; }
+.fx-banner.ng .fx-sub { -webkit-text-stroke: 5px #7a2318; }
+@keyframes fxban {
+  0% { opacity: 0; transform: scale(.4) rotate(-6deg); }
+  12% { opacity: 1; transform: scale(1.15) rotate(2deg); }
+  22% { transform: scale(1) rotate(0); }
+  78% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(.9) translateY(-40px); } }
+/* 花火 */
+.fx-p { position: absolute; left: var(--x); top: var(--y); width: 9px; height: 9px; border-radius: 50%;
+  background: var(--c); box-shadow: 0 0 10px var(--c); animation: fxp 1.2s ease-out forwards; animation-delay: var(--d, 0ms); }
+@keyframes fxp { 0% { opacity: 1; transform: translate(0,0) scale(1.2); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 70px)) scale(.3); } }
+/* 紙ふぶき */
+.fx-cf { position: absolute; left: var(--x); top: -20px; width: var(--w, 8px); height: calc(var(--w, 8px) * 1.6);
+  background: var(--c); animation: fxcf 2.8s linear forwards; animation-delay: var(--d, 0ms); border-radius: 2px; }
+@keyframes fxcf { 0% { opacity: 1; transform: translateY(0) rotate(0); }
+  100% { opacity: .9; transform: translateY(105vh) rotate(var(--r, 360deg)); } }
+/* はじめての説明 */
+.tip-back { position: absolute; inset: 0; background: rgba(20,15,10,.62); display: flex; align-items: center; justify-content: center;
+  pointer-events: auto; animation: fxfade .2s ease; padding: 16px; }
+@keyframes fxfade { from { opacity: 0; } }
+.tip-card { background: linear-gradient(180deg,#fffdf6,#f6efdd); border: 4px solid #c9a227; border-radius: 18px;
+  padding: 20px 22px; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,.4); animation: fxpop .35s cubic-bezier(.2,1.7,.4,1); }
+@keyframes fxpop { from { transform: scale(.7); opacity: 0; } }
+.tip-title { font-size: 22px; font-weight: 900; color: var(--navy); text-align: center; margin-bottom: 10px; }
+.tip-body { font-size: 15px; line-height: 1.9; color: #4a3a26; }
+.tip-body p { margin: 6px 0; }
+.tip-demo { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0 12px; }
+.tip-demo .big { position: static; transform: none; width: 56px; height: 56px; display: inline-block; }
+.tip-demo .gone { opacity: .18; }
+.tip-ar { font-size: 26px; color: var(--bead-hi); }
+.tip-ok { display: block; width: 100%; margin-top: 14px; font-size: 17px; padding: 12px; background: var(--ok); }

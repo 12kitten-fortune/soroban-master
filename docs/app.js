@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-43"; // 最新反映の確認用
+const BUILD = "2026-09-05-44"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -813,8 +813,20 @@ function finishSession() {
     msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   }
   renderProfile();
-  if (session.timed) { (session.correct * cf.per >= cf.pass) ? bigFanfareSnd() : wrongSnd(); }
-  else if (completed) fanfareSnd();
+  // 音だけでなく、画面いっぱいに ねぎらいと祝福を出す
+  const acc100 = session.N ? Math.round(session.correct / session.N * 100) : 0;
+  if (session.timed) {
+    const pass2 = session.correct * cf.per >= cf.pass;
+    if (pass2) fxCelebrate(3, "🎓 " + session.grade.key + " ごうかく！", "おめでとう！ よく がんばったね");
+    else fxCheer("あと すこし…", "合格は " + cf.pass + "点。もう一度 いこう！");
+  } else if (completed) {
+    if (bestUpdated) fxCelebrate(3, "⏱ 自己ベスト こうしん！", "いままでで いちばん 速かった！");
+    else if (acc100 === 100) fxCelebrate(3, "💯 ぜんもん せいかい！", "パーフェクト！");
+    else if (acc100 >= 80) fxCelebrate(2, "よくできました！", "正答率 " + acc100 + "%");
+    else fxCelebrate(1, "おつかれさま！", "さいごまで やりきったね");
+  } else {
+    fxCheer("とちゅうまで やったね", "つづきは いつでも できるよ");
+  }
   if (completed) coinSnd(1.0); // GOLD獲得の「チャリーン」はファンファーレの後に
   msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🧩 パズルへ</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
   const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
@@ -964,6 +976,7 @@ function finishRoutine() {
   $("#playResult").className = "result ok";
   const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
+  fxCelebrate(3, "🏁 本日の練習 かんりょう！", acc >= 90 ? "正答率 " + acc + "%　パーフェクト！" : "毎日 つづけているのが すごい");
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
   const allItems = rs.sections.reduce((a, s) => a.concat(s.items || []), []);   // 本日の練習ぜんぶ分のクセ
   $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${missReportHTML(allItems)}${goldBlock}${detail}<br><button id="toKingdomBtn2">🧩 パズルへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
@@ -1539,7 +1552,13 @@ function finishFlashSet(res) {
   logSession("flash", N, correct, sum, 0);   // 記録に残す（保護者画面のグラフに乗る）
   msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : FLASH_SET + "問"} が はじまるよ</div>`;
-  (pass || (!flashExam.on && acc >= 90)) ? bigFanfareSnd() : fanfareSnd();
+  if (flashExam.on) {
+    if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + " ごうかく！", correct + " / " + N + " 正解");
+    else fxCheer("あと すこし…", "合格は 140点。もう一度 いこう！");
+  } else if (r.improved) fxCelebrate(3, "⏱ 自己ベスト こうしん！", "1問 " + avg.toFixed(1) + "秒");
+  else if (acc === 100) fxCelebrate(3, "💯 ぜんもん せいかい！", "1問 " + avg.toFixed(1) + "秒");
+  else if (acc >= 80) fxCelebrate(2, "よくできました！", "正答率 " + acc + "%");
+  else fxCelebrate(1, "おつかれさま！", "正答率 " + acc + "%");
   coinSnd(1.0);
   renderProfile();
   res.innerHTML = msg; res.className = "result " + (flashExam.on && !pass ? "ng" : "ok");
@@ -2500,6 +2519,113 @@ document.addEventListener("fullscreenchange", function () {
   if (window.ResizeObserver) new ResizeObserver(on).observe(cv);
 })();
 
+/* ============================================================ 祝福とねぎらい（アプリ全体で使う）
+   「音だけで しらせる」のをやめて、画面に大きく出す。
+   できたときは 花火と大きな文字、できなかったときも ねぎらいの言葉を出す。 */
+const FX_COLORS = ["#ffd35b", "#ff6b6b", "#4dd4ac", "#5aa9ff", "#c77dff", "#fff"];
+function fxLayer() {
+  let el = document.getElementById("fxLayer");
+  if (!el) { el = document.createElement("div"); el.id = "fxLayer"; document.body.appendChild(el); }
+  return el;
+}
+/* 大きな文字（スーパー）を出す。kind: ok / ng / gold */
+function fxBanner(main, sub, kind) {
+  const el = fxLayer();
+  const d = document.createElement("div");
+  d.className = "fx-banner " + (kind || "ok");
+  d.innerHTML = '<div class="fx-main">' + main + "</div>" + (sub ? '<div class="fx-sub">' + sub + "</div>" : "");
+  el.appendChild(d);
+  setTimeout(() => d.remove(), 2200);
+}
+/* 花火（下から上がって、はじけて 散る） */
+function fxFirework(x, y, n) {
+  const el = fxLayer();
+  for (let i = 0; i < (n || 18); i++) {
+    const p = document.createElement("i");
+    p.className = "fx-p";
+    const a = (Math.PI * 2 * i) / (n || 18) + Math.random() * 0.3;
+    const v = 90 + Math.random() * 80;
+    p.style.setProperty("--x", x + "px");
+    p.style.setProperty("--y", y + "px");
+    p.style.setProperty("--dx", (Math.cos(a) * v).toFixed(1) + "px");
+    p.style.setProperty("--dy", (Math.sin(a) * v).toFixed(1) + "px");
+    p.style.setProperty("--c", FX_COLORS[(Math.random() * FX_COLORS.length) | 0]);
+    p.style.setProperty("--d", (Math.random() * 120).toFixed(0) + "ms");
+    el.appendChild(p);
+    setTimeout(() => p.remove(), 1400);
+  }
+}
+// 何発か 順番に打ち上げる
+function fxFireworks(rounds) {
+  const W = window.innerWidth, H = window.innerHeight;
+  for (let r = 0; r < (rounds || 5); r++) {
+    setTimeout(() => {
+      const x = W * (0.15 + Math.random() * 0.7), y = H * (0.15 + Math.random() * 0.35);
+      fxFirework(x, y, 16 + ((Math.random() * 8) | 0));
+      try { const c = ensureAudio(), t = c.currentTime; tone(300 + Math.random() * 500, t, 0.35, "triangle", 0.12); } catch (e) { }
+    }, r * 260);
+  }
+}
+/* 紙ふぶき */
+function fxConfetti(n) {
+  const el = fxLayer(), W = window.innerWidth;
+  for (let i = 0; i < (n || 40); i++) {
+    const p = document.createElement("i");
+    p.className = "fx-cf";
+    p.style.setProperty("--x", (Math.random() * W).toFixed(0) + "px");
+    p.style.setProperty("--c", FX_COLORS[(Math.random() * FX_COLORS.length) | 0]);
+    p.style.setProperty("--d", (Math.random() * 900).toFixed(0) + "ms");
+    p.style.setProperty("--r", ((Math.random() * 2 - 1) * 720).toFixed(0) + "deg");
+    p.style.setProperty("--w", (6 + Math.random() * 6).toFixed(0) + "px");
+    el.appendChild(p);
+    setTimeout(() => p.remove(), 3200);
+  }
+}
+/* できたとき：大きさを 3段階で選ぶ（1=よくできた 2=すごい 3=大成功） */
+const FX_PRAISE = [
+  ["よくできました！", "その調子だよ"],
+  ["すごい！", "よく がんばったね"],
+  ["だいせいこう！", "レオ王も おどろいてる"],
+];
+function fxCelebrate(level, main, sub) {
+  const L = Math.max(1, Math.min(3, level || 1));
+  const p = FX_PRAISE[L - 1];
+  fxBanner(main || p[0], sub || p[1], "ok");
+  fxFireworks(L * 2 + 1);
+  if (L >= 2) fxConfetti(L * 20);
+  try { L >= 2 ? bigFanfareSnd() : fanfareSnd(); } catch (e) { }
+}
+/* できなかったとき：責めずに ねぎらう */
+const FX_CHEER = [
+  ["おしい！", "あと ちょっとだったね"],
+  ["ドンマイ！", "つぎは いけるよ"],
+  ["よく ちょうせんした！", "やめずに つづけたのが えらい"],
+];
+function fxCheer(main, sub) {
+  const c = FX_CHEER[(Math.random() * FX_CHEER.length) | 0];
+  fxBanner(main || c[0], sub || c[1], "ng");
+  try { wrongSnd(); } catch (e) { }
+}
+/* ============================================================ はじめての説明（1回だけ出る） */
+const TIPS_KEY = "soroban_tips";
+const tipsSeen = () => { try { return JSON.parse(localStorage.getItem(TIPS_KEY) || "{}"); } catch (e) { return {}; } };
+function tipDone(k) { const t = tipsSeen(); t[k] = 1; try { localStorage.setItem(TIPS_KEY, JSON.stringify(t)); } catch (e) { } }
+// key が まだ見ていなければ 説明を出す。onClose は 閉じたあとに呼ぶ
+function tipOnce(key, title, bodyHTML, onClose) {
+  if (tipsSeen()[key]) { if (onClose) onClose(); return false; }
+  const el = fxLayer();
+  const d = document.createElement("div");
+  d.className = "tip-back";
+  d.innerHTML = '<div class="tip-card"><div class="tip-title">' + title + "</div>" +
+    '<div class="tip-body">' + bodyHTML + "</div>" +
+    '<button class="tip-ok">わかった！</button></div>';
+  el.appendChild(d);
+  d.querySelector(".tip-ok").onclick = function () {
+    tipDone(key); d.remove(); if (onClose) onClose();
+  };
+  return true;
+}
+
 /* ============================================================ そろばんパズル
    ロイヤルマッチのような「入れかえて3つそろえる」パズル。
    ★方針：GOLDはここでは増えない（1プレイぶんのGOLDを使って遊ぶ）。
@@ -3430,7 +3556,9 @@ function pzFinish(done) {
     d.lv = Math.max(d.lv, pz.lv.n + 1);
     d.best = Math.max(d.best || 0, pz.lv.n);
     pzSave(d);
-    try { bigFanfareSnd(); } catch (e) { }
+    fxCelebrate(st, "レベル " + pz.lv.n + " クリア！", st >= 3 ? "パーフェクト！ ★★★" : "よく がんばったね");
+  } else {
+    fxCheer("あと " + Math.max(0, pz.lv.need - pz.got) + " こ だった…", "つぎは いけるよ！");
   }
   (async () => {
     try {
@@ -3512,6 +3640,22 @@ function pzRenderLobby() {
     renderPuzzle();
   };
 }
+// はじめて出てくる仕掛けは、あそぶ前に 説明する
+function pzTipFor(lv) {
+  if (lv.goal === "grass") {
+    tipOnce("pz-grass", "🌿 みどりの 草を はがそう",
+      '<div class="tip-demo"><i class="pz-fl big"></i><span class="tip-ar">▶</span><i class="pz-fl big gone"></i></div>' +
+      "<p><b>草のマスの上で、玉を3つ そろえる</b>と 草が はがれます。</p>" +
+      "<p>草そのものを 動かすことは できません。<b>草の上に ある玉</b>を そろえるのが コツ。</p>" +
+      "<p>ロケットや TNT で ふきとばしても はがれます。</p>");
+  } else if (lv.goal === "box") {
+    tipOnce("pz-box", "📦 木箱を こわそう",
+      '<div class="tip-demo"><i class="pz-bk box big"></i><span class="tip-ar">▶</span><i class="pz-bk box big gone"></i></div>' +
+      "<p><b>箱の となりで 玉を そろえる</b>と こわれます。箱の上では そろえられません。</p>" +
+      "<p>箱は 動かせず、玉も 通りぬけできません。</p>" +
+      "<p><b>石の箱</b>は かたいので <b>2回</b> こわす ひつようが あります。</p>");
+  }
+}
 function renderPuzzle() {
   const lob = $("#pzLobby"), brd = $("#pzPlay"), ov = $("#pzOver");
   if (!lob) return;
@@ -3525,6 +3669,7 @@ function renderPuzzle() {
     lob.classList.add("hidden"); brd.classList.remove("hidden");
     pzArmed = null;
     pzResetBoard(); pzRenderHud(); pzRenderTools();
+    pzTipFor(pz.lv);
   }
   renderGoldPill();
 }
