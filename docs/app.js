@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-39"; // 最新反映の確認用
+const BUILD = "2026-09-05-40"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2932,9 +2932,19 @@ let pzNodes = {};               // 玉のid → 画面の要素
 const pzWait = (ms) => new Promise((r) => setTimeout(r, ms));
 const pzKind = (k) => PZ_KINDS.find((x) => x.k === k) || PZ_KINDS[0];
 const PZ_SP_ICON = { rh: "🚀", rv: "🚀", tnt: "💣", prop: "🚁", disco: "✨" };
+// 玉は「色ちがい」ではなく「形ちがい」にする（ロイヤルマッチと同じで、ひと目で見分けられる）
+const PZ_PATH = {
+  spade: "M50 8 C 30 30, 10 42, 10 58 A 18 18 0 0 0 42 70 L 36 92 L 64 92 L 58 70 A 18 18 0 0 0 90 58 C 90 42, 70 30, 50 8 Z",
+  heart: "M50 92 C 18 68, 6 50, 6 34 A 21 21 0 0 1 50 24 A 21 21 0 0 1 94 34 C 94 50, 82 68, 50 92 Z",
+  dia: "M50 5 L93 50 L50 95 L7 50 Z",
+  club: "M50 6 A 19 19 0 0 1 66 36 A 19 19 0 1 1 66 66 A 19 19 0 0 1 50 62 A 19 19 0 0 1 34 66 A 19 19 0 1 1 34 36 A 19 19 0 0 1 50 6 Z M42 62 L36 94 L64 94 L58 62 Z",
+  bead: "M50 8 L92 40 L76 90 L24 90 L8 40 Z",
+};
 function pzFaceHTML(t) {
-  const face = t.k === "bead" ? '<i class="pz-bead"></i>' : '<i class="pz-mark">' + pzKind(t.k).s + "</i>";
   if (t.sp === "disco") return '<i class="pz-disco"></i>';                       // 光の玉は 色を持たない見た目
+  const face = '<svg class="pz-svg" viewBox="0 0 100 100" aria-hidden="true">' +
+    '<path d="' + (PZ_PATH[t.k] || PZ_PATH.dia) + '" fill="url(#g-' + t.k + ')" stroke="rgba(0,0,0,.45)" stroke-width="5" stroke-linejoin="round"/>' +
+    '<ellipse class="pz-gloss" cx="36" cy="30" rx="15" ry="9" transform="rotate(-24 36 30)"/></svg>';
   const sp = t.sp ? '<b class="pz-sp sp-' + t.sp + '">' + (PZ_SP_ICON[t.sp] || "") + "</b>" : "";
   return face + sp;
 }

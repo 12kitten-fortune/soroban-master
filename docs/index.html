@@ -272,7 +272,14 @@
               </div>
               <div class="pz-barwrap"><i id="pzBar"></i></div>
               <div id="pzMsg" class="pz-msg"></div>
-              <div id="pzBoard" class="pz-board"></div>
+              <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+                <linearGradient id="g-spade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7b7b93"/><stop offset=".45" stop-color="#4a4a5e"/><stop offset="1" stop-color="#26262f"/></linearGradient>
+                <linearGradient id="g-heart" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8f83"/><stop offset=".45" stop-color="#e0453a"/><stop offset="1" stop-color="#a01d16"/></linearGradient>
+                <linearGradient id="g-dia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fc4ff"/><stop offset=".45" stop-color="#2f7ae0"/><stop offset="1" stop-color="#14458c"/></linearGradient>
+                <linearGradient id="g-club" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08f"/><stop offset=".45" stop-color="#37a35c"/><stop offset="1" stop-color="#186336"/></linearGradient>
+                <linearGradient id="g-bead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".45" stop-color="#e0a92b"/><stop offset="1" stop-color="#96650d"/></linearGradient>
+              </defs></svg>
+              <div class="pz-stage"><div id="pzBoard" class="pz-board"></div></div>
             </div>
             <div id="pzOver" class="pz-over hidden"></div>
           </div>
