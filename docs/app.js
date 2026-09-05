@@ -315,7 +315,7 @@ function tone(freq, t0, dur, type = "sine", vol = 0.15) {
 const SFX_DIR = "assets/sfx/";
 const SFX_LIST = {
   click: "click", correct: "correct", wrong: "wrong", coin: "coin",
-  pop: "pop", rocket: "rocket", clear: "clear", levelup: "levelup", star: "star",
+  pop: "pop", rocket: "rocket", boom: "boom", clear: "clear", levelup: "levelup", star: "star",
 };
 const sfxBuf = {};                       // 読みこんだ音
 let sfxTried = false;
@@ -361,7 +361,7 @@ function chord(t0, root, kind, dur, vol) {
 
 /* ---- BGM（材料があれば鳴る。無ければ 何も起きない） ---- */
 const BGM_KEY = "soroban_bgm", VOL_KEY = "soroban_vol";
-let bgmOn = localStorage.getItem(BGM_KEY) === "on";
+let bgmOn = localStorage.getItem(BGM_KEY) !== "off";   // 材料が入ったので はじめから流す（設定で止められる）
 let bgmEl = null, bgmName = "";
 sfxVol = (function () { const v = parseFloat(localStorage.getItem(VOL_KEY)); return isFinite(v) ? v : 0.8; })();
 function bgmPlay(name) {
@@ -370,7 +370,11 @@ function bgmPlay(name) {
   bgmStop();
   let ext = 0;
   const tryNext = function () {
-    if (ext >= SFX_EXT.length) { bgmEl = null; bgmName = ""; return; }
+    if (ext >= SFX_EXT.length) {
+      bgmEl = null; bgmName = "";
+      if (name !== "bgm_study") bgmPlay("bgm_study");     // 専用のBGMが無ければ 練習用を流す
+      return;
+    }
     bgmEl = new Audio(SFX_DIR + name + "." + SFX_EXT[ext++]);
     bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
     bgmEl.addEventListener("error", tryNext, { once: true });
@@ -2713,7 +2717,8 @@ function fxFireworks(rounds) {
     setTimeout(() => {
       const x = W * (0.15 + Math.random() * 0.7), y = H * (0.15 + Math.random() * 0.35);
       fxFirework(x, y, 16 + ((Math.random() * 8) | 0));
-      try { const c = ensureAudio(), t = c.currentTime; tone(300 + Math.random() * 500, t, 0.35, "triangle", 0.12); } catch (e) { }
+      if (r === 0) sfx("levelup", function () { try { const c = ensureAudio(), t = c.currentTime; tone(300 + Math.random() * 500, t, 0.35, "triangle", 0.12); } catch (e) { } });
+      else if (!sfxBuf["levelup"]) { try { const c = ensureAudio(), t = c.currentTime; tone(300 + Math.random() * 500, t, 0.35, "triangle", 0.12); } catch (e) { } }
     }, r * 260);
   }
 }
@@ -2965,6 +2970,8 @@ function pzBlast(c, i, out, fired, opt) {
     if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired, { at: base + (d || 0) + 60 });   // 巻きこまれた物は 少し遅れて発動
   };
   const sp = opt.as || t.sp;
+  if (sp === "rh" || sp === "rv") sfx("rocket");
+  else if (sp === "tnt" || sp === "cross") sfx("boom");
   if (sp === "rh") { pzShow({ fx: "rocket", dir: "h", x: x, y: y, at: base }); for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y), Math.abs(k - x) * 26); }
   else if (sp === "rv") { pzShow({ fx: "rocket", dir: "v", x: x, y: y, at: base }); for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k), Math.abs(k - y) * 26); }
   else if (sp === "tnt") {
@@ -3676,7 +3683,7 @@ async function pzCeremony(st, cleared) {
     sp.className = "pz-star" + (on ? " on" : "");
     sp.textContent = on ? "★" : "☆";
     row.appendChild(sp);
-    if (on) { pzTone(4 + i * 3, true); sp.classList.add("fly"); }
+    if (on) { sfx("star", function () { pzTone(4 + i * 3, true); }); sp.classList.add("fly"); }
     await pzWait(on ? 330 : 120);
   }
   // ③ スコアを かぞえ上げる
