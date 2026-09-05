@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-31"; // 最新反映の確認用
+const BUILD = "2026-09-05-32"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1362,6 +1362,7 @@ $("#showSteps").addEventListener("click", () => {
 /* ============================================================ フラッシュ暗算 */
 let flashAnswer = null, flashBusy = false, flashSpec = null, flashGrade = null;
 let flashExam = { on: false, idx: 0, N: 20, correct: 0 };
+let flashRun = 0;   // ふつうの練習での連続正解
 function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
   hidePauseUI();
@@ -1376,6 +1377,7 @@ function startFlash(grade) {
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
   $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display"; $("#flashForm").classList.add("hidden");
   flashExam = { on: $("#flashExamMode").checked, idx: 0, N: 20, correct: 0 };
+  flashRun = 0;
 }
 $("#flashStart").addEventListener("click", () => { flashExam.on = $("#flashExamMode").checked; runFlash(); });
 // 数字1個ごとの音（1個目・2個目…とドレミで上がっていく＝リズムが分かる）
@@ -1491,7 +1493,26 @@ $("#flashForm").addEventListener("submit", (e) => {
       msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="goal">${nextGoalHint()}</div></div>`;
       renderProfile(); res.innerHTML = msg; res.className = "result " + (pass ? "ok" : "ng"); $("#flashProgress").textContent = "";
     }
-  } else { res.textContent = ok ? "正解！すごい！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result " + (ok ? "ok" : "ng"); if (ok) touchStreak(); }
+  } else {
+    // ふつうの練習でも、正解1問ごとにGOLDが出る（他の種目と同じ「学習の成果」あつかい）
+    if (ok) {
+      touchStreak();
+      flashRun = (flashRun || 0) + 1;
+      const m = gradeGoldMult(flashGrade);
+      let earned = Math.round(2 * m), lines = [`正解 ＋${Math.round(2 * m)}`];
+      if (flashRun % 5 === 0) { const b = Math.round(10 * m); earned += b; lines.push(`${flashRun}問れんぞく正解 ＋${b}`); }
+      const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+      addGold(earned); coinSnd(0.25);
+      logSession("flash", 1, 1, 0);   // 学習の記録にも1問ぶん残す
+      res.innerHTML = `正解！すごい！<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div></div>`;
+      res.className = "result ok";
+      renderProfile();
+    } else {
+      flashRun = 0;
+      logSession("flash", 1, 0, 0);
+      res.textContent = `おしい（答え: ${flashAnswer.toLocaleString()}）`; res.className = "result ng";
+    }
+  }
 });
 
 /* ============================================================ たいせん（CPU対戦ゲーム／レオ王） */
