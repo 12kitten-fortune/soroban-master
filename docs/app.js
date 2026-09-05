@@ -316,8 +316,12 @@ const SFX_DIR = "assets/sfx/";
 const SFX_LIST = {
   click: "click", correct: "correct", wrong: "wrong", coin: "coin",
   pop: "pop", rocket: "rocket", boom: "boom", clear: "clear", levelup: "levelup", star: "star",
-  sparkle: "sparkle",   // 金の星の玉が 消えたとき
-  drop: "drop",         // 水色（青いしずく）の玉が 消えたとき
+  // 玉の色ごとの音（消えたときに 鳴る）
+  sparkle: "sparkle",       // 金の星
+  drop: "drop",             // 水色（青いしずく）
+  tile_red: "tile_red",     // 赤
+  tile_purple: "tile_purple", // 紫
+  tile_green: "tile_green",   // 緑
 };
 const sfxBuf = {};                       // 読みこんだ音
 let sfxTried = false;
@@ -351,6 +355,18 @@ function sfx(name, fallback, rate) {
     } catch (e) { }
   }
   if (fallback) { try { fallback(); } catch (e) { } }
+}
+// 音量を 指定して鳴らす（下じきの音を 小さくするため）
+function sfxAt(name, vol, rate) {
+  if (!soundOn) return;
+  const a = sfxBuf[name];
+  if (!a) return;
+  try {
+    const c = a.cloneNode();
+    c.volume = Math.max(0, Math.min(1, sfxVol * vol));
+    if (rate) c.playbackRate = Math.max(0.5, Math.min(2.4, rate));
+    c.play().catch(function () { });
+  } catch (e) { }
 }
 // ペンタトニックの音程ぶんだけ 再生速度を上げる＝音が階段状に上がる
 const sfxRateFor = (step) => Math.pow(2, SCALE_PENTA[Math.max(0, Math.min(SCALE_PENTA.length - 1, step | 0))] / 12);
@@ -3282,7 +3298,13 @@ function pzShowFx(o) {
 /* ---- 順番に こわす（ロケットは通った所から、TNTは中心から） ---- */
 /* 玉の種類ごとの音（消えたときに 1回だけ鳴る）
    bead＝金の星 → キラッ ／ dia＝水色のしずく → 涙のしずく */
-const PZ_KIND_SFX = { bead: "sparkle", dia: "drop" };
+const PZ_KIND_SFX = {
+  bead: "sparkle",       // 金の星 → キラッ
+  dia: "drop",           // 水色   → 水滴
+  heart: "tile_red",     // 赤     → 目玉焼き
+  spade: "tile_purple",  // 紫     → 決定音
+  club: "tile_green",    // 緑     → パッ
+};
 function pzKindSfx(list, delay) {
   const hit = {};
   (list && list.forEach ? list : []).forEach(function (i) {
@@ -3291,7 +3313,8 @@ function pzKindSfx(list, delay) {
   });
   const names = Object.keys(hit);
   if (!names.length) return false;
-  names.forEach(function (n, k) { setTimeout(function () { sfx(n); }, (delay || 0) + k * 90); });
+  // いちどに いくつも消えても 音が団子にならないよう、少しずつ ずらす（多いときは 3種類まで）
+  names.slice(0, 3).forEach(function (n, k) { setTimeout(function () { sfx(n); }, (delay || 0) + k * 70); });
   return true;
 }
 function pzHadStar(list) {
@@ -3524,7 +3547,7 @@ function pzBurst(i, kind, n) {
 function pzTone(step, big) {
   if (!soundOn) return;
   // しゃきん！ 連鎖するほど 少しだけ高くする（上げすぎると あほっぽくなる）
-  if (sfxBuf["pop"]) return sfx("pop", null, 1 + Math.min(6, step) * 0.045);
+  if (sfxBuf["pop"]) return sfxAt("pop", 0.45, 1 + Math.min(6, step) * 0.045);   // 色ごとの音を 主役にするため 小さめに
   try {
     const c = ensureAudio(), t = c.currentTime;
     const f = noteHz(step);
