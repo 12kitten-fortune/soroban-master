@@ -261,7 +261,10 @@ function gradeGoldMult(grade) {
    ② 同じ級・同じ種目を その日に くり返すほど 減る
    どちらも「ちょうどよい難しさを 少しずつ」に 報酬を寄せるための仕組み。 */
 const gradeIdxOf = (grade) => GRADES.findIndex((x) => x.key === (grade && grade.key));
+// ★いまは 動作確認のため 制限を止めている。GOLD_RULES を true にすると 効くようになる
+const GOLD_RULES = false;
 function fitMult(grade) {
+  if (!GOLD_RULES) return { m: 1, label: "" };
   const gi = gradeIdxOf(grade); if (gi < 0) return { m: 1, label: "" };
   const aim = myRankIdx() + 1;                    // つぎに目指す級＝いまの適正
   const d = gi - aim;
@@ -282,6 +285,7 @@ function dailyCount(key, add) {
   return n;
 }
 function repeatMult(subj, grade, count) {
+  if (!GOLD_RULES) return { m: 1, label: "" };
   const t = [1, 0.7, 0.5, 0.3];
   const m = t[Math.min(count, t.length - 1)];
   return { m: m, label: m < 1 ? "きょう " + (count + 1) + "回目 ×" + m : "" };
@@ -525,12 +529,10 @@ function setBgmMain(f) {
    メインの曲を 1回おきに挟むので、メインが いちばん多くかかりつつ 毎回ちがう曲になる。 */
 function bgmNextStage() {
   let t = parseInt(localStorage.getItem(TURN_KEY), 10); if (!isFinite(t)) t = 0;
-  t++;
-  try { localStorage.setItem(TURN_KEY, String(t)); } catch (e) { }
-  if (t % 2 === 1) return bgmMain;                                  // 奇数回は メインの曲
-  const others = BGM_LIST.filter((b) => b.f !== bgmMain);
-  if (!others.length) return bgmMain;
-  return others[((t / 2 | 0) - 1 + others.length) % others.length].f;
+  try { localStorage.setItem(TURN_KEY, String(t + 1)); } catch (e) { }
+  // メインの曲から はじめて、ぜんぶ 一巡してから もどる＝毎ステージ ちがう曲
+  const order = [bgmMain].concat(BGM_LIST.filter((b) => b.f !== bgmMain).map((b) => b.f));
+  return order[t % order.length];
 }
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v, next) {
