@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-33"; // 最新反映の確認用
+const BUILD = "2026-09-05-34"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1683,75 +1683,84 @@ $("#battleQuit").addEventListener("click", () => { if (battleTimer) { clearInter
 /* ============================================================ クラフト王国（広い世界をブロックで作る）
    ブロックの絵もキャラクターも地形も、すべてこのコードで描いている。既存ゲームの絵・素材は一切使わない。
    借りたのは「マス目に積んで世界を作る」という遊び方の枠組みだけ。 */
-const CRAFT_KEY = "soroban_craft";
-const CW_ = 48, CH_ = 48, CD_ = 10;              // 世界の広さ(48x48=2304マス)と積める高さ(10段)
-const CTW = 46, CTH = 23, CBH = 27;              // ひし形タイルの幅・高さ・ブロックの厚み
-const SEA = 2;                                   // 海の高さ
+/* ============================================================ そろばんの町（組み立てキット）
+   ブロックを自由に積む砂場ではなく、「設計図の部品を はめて 建物を完成させる」方式。
+   完成すると住民が引っ越してきて、町が育つ。部品を買うGOLDは学習からしか出ない。 */
+const CRAFT_KEY = "soroban_town";                // 旧「soroban_craft」は消さずに残してある
+const CW_ = 16, CH_ = 16, CD_ = 6;               // 町の区画（空き地を作らない広さ）
+const CTW = 46, CTH = 23, CBH = 27;              // ひし形タイルの幅・高さ・部品1つぶんの厚み
 const ERAS = [
-  { n: "原始時代", need: -1, cond: "さいしょから" },
-  { n: "古代", need: 5, cond: "15級に ごうかく" },
-  { n: "中世", need: 10, cond: "10級に ごうかく" },
-  { n: "近世", need: 14, cond: "6級に ごうかく" },
-  { n: "現代", need: 18, cond: "2級に ごうかく" },
-  { n: "未来", need: 21, cond: "二段に ごうかく" },
+  { n: "むらの はじまり", need: -1, cond: "さいしょから" },
+  { n: "しゅくば町", need: 5, cond: "15級に ごうかく" },
+  { n: "城下町", need: 10, cond: "10級に ごうかく" },
+  { n: "みなと町", need: 14, cond: "6級に ごうかく" },
+  { n: "大きな 城", need: 18, cond: "2級に ごうかく" },
+  { n: "そろばん王国", need: 21, cond: "二段に ごうかく" },
 ];
-// 色も模様もすべてオリジナル。era＝その時代になると使えるようになる
+/* ---- 部品（ブロックではなく「建物のパーツ」）。色も模様もコードで作る ---- */
 const BLOCKS = [
   null,
-  { n: "くさ", top: "#7ec95e", lf: "#54913c", rt: "#69ad4b", cost: 1, pat: "grass", era: 0 },
-  { n: "つち", top: "#b07f52", lf: "#7c5635", rt: "#966942", cost: 1, pat: "dirt", era: 0 },
-  { n: "いし", top: "#bcbcc2", lf: "#83838a", rt: "#a0a0a7", cost: 2, pat: "stone", era: 0 },
-  { n: "き", top: "#b5813f", lf: "#7a5227", rt: "#996b33", cost: 2, pat: "wood", era: 0 },
-  { n: "はっぱ", top: "#57ab3e", lf: "#2f6321", rt: "#3f8a2d", cost: 2, pat: "leaf", era: 0 },
-  { n: "すな", top: "#ecdca8", lf: "#b8a476", rt: "#d3c090", cost: 2, pat: "sand", era: 0 },
-  { n: "みず", top: "#63b4ee", lf: "#3573ad", rt: "#4a93cf", cost: 3, pat: "water", era: 0 },
-  { n: "わら", top: "#e3c96f", lf: "#ab9445", rt: "#c8b057", cost: 4, pat: "straw", era: 1 },
-  { n: "レンガ", top: "#c9604c", lf: "#8d3d2f", rt: "#ab4e3d", cost: 5, pat: "brick", era: 1 },
-  { n: "いしレンガ", top: "#a8a8ae", lf: "#74747a", rt: "#8e8e95", cost: 5, pat: "sbrick", era: 1 },
-  { n: "いた", top: "#d8a86a", lf: "#a67c46", rt: "#bf9258", cost: 6, pat: "plank", era: 2 },
-  { n: "ガラス", top: "#d8f2ff", lf: "#9cc4d6", rt: "#bcdcea", cost: 7, pat: "glass", era: 2 },
-  { n: "やねがわら", top: "#4a6fa5", lf: "#2f4a73", rt: "#3c5c8c", cost: 7, pat: "tile", era: 2 },
-  { n: "大理石", top: "#f2efe6", lf: "#c4c0b5", rt: "#dbd7cc", cost: 9, pat: "marble", era: 3 },
-  { n: "きん", top: "#f4dc8d", lf: "#b8912a", rt: "#d9b445", cost: 12, pat: "gold", era: 3 },
-  { n: "ランプ", top: "#ffdf9b", lf: "#c9a44a", rt: "#e6c069", cost: 12, pat: "glow", era: 3 },
-  { n: "コンクリート", top: "#c6c6c2", lf: "#8b8b88", rt: "#a9a9a5", cost: 15, pat: "concrete", era: 4 },
-  { n: "てつ", top: "#b9c2cc", lf: "#7b8592", rt: "#9aa4b0", cost: 18, pat: "metal", era: 4 },
-  { n: "ネオン", top: "#ff8fdc", lf: "#a82e84", rt: "#d45bb0", cost: 20, pat: "neon", era: 4 },
-  { n: "クリスタル", top: "#c3b2ff", lf: "#7a63d1", rt: "#9e8bea", cost: 28, pat: "crystal", era: 5 },
-  { n: "ひかり", top: "#fff6c9", lf: "#ddcb72", rt: "#efe19b", cost: 32, pat: "glow", era: 5 },
-  { n: "にじいろ", top: "#ffb3d1", lf: "#5fbcd0", rt: "#ffd36b", cost: 40, pat: "rainbow", era: 5 },
+  { n: "どだい", top: "#b9b4a6", lf: "#7f7b70", rt: "#9c9789", cost: 2, pat: "stone", era: 0 },
+  { n: "はしら", top: "#b5813f", lf: "#7a5227", rt: "#996b33", cost: 3, pat: "wood", era: 0 },
+  { n: "つちかべ", top: "#e6dcc4", lf: "#b0a68c", rt: "#cfc4a8", cost: 3, pat: "plaster", era: 0 },
+  { n: "しょうじ", top: "#f6f1e2", lf: "#c8c0aa", rt: "#e2dbc6", cost: 4, pat: "shoji", era: 0 },
+  { n: "とびら", top: "#a9793c", lf: "#6f4e24", rt: "#8c6330", cost: 4, pat: "door", era: 0 },
+  { n: "わらやね", top: "#dcc26a", lf: "#a08b41", rt: "#c0a653", cost: 5, pat: "straw", era: 0 },
+  { n: "朱のはしら", top: "#d5523f", lf: "#8e3123", rt: "#b3402f", cost: 5, pat: "redwood", era: 0 },
+  { n: "かさぎ", top: "#c9452f", lf: "#87291a", rt: "#a83725", cost: 6, pat: "redwood", era: 0 },
+  { n: "いしだたみ", top: "#c3bfb4", lf: "#89857c", rt: "#a6a299", cost: 2, pat: "stone", era: 0 },
+  { n: "かわらやね", top: "#4a6fa5", lf: "#2f4a73", rt: "#3c5c8c", cost: 6, pat: "tile", era: 1 },
+  { n: "しろかべ", top: "#f4f1ea", lf: "#c3bfb4", rt: "#dedad1", cost: 5, pat: "white", era: 1 },
+  { n: "ちょうちん", top: "#ffd98a", lf: "#c9a04a", rt: "#e6bd68", cost: 6, pat: "glow", era: 1 },
+  { n: "まつの木", top: "#57ab3e", lf: "#2f6321", rt: "#3f8a2d", cost: 4, pat: "leaf", era: 0 },
+  { n: "じめん", top: "#8fd06a", lf: "#5c8f3e", rt: "#74b052", cost: 0, pat: "grass", era: 99 },   // 町の地面（買えない）
 ];
-/* ---- レオ王のお願い（クラフトの目的）----
-   ごほうびは「称号」だけ。GOLDは学習からしか出さない方針を守る。
-   お願いは時代（＝合格した級）で開いていくので、勉強が進むほど作れる物が増える。 */
-const QUESTS = [
-  { id: "hut", era: 0, n: "はじめての 家", ttl: "木こり見習い", need: { "き": 4, "はっぱ": 6 }, tip: "き で 柱を たてて、はっぱ で 屋根に しよう" },
-  { id: "lake", era: 0, n: "いずみを つくる", ttl: "水の まもり人", need: { "みず": 8, "いし": 6 }, tip: "いし で ふちを かこんで、中に みず を 入れよう" },
-  { id: "brick", era: 1, n: "レンガの 小屋", ttl: "古代の 大工", need: { "レンガ": 12, "わら": 6 }, tip: "レンガ の かべに、わら の 屋根" },
-  { id: "road", era: 2, n: "まちの 大通り", ttl: "まちの 設計士", need: { "いた": 10, "いしレンガ": 14 }, tip: "いしレンガ を まっすぐ ならべて 道に しよう" },
-  { id: "gold", era: 3, n: "金の モニュメント", ttl: "黄金の 建築家", need: { "きん": 6, "大理石": 10 }, tip: "大理石 の 台の上に きん を つみ上げよう" },
-  { id: "tower", era: 4, n: "ガラスの タワー", ttl: "現代の 名工", need: { "てつ": 12, "ガラス": 10, "コンクリート": 14 }, tip: "たかく たかく。ガラス は うしろが すけるよ" },
-  { id: "castle", era: 5, n: "ひかりの 城", ttl: "そろばん王国の 王", need: { "クリスタル": 8, "ひかり": 6, "にじいろ": 4 }, tip: "さいごの お願い。きみだけの 城を" },
-];
-// ブロックは名前で引く（並び順を変えても地形づくりが壊れないように）
 const bId = (n) => { for (let i = 1; i < BLOCKS.length; i++) if (BLOCKS[i].n === n) return i; return 0; };
-const B_GRASS = bId("くさ"), B_DIRT = bId("つち"), B_STONE = bId("いし"), B_WOOD = bId("き"),
-  B_LEAF = bId("はっぱ"), B_SAND = bId("すな"), B_WATER = bId("みず"), B_GLASS = bId("ガラス");
-// 立方体をやめて、それらしい形で描くブロック
+const P_BASE = bId("どだい"), P_PILLAR = bId("はしら"), P_WALL = bId("つちかべ"), P_WIN = bId("しょうじ"),
+  P_DOOR = bId("とびら"), P_STRAW = bId("わらやね"), P_TORII = bId("朱のはしら"), P_BEAM = bId("かさぎ"),
+  P_STONE = bId("いしだたみ"), P_TILE = bId("かわらやね"), P_WHITE = bId("しろかべ"), P_LAMP = bId("ちょうちん"), P_PINE = bId("まつの木"), P_GROUND = bId("じめん");
+// 立方体をやめて それらしい形で描く部品
 const SHAPE = {};
-[["き", "trunk"], ["はっぱ", "canopy"], ["ランプ", "glow"], ["ネオン", "glow"], ["ひかり", "glow"], ["クリスタル", "crystal"]]
-  .forEach(function (p) { const i = bId(p[0]); if (i) SHAPE[i] = p[1]; });
-// マスをぴったり埋めない＝うしろが透けて見えるブロック（かくれ判定から外す）
-const SEETHRU = {}; [B_WATER, B_GLASS, B_LEAF, B_WOOD, bId("クリスタル")].forEach(function (i) { if (i) SEETHRU[i] = 1; });
+[[P_BASE, "slab"], [P_STONE, "slab"], [P_PILLAR, "pillar"], [P_TORII, "pillar"], [P_BEAM, "beam"],
+[P_STRAW, "roof"], [P_TILE, "roof"], [P_LAMP, "glow"], [P_PINE, "canopy"]].forEach(function (p) { if (p[0]) SHAPE[p[0]] = p[1]; });
+// うしろが透けて見える部品（かくれ判定から外す）
+const SEETHRU = {}; [P_PILLAR, P_TORII, P_BEAM, P_LAMP, P_PINE, P_WIN].forEach(function (i) { if (i) SEETHRU[i] = 1; });
 
-// いま使える時代（検定に合格した級で決まる）
+/* ---- 設計図（部品を はめる場所が決まっている）----
+   cells: [左右, 奥手前, 高さ, 部品]。完成すると住民が引っ越してくる。 */
+const BPS = [
+  {
+    id: "torii", n: "鳥居", era: 0, ttl: "むらの 見はり", who: "こぎつね", tip: "2本の 朱のはしら の上に かさぎ を のせよう",
+    cells: [[0, 0, 0, P_TORII], [0, 0, 1, P_TORII], [2, 0, 0, P_TORII], [2, 0, 1, P_TORII],
+    [0, 0, 2, P_BEAM], [1, 0, 2, P_BEAM], [2, 0, 2, P_BEAM]],
+  },
+  {
+    id: "terakoya", n: "寺子屋", era: 0, ttl: "むらの 先生", who: "そろばんの弟子", tip: "土台 → 柱・とびら → やね の順に はめよう",
+    cells: [[0, 0, 0, P_BASE], [1, 0, 0, P_BASE], [2, 0, 0, P_BASE],
+    [0, 1, 0, P_BASE], [1, 1, 0, P_BASE], [2, 1, 0, P_BASE],
+    [0, 0, 1, P_PILLAR], [2, 0, 1, P_PILLAR], [0, 1, 1, P_PILLAR], [2, 1, 1, P_PILLAR],
+    [1, 0, 1, P_DOOR], [1, 1, 1, P_WALL],
+    [0, 0, 2, P_STRAW], [1, 0, 2, P_STRAW], [2, 0, 2, P_STRAW],
+    [0, 1, 2, P_STRAW], [1, 1, 2, P_STRAW], [2, 1, 2, P_STRAW]],
+  },
+  {
+    id: "kura", n: "蔵", era: 1, ttl: "町の 番頭さん", who: "蔵ばん", tip: "白いかべ と かわらやね の りっぱな蔵",
+    cells: [[0, 0, 0, P_BASE], [1, 0, 0, P_BASE], [0, 1, 0, P_BASE], [1, 1, 0, P_BASE],
+    [0, 0, 1, P_WHITE], [1, 0, 1, P_DOOR], [0, 1, 1, P_WHITE], [1, 1, 1, P_WHITE],
+    [0, 0, 2, P_WHITE], [1, 0, 2, P_WIN], [0, 1, 2, P_WHITE], [1, 1, 2, P_WHITE],
+    [0, 0, 3, P_TILE], [1, 0, 3, P_TILE], [0, 1, 3, P_TILE], [1, 1, 3, P_TILE]],
+  },
+];
+const bpById = (id) => { for (const b of BPS) if (b.id === id) return b; return null; };
 function myRankIdx() { try { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.idx : -1; } catch (e) { return -1; } }
 function eraOpen(e) { return myRankIdx() >= ERAS[e].need; }
 function myEra() { let m = 0; for (let e = 0; e < ERAS.length; e++) if (eraOpen(e)) m = e; return m; }
-let craft = null, craftSel = 1, craftBreak = false, craftHist = [], craftPick = null, craftHover = -1;
-let camS = 1, camX = 0, camY = 0, dragging = false, dragMoved = false, dragSX = 0, dragSY = 0;
+let craft = null, craftSel = 1, craftPick = null, craftHover = -1;
+let craftSite = null;      // いま組み立て中の場所 { bp, x, y }
+let ghostPhase = 0, ghostNext = null;   // 次にはめる場所の点めつ
+let craftHist = [];   // はめた順（もどす用）
 
-/* ---- 地形をつくる（かんたんなノイズで島の形にする） ---- */
+/* ---- 町をつくる（平らな区画。空き地を作らない広さにしてある） ---- */
 function hash2(x, y) {
   let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177) | 0;
@@ -1763,82 +1772,12 @@ function vnoise(x, y, sc) {
   const a = hash2(x0, y0), b = hash2(x0 + 1, y0), c = hash2(x0, y0 + 1), d = hash2(x0 + 1, y0 + 1);
   return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy;
 }
-function makeWorld() {
-  const cells = new Array(CW_ * CH_ * CD_).fill(0);
-  const put = (x, y, z, v) => { cells[(z * CH_ + y) * CW_ + x] = v; };
-  const trees = [];
-  for (let y = 0; y < CH_; y++) for (let x = 0; x < CW_; x++) {
-    // 中心ほど高く、はしは海になるようにする（島の形）
-    const dx = (x - CW_ / 2) / (CW_ / 2), dy = (y - CH_ / 2) / (CH_ / 2);
-    const fall = Math.max(0, 1 - Math.sqrt(dx * dx + dy * dy) * 0.95);
-    const n = vnoise(x, y, 13) * 0.6 + vnoise(x, y, 6) * 0.4;
-    // ノイズを強めに効かせて、輪っかではなく でこぼこした島にする
-    let h = Math.round(n * 3.4 + fall * 3.6);
-    h = Math.max(1, Math.min(7, h));
-    for (let z = 0; z < h; z++) put(x, y, z, z < h - 2 ? B_STONE : B_DIRT);   // 下はいし、上はつち
-    const t = h - 1;
-    if (h <= SEA) { for (let z = h; z <= SEA; z++) put(x, y, z, B_WATER); }   // 海
-    else if (h === SEA + 1) put(x, y, t, B_SAND);                             // すなはま
-    else if (h >= 7) put(x, y, t, B_STONE);                                   // いちばん高い山の頂上だけ いし
-    else {
-      put(x, y, t, B_GRASS);                                                  // くさ
-      if (hash2(x * 7 + 1, y * 13 + 3) > 0.955 && t + 4 < CD_) {              // 木（幹2つ＋葉のかたまり）
-        put(x, y, t + 1, B_WOOD); put(x, y, t + 2, B_WOOD);
-        put(x, y, t + 3, B_LEAF); put(x, y, t + 4, B_LEAF);
-        trees.push([x, y, t + 3]);
-      }
-    }
-  }
-  // まわりにも葉を広げて、こんもりした木にする（となりのマスの上に浮かせる）
-  trees.forEach(function (p) {
-    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
-      const x = p[0] + d[0], y = p[1] + d[1], z = p[2];
-      if (x < 0 || y < 0 || x >= CW_ || y >= CH_) return;
-      if (cells[(z * CH_ + y) * CW_ + x]) return;
-      if (hash2(x * 3 + z, y * 11) > 0.22) put(x, y, z, B_LEAF);
-    });
-  });
-  return { w: CW_, h: CH_, d: CD_, cells, hx: CW_ >> 1, hy: CH_ >> 1, built: 0, placed: {}, done: [] };
-}
-/* ---- 保存（同じ値の連続をまとめて小さくする） ---- */
-function packCells(a) { const o = []; let v = a[0], c = 0; for (let i = 0; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v, c); v = a[i]; c = 1; } } o.push(v, c); return o; }
-function unpackCells(o) { const a = []; for (let i = 0; i < o.length; i += 2) for (let k = 0; k < o[i + 1]; k++) a.push(o[i]); return a; }
-// 古い世界の直し（海が すな・はまべが はっぱ・木のてっぺんが みず になっていた分をなおす）
-function fixOldWorld(cells) {
-  const at = (x, y, z) => cells[(z * CH_ + y) * CW_ + x];
-  const set = (x, y, z, v) => { cells[(z * CH_ + y) * CW_ + x] = v; };
-  for (let y = 0; y < CH_; y++) for (let x = 0; x < CW_; x++) {
-    let top = -1; for (let z = CD_ - 1; z >= 0; z--) if (at(x, y, z)) { top = z; break; }
-    for (let z = 0; z < CD_; z++) {
-      const v = at(x, y, z); if (!v) continue;
-      if (v === B_WATER && z > 0 && at(x, y, z - 1) === B_WOOD) set(x, y, z, B_LEAF);      // 木のてっぺん
-      else if (v === B_LEAF && z === SEA + 1 && z === top) set(x, y, z, B_SAND);           // はまべ
-      else if (v === B_SAND && z <= SEA && top <= SEA) set(x, y, z, B_WATER);              // 海
-    }
-  }
-  return cells;
-}
-function loadCraft() {
-  try {
-    const d = JSON.parse(localStorage.getItem(CRAFT_KEY) || "null");
-    if (d && d.w === CW_ && d.h === CH_ && d.d === CD_ && d.rle) {
-      const cells = unpackCells(d.rle);
-      if (cells.length === CW_ * CH_ * CD_) {
-        if (d.v !== 2) fixOldWorld(cells);
-        return { w: CW_, h: CH_, d: CD_, cells, hx: d.hx, hy: d.hy, built: d.built || 0, placed: d.placed || {}, done: d.done || [] };
-      }
-    }
-  } catch (e) {}
-  return makeWorld();
-}
-function saveCraft() {
-  try { localStorage.setItem(CRAFT_KEY, JSON.stringify({ v: 2, w: CW_, h: CH_, d: CD_, hx: craft.hx, hy: craft.hy, built: craft.built || 0, placed: craft.placed || {}, done: craft.done || [], rle: packCells(craft.cells) })); }
-  catch (e) { craftMsg("ほぞんに しっぱいしました"); }
+function makeTown() {
+  return { w: CW_, h: CH_, d: CD_, cells: new Array(CW_ * CH_ * CD_).fill(0), built: 0, placed: {}, done: [], sites: [], people: [] };
 }
 const cIdx = (x, y, z) => (z * CH_ + y) * CW_ + x;
-const cGet = (x, y, z) => craft.cells[cIdx(x, y, z)];
+const cGet = (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= CW_ || y >= CH_ || z >= CD_) ? 0 : craft.cells[cIdx(x, y, z)];
 function colTop(x, y) { for (let z = CD_ - 1; z >= 0; z--) if (cGet(x, y, z)) return z; return -1; }
-// 手前のブロックに完全にかくれるものは描かない（広い世界でも軽く動かすため）
 const solidAt = (x, y, z) => { const v = cGet(x, y, z); return v && !SEETHRU[v] ? v : 0; };
 function occluded(x, y, z) {
   if (z + 1 >= CD_) return false;
@@ -1847,6 +1786,29 @@ function occluded(x, y, z) {
   if (y + 1 < CH_ && !solidAt(x, y + 1, z)) return false;
   return true;
 }
+function packCells(a) { const o = []; let v = a[0], c = 0; for (let i = 0; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v, c); v = a[i]; c = 1; } } o.push(v, c); return o; }
+function unpackCells(o) { const a = []; for (let i = 0; i < o.length; i += 2) for (let k = 0; k < o[i + 1]; k++) a.push(o[i]); return a; }
+function loadCraft() {
+  try {
+    const d = JSON.parse(localStorage.getItem(CRAFT_KEY) || "null");
+    if (d && d.w === CW_ && d.h === CH_ && d.d === CD_ && d.rle) {
+      const cells = unpackCells(d.rle);
+      if (cells.length === CW_ * CH_ * CD_) {
+        return { w: CW_, h: CH_, d: CD_, cells, built: d.built || 0, placed: d.placed || {}, done: d.done || [], sites: d.sites || [], people: d.people || [] };
+      }
+    }
+  } catch (e) { }
+  return makeTown();
+}
+function saveCraft() {
+  try {
+    localStorage.setItem(CRAFT_KEY, JSON.stringify({
+      v: 1, w: CW_, h: CH_, d: CD_, built: craft.built || 0, placed: craft.placed || {},
+      done: craft.done || [], sites: craft.sites || [], people: craft.people || [], rle: packCells(craft.cells)
+    }));
+  } catch (e) { craftMsg("ほぞんに しっぱいしました"); }
+}
+
 const isoX = (x, y) => (x - y) * (CTW / 2);
 const isoY = (x, y, z) => (x + y) * (CTH / 2) - z * CBH;
 
@@ -1862,7 +1824,7 @@ const TEXN = 16;                       // 1面あたりのドットの数（細�
 let craftDPR = 1, BAKE = 3;            // 画面の細かさ／焼き込みの倍率
 const SPR = {}, SIL = {}, CHIP = {};   // 焼いた絵／白いシルエット／パレット用の小さい絵
 const TEXC = {};                       // テクスチャの使いまわし
-let WATER = [], waterPhase = 0, craftAnim = null;
+let craftAnim = null;
 
 const newCv = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
 const cl255 = (v) => (v < 0 ? 0 : v > 255 ? 255 : v | 0);
@@ -1972,6 +1934,33 @@ function texel(b, id, face, i, j, ph) {
       f = (((i * 2 + j) % 8) < 4 ? 1.1 : 0.88) + stepq(r1, 3) * 0.06;
       if ((i + j) % 11 === 0) c = mixc(base, C_WHITE, 0.7);
       break;
+    case "plaster":                                                         // つちかべ：ざらざらした土壁
+      f = 0.95 + stepq(r1, 4) * 0.1;
+      if (r2 > 0.93) f -= 0.07;
+      if (face === 0 && (j === 0 || j === N - 1)) f -= 0.05;
+      break;
+    case "white":                                                           // 蔵のしっくい壁：なめらかで白い
+      f = 0.98 + stepq(r1, 3) * 0.04;
+      if (j % 7 === 0) f -= 0.04;
+      break;
+    case "shoji": {                                                         // しょうじ：格子と やわらかい紙
+      const gx = i % 5 === 0, gy = j % 5 === 0;
+      if (gx || gy) { c = tint(hx2n("#8c6330"), 0.95 + stepq(r1, 3) * 0.1); break; }   // 桟（さん）
+      f = 1.0 + stepq(r1, 3) * 0.05;
+      break;
+    }
+    case "door": {                                                          // とびら：たて板と 引き手
+      f = 0.92 + stepq(hash2(Math.floor(i / 4) + sd, 2), 4) * 0.16;
+      if (i % 4 === 0) f -= 0.16;                                           // 板のさかい目
+      if (face === 0) break;
+      if (i >= N - 5 && i <= N - 4 && j >= 6 && j <= 9) c = tint(hx2n("#2b2b2b"), 1);  // 引き手
+      break;
+    }
+    case "redwood":                                                         // 鳥居の朱塗り：つやのある赤
+      f = 0.94 + stepq(r1, 3) * 0.1;
+      if (i % 6 === 0) f += 0.06;
+      if (j < 2) f += 0.06;
+      break;
     case "rainbow": {
       const RB = [[255, 138, 168], [255, 196, 120], [255, 240, 140], [150, 224, 150], [130, 196, 255], [190, 160, 240]];
       c = tint(RB[(Math.floor((i + j) / 3) + sd) % 6], face === 0 ? 1 : face === 1 ? 0.76 : 0.9);
@@ -2046,6 +2035,47 @@ function drawCanopy(g, id, flat) {
     }
   }
 }
+/* やね：四方に流れる寄棟。前の2面だけが見える */
+function drawRoof(g, id, flat, ph) {
+  const b = BLOCKS[id], hw = CTW / 2 + 4, hh = CTH / 2 + 2, eave = 3, apex = -hh - 14;
+  const top = hx2n(b.top), lf = hx2n(b.lf), rt = hx2n(b.rt);
+  // 軒（のき）の厚み
+  g.fillStyle = flat || css(tint(lf, 0.9));
+  g.beginPath(); g.moveTo(-hw, 0); g.lineTo(0, hh); g.lineTo(0, hh + eave); g.lineTo(-hw, eave); g.closePath(); g.fill();
+  g.fillStyle = flat || css(tint(rt, 0.9));
+  g.beginPath(); g.moveTo(hw, 0); g.lineTo(0, hh); g.lineTo(0, hh + eave); g.lineTo(hw, eave); g.closePath(); g.fill();
+  // 手前の2面（左は暗く、右は明るく）
+  const face = (x1, y1, x2, y2, col) => {
+    g.fillStyle = flat || css(col);
+    g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(0, apex); g.closePath(); g.fill();
+  };
+  face(-hw, 0, 0, hh, tint(lf, 1.02));
+  face(0, hh, hw, 0, tint(rt, 1.12));
+  if (!flat) {
+    // かわら・わらの筋を、軒から むね に向かって引く
+    g.save(); g.globalAlpha = .45; g.lineWidth = 1; g.strokeStyle = "rgba(0,0,0,.5)";
+    for (let s = 1; s <= 4; s++) {
+      const t = s / 5;
+      g.beginPath(); g.moveTo(-hw * (1 - t), hh * t); g.lineTo(0, apex); g.stroke();          // 左の面
+      g.beginPath(); g.moveTo(hw * (1 - t), hh * t); g.lineTo(0, apex); g.stroke();           // 右の面
+    }
+    g.restore();
+    // むね（頂上の線）
+    g.strokeStyle = "rgba(255,255,255,.45)"; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(-hw, 0); g.lineTo(0, apex); g.lineTo(hw, 0); g.stroke();
+    g.strokeStyle = "rgba(20,30,50,.4)"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(-hw, 0); g.lineTo(0, hh); g.lineTo(hw, 0); g.stroke();
+    g.fillStyle = css(tint(top, 1.15));   // むね瓦
+    g.beginPath(); g.ellipse(0, apex + 2, 5, 2.4, 0, 0, 7); g.fill();
+  }
+}
+/* 鳥居の横木（かさぎ）：横に長い角材 */
+function drawBeam(g, id, flat, ph) {
+  drawCube(g, id, CTW, CTH * 0.7, 9, flat, ph);
+  if (flat) return;
+  g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(-CTW / 2, 0); g.lineTo(0, -CTH * 0.35); g.lineTo(CTW / 2, 0); g.stroke();
+}
 /* とがったクリスタル */
 function drawCrystal(g, id, flat, ph) {
   drawCube(g, id, CTW * 0.68, CTH * 0.68, CBH * 0.8, flat, ph);
@@ -2073,11 +2103,15 @@ function bakeOne(id, flat, ph, k) {
   let w = CTW, h = CTH + CBH, ox = CTW / 2, oy = CTH / 2;
   if (sh === "canopy") { w = CTW * 1.8; h = CTH + CBH + 30; ox = w / 2; oy = CTH / 2 + 14; }
   if (sh === "crystal") { h = CTH + CBH + 24; oy = CTH / 2 + 24; }
+  if (sh === "roof") { w = CTW + 12; h = CTH + CBH + 22; ox = w / 2; oy = CTH / 2 + 19; }
   w += P * 2; h += P * 2; ox += P; oy += P;
   const cv = newCv(w * k, h * k), g = cv.getContext("2d");
   g.setTransform(k, 0, 0, k, ox * k, oy * k);
   if (sh === "canopy") drawCanopy(g, id, flat);
-  else if (sh === "trunk") drawCube(g, id, CTW * 0.56, CTH * 0.56, CBH, flat, ph);
+  else if (sh === "pillar") drawCube(g, id, CTW * 0.42, CTH * 0.42, CBH, flat, ph);   // 柱：細い
+  else if (sh === "slab") drawCube(g, id, CTW, CTH, 7, flat, ph);                     // 土台・石だたみ：うすい
+  else if (sh === "beam") drawBeam(g, id, flat, ph);                                  // 鳥居の横木
+  else if (sh === "roof") drawRoof(g, id, flat, ph);                                  // やね
   else if (sh === "crystal") drawCrystal(g, id, flat, ph);
   else {
     if (sh === "glow" && !flat) drawGlow(g, id);
@@ -2093,7 +2127,7 @@ function bakeBlocks() {
     SIL[id] = bakeOne(id, "#ffffff", 0, sk);
     CHIP[id] = chipURL(id);
   }
-  WATER = [0, 1, 2].map((p) => bakeOne(B_WATER, null, p, BAKE));
+
 }
 // パレットの見本も、置いたときとまったく同じ絵にする
 function chipURL(id) {
@@ -2111,7 +2145,7 @@ function topShade(x, y, z) {
   return Math.min(0.32, s);
 }
 function drawBlockAt(g, x, y, z, id) {
-  const s = id === B_WATER ? (WATER[waterPhase] || SPR[id]) : SPR[id]; if (!s) return;
+  const s = SPR[id]; if (!s) return;
   const px = isoX(x, y), py = isoY(x, y, z);
   g.drawImage(s.cv, px - s.ox, py - s.oy, s.w, s.h);
   if (!SHAPE[id] && (z + 1 >= CD_ || !cGet(x, y, z + 1))) {          // 上面が見えている立方体だけ影をのせる
@@ -2121,41 +2155,6 @@ function drawBlockAt(g, x, y, z, id) {
   const fog = Math.min(0.15, Math.max(0, (30 - (x + y)) * 0.006));   // 遠くはうっすら空にとける
   if (fog > 0.01 && SIL[id]) { g.save(); g.globalAlpha = fog; g.drawImage(SIL[id].cv, px - s.ox, py - s.oy, s.w, s.h); g.restore(); }
 }
-/* ---- キャラクター（オリジナル：まる顔＋王冠のたんけん家） ---- */
-function drawHero(g, x, y, z) {
-  const px = isoX(x, y), py = isoY(x, y, z) - 4;
-  g.save();
-  g.fillStyle = "rgba(0,0,0,.22)"; g.beginPath(); g.ellipse(px, py + 5, 13, 6, 0, 0, 7); g.fill();
-  g.fillStyle = "#16305c"; g.fillRect(px - 9, py - 22, 18, 24);
-  g.fillStyle = "#d4af37"; g.fillRect(px - 9, py - 10, 18, 4);
-  g.fillStyle = "#ffdcb5"; g.beginPath(); g.arc(px, py - 29, 11, 0, 7); g.fill();
-  g.fillStyle = "#2b2b2b";
-  g.beginPath(); g.arc(px - 4, py - 30, 1.8, 0, 7); g.fill();
-  g.beginPath(); g.arc(px + 4, py - 30, 1.8, 0, 7); g.fill();
-  g.strokeStyle = "#2b2b2b"; g.lineWidth = 1.4;
-  g.beginPath(); g.arc(px, py - 26, 4, 0.25, Math.PI - 0.25); g.stroke();
-  g.fillStyle = "#f0d98a";
-  g.beginPath(); g.moveTo(px - 10, py - 37); g.lineTo(px - 6, py - 44); g.lineTo(px - 2, py - 38);
-  g.lineTo(px + 2, py - 44); g.lineTo(px + 6, py - 38); g.lineTo(px + 10, py - 44);
-  g.lineTo(px + 10, py - 35); g.lineTo(px - 10, py - 35); g.closePath(); g.fill();
-  g.strokeStyle = "#b8912a"; g.lineWidth = 1; g.stroke();
-  g.restore();
-}
-/* ---- 画面の大きさを、その端末の細かさ（Retina等）に合わせる ---- */
-function resizeCraftCanvas() {
-  const cv = $("#craftCanvas"); if (!cv || !cv.getBoundingClientRect) return false;
-  const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return false;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
-  const nb = Math.max(2, Math.min(4, Math.ceil(dpr * 1.8)));
-  if (cv.width === w && cv.height === h && nb === BAKE && SPR[1]) return false;
-  const ow = cv.width || w, oh = cv.height || h;
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; camX += (w - ow) / 2; camY += (h - oh) / 2; }
-  craftDPR = dpr;
-  if (nb !== BAKE || !SPR[1]) { BAKE = nb; bakeBlocks(); }
-  return true;
-}
-const camScale = () => camS * craftDPR;
 /* ---- 世界を描く（見えている所だけ・奥から手前へ） ---- */
 function drawCraft() {
   const cv = $("#craftCanvas"); if (!cv || !cv.getContext) return;
@@ -2180,20 +2179,35 @@ function drawCraft() {
       const y = s - x; if (y < 0 || y >= CH_) continue;
       const px = isoX(x, y); if (px < L || px > R) continue;
       const pyBase = isoY(x, y, 0); if (pyBase < T || pyBase - CBH * CD_ > B) continue;
+      drawBlockAt(g, x, y, -1, P_GROUND);                 // 町の地面
       for (let z = 0; z < CD_; z++) {
         const id = cGet(x, y, z);
         if (id && !occluded(x, y, z)) drawBlockAt(g, x, y, z, id);
       }
+      // 組み立て中なら、部品が入る場所を うすく見せる（次に入れる1つは 点めつする）
+      if (craftSite) {
+        const nx = ghostNext;
+        siteCells(craftSite).forEach(function (c) {
+          if (c.x !== x || c.y !== y || cGet(c.x, c.y, c.z) === c.id) return;
+          const sp = SPR[c.id], sl = SIL[c.id]; if (!sp) return;
+          const isNext = nx && nx.x === c.x && nx.y === c.y && nx.z === c.z;
+          g.save();
+          g.globalAlpha = isNext ? .55 + Math.sin(ghostPhase) * .2 : .22;
+          g.drawImage(sp.cv, px - sp.ox, isoY(x, y, c.z) - sp.oy, sp.w, sp.h);
+          if (isNext && sl) { g.globalAlpha = .35 + Math.sin(ghostPhase) * .2; g.drawImage(sl.cv, px - sp.ox, isoY(x, y, c.z) - sp.oy, sp.w, sp.h); }
+          g.restore();
+        });
+      }
       const tz = colTop(x, y), col = x + y * CW_;
       if (pg) {
         pg.fillStyle = "rgb(" + ((col + 1) & 255) + "," + (((col + 1) >> 8) & 255) + ",7)";
-        facePath(pg, px, isoY(x, y, tz < 0 ? 0 : tz)); pg.fill();
+        facePath(pg, px, isoY(x, y, tz < 0 ? -1 : tz)); pg.fill();
       }
-      if (craftHover === col && tz >= 0) {
-        const hid = cGet(x, y, tz), hs = SIL[hid], sp = SPR[hid];
-        if (hs && sp) { g.save(); g.globalAlpha = .34; g.drawImage(hs.cv, px - sp.ox, isoY(x, y, tz) - sp.oy, sp.w, sp.h); g.restore(); }
+      if (craftHover === col) {
+        const hz = tz < 0 ? -1 : tz, hid = tz < 0 ? P_GROUND : cGet(x, y, tz), hs = SIL[hid], sp = SPR[hid];
+        if (hs && sp) { g.save(); g.globalAlpha = .3; g.drawImage(hs.cv, px - sp.ox, isoY(x, y, hz) - sp.oy, sp.w, sp.h); g.restore(); }
       }
-      if (craft.hx === x && craft.hy === y) drawHero(g, x, y, tz < 0 ? 0 : tz);
+      (craft.people || []).forEach(function (pp) { if (Math.round(pp.x) === x && Math.round(pp.y) === y) drawPerson(g, pp); });
     }
   }
   g.setTransform(1, 0, 0, 1, 0, 0);
@@ -2204,9 +2218,44 @@ function craftAnimStart() {
   craftAnim = setInterval(function () {
     const v = $("#view-craft");
     if (document.hidden || !v || v.classList.contains("hidden") || !craft) return;
-    waterPhase = (waterPhase + 1) % (WATER.length || 1); drawCraft();
-  }, 460);
+    ghostPhase += 0.9;
+    ghostNext = craftSite ? nextNeed(craftSite) : null;
+    movePeople();
+    drawCraft();
+  }, 380);
 }
+/* ---- 住民（完成した建物に引っ越してくる。町がうごいて見える） ---- */
+function drawPerson(g, p) {
+  const px = isoX(p.x, p.y), py = isoY(p.x, p.y, colTop(Math.round(p.x), Math.round(p.y)) + 1) + 2;
+  const c = PEOPLE_COLORS[p.c % PEOPLE_COLORS.length], bob = Math.sin((p.ph || 0) * 1.7) * 1.6;
+  g.save();
+  g.fillStyle = "rgba(0,0,0,.2)"; g.beginPath(); g.ellipse(px, py + 2, 7, 3.2, 0, 0, 7); g.fill();
+  g.fillStyle = c.b; g.beginPath();                                  // 体（着物）
+  g.moveTo(px - 6, py + bob); g.lineTo(px + 6, py + bob); g.lineTo(px + 4, py - 13 + bob); g.lineTo(px - 4, py - 13 + bob); g.closePath(); g.fill();
+  g.fillStyle = c.o; g.fillRect(px - 6, py - 6 + bob, 12, 2.5);      // 帯
+  g.fillStyle = "#ffe0bd"; g.beginPath(); g.arc(px, py - 18 + bob, 6, 0, 7); g.fill();   // 顔
+  g.fillStyle = c.h; g.beginPath(); g.arc(px, py - 20 + bob, 6, Math.PI, 0); g.fill();   // 髪
+  g.fillStyle = "#2b2b2b";
+  g.beginPath(); g.arc(px - 2.2, py - 18 + bob, 0.9, 0, 7); g.fill();
+  g.beginPath(); g.arc(px + 2.2, py - 18 + bob, 0.9, 0, 7); g.fill();
+  g.restore();
+}
+const PEOPLE_COLORS = [{ b: "#4a6fa5", o: "#d4af37", h: "#2b2b2b" }, { b: "#8e5a3b", o: "#e6dcc4", h: "#3b2a1c" },
+{ b: "#5b8c5a", o: "#f4f1ea", h: "#2b2b2b" }, { b: "#a8556b", o: "#ffd98a", h: "#4a2b2b" }];
+// 住民をすこし歩かせる（自分の家のまわりをうろうろする）
+function movePeople() {
+  if (!craft || !craft.people) return;
+  craft.people.forEach(function (p) {
+    p.ph = (p.ph || 0) + 1;
+    if (p.ph % 3) return;
+    const nx = p.x + [0, 1, 0, -1][p.d || 0], ny = p.y + [1, 0, -1, 0][p.d || 0];
+    const near = Math.abs(nx - p.hx) <= 2 && Math.abs(ny - p.hy) <= 2;
+    if (near && nx >= 0 && ny >= 0 && nx < CW_ && ny < CH_ && colTop(nx, ny) < 1) { p.x = nx; p.y = ny; }
+    else p.d = (p.d + 1 + Math.floor(hash2(p.x + p.ph, p.y) * 3)) % 4;
+  });
+}
+
+/* ---- クリックの受け取り ---- */
 function craftPickAt(ev) {
   const cv = $("#craftCanvas"); if (!cv || !cv.getBoundingClientRect) return null;
   const r = cv.getBoundingClientRect();
@@ -2224,52 +2273,143 @@ function craftPickAt(ev) {
 function craftMsg(t) {
   const el = $("#craftMsg"); if (!el) return;
   el.textContent = t; clearTimeout(craftMsg._t);
-  craftMsg._t = setTimeout(function () { el.textContent = ""; }, 2400);
+  craftMsg._t = setTimeout(function () { el.textContent = ""; }, 2600);
 }
+/* ---- 設計図：どこに何の部品が入るか ---- */
+function siteCells(site) {
+  return site.bp.cells.map(function (c) { return { x: site.x + c[0], y: site.y + c[1], z: c[2], id: c[3] }; });
+}
+function siteFits(bp, x, y) {
+  return bp.cells.every(function (c) {
+    const cx = x + c[0], cy = y + c[1];
+    return cx >= 0 && cy >= 0 && cx < CW_ && cy < CH_ && !cGet(cx, cy, c[2]);
+  });
+}
+const siteLeft = (site) => siteCells(site).filter(function (c) { return cGet(c.x, c.y, c.z) !== c.id; });
+// いま組み立て中の場所で、次に入れるべき部品（下から順に）
+function nextNeed(site) {
+  const left = siteLeft(site);
+  left.sort(function (a, b) { return (a.z - b.z) || (a.y - b.y) || (a.x - b.x); });
+  return left[0] || null;
+}
+/* ---- マスをクリックしたとき ---- */
 function craftClick(ev) {
-  if (dragMoved) return;                                  // 画面を動かしただけのときは置かない
+  if (dragMoved) return;
   const p = craftPickAt(ev); if (!p) return;
-  const tz = colTop(p.x, p.y);
-  if (craftBreak) {
-    if (tz < 0) return craftMsg("これいじょう けずれないよ");
-    const id = cGet(p.x, p.y, tz);
-    craft.cells[cIdx(p.x, p.y, tz)] = 0;
-    craftHist.push({ t: "b", x: p.x, y: p.y, z: tz, id: id }); craft.built = Math.max(0, (craft.built || 0) - 1);
-    addGold(Math.floor(BLOCKS[id].cost / 2));
-    clickSnd();
-  } else {
-    const nz = tz + 1;
-    if (nz >= CD_) return craftMsg("これいじょう つめないよ");
-    const b = BLOCKS[craftSel], have = getGold();
-    if (!eraOpen(b.era)) return craftMsg("「" + b.n + "」は " + ERAS[b.era].cond + "すると つかえるよ");
-    if (have < b.cost) return craftMsg("GOLDが " + (b.cost - have) + " たりない…そろばんで かせごう！");
-    craft.cells[cIdx(p.x, p.y, nz)] = craftSel;
-    craftHist.push({ t: "p", x: p.x, y: p.y, z: nz, id: craftSel }); craft.built = (craft.built || 0) + 1;
-    craft.placed = craft.placed || {}; craft.placed[b.n] = (craft.placed[b.n] || 0) + 1;   // お願いの進み具合
-    addGold(-b.cost); coinSnd();
+  if (!craftSite) { craftMsg("上の「設計図」を えらんでね"); return; }
+  // クリックした場所に入るべき部品をさがす（同じ列の下から順に）
+  const want = siteCells(craftSite).filter(function (c) { return c.x === p.x && c.y === p.y && cGet(c.x, c.y, c.z) !== c.id; })
+    .sort(function (a, b) { return a.z - b.z; })[0];
+  if (!want) { craftMsg("そのマスは もう できているよ"); return; }
+  const b = BLOCKS[craftSel];
+  if (craftSel !== want.id) {
+    craftMsg("ここは「" + BLOCKS[want.id].n + "」だよ（いま持っているのは「" + b.n + "」）");
+    wrongSnd(); return;
   }
+  const have = getGold();
+  if (!eraOpen(b.era)) { craftMsg("「" + b.n + "」は " + ERAS[b.era].cond + "すると つかえるよ"); return; }
+  if (have < b.cost) { craftMsg("GOLDが " + (b.cost - have) + " たりない…そろばんで かせごう！"); return; }
+  craft.cells[cIdx(want.x, want.y, want.z)] = want.id;
+  craft.built = (craft.built || 0) + 1;
+  craft.placed = craft.placed || {}; craft.placed[b.n] = (craft.placed[b.n] || 0) + 1;
+  craftHist.push({ x: want.x, y: want.y, z: want.z, id: want.id });
   if (craftHist.length > 300) craftHist.shift();
-  checkQuest();
+  addGold(-b.cost); clickSnd(); coinSnd(0.05);
+  const left = siteLeft(craftSite);
+  if (!left.length) finishBuilding();
+  else {
+    const nx = nextNeed(craftSite);
+    if (nx && nx.id !== craftSel) { craftSel = nx.id; craftMsg("つぎは「" + BLOCKS[nx.id].n + "」！（じどうで もちかえたよ）"); }
+  }
   saveCraft(); renderCraft();
 }
-function craftCenterOnHero() {
-  const cv = $("#craftCanvas"); if (!cv) return;
-  camX = cv.width / 2 - isoX(craft.hx, craft.hy) * camScale();
-  camY = cv.height / 2 - isoY(craft.hx, craft.hy, 4) * camScale();
+/* ---- 建物が完成した ---- */
+function finishBuilding() {
+  const bp = craftSite.bp, x = craftSite.x, y = craftSite.y;
+  craft.sites = (craft.sites || []).concat([{ id: bp.id, x: x, y: y }]);
+  if ((craft.done || []).indexOf(bp.id) < 0) craft.done = (craft.done || []).concat([bp.id]);
+  // 住民が引っ越してくる
+  let px = x, py = y + 2;
+  for (let t = 0; t < 12 && (py >= CH_ || colTop(px, py) >= 1); t++) { py = (py + 1) % CH_; }
+  craft.people = (craft.people || []).concat([{ x: px, y: py, hx: x, hy: y, d: 0, ph: 0, c: craft.people.length, name: bp.who }]);
+  craftSite = null;
+  craftMsg("🎉 「" + bp.n + "」 かんせい！ " + bp.who + " が ひっこして きた！　称号『" + bp.ttl + "』");
+  try { bigFanfareSnd(); } catch (e) { }
 }
+/* ---- 設計図パネル ---- */
+function renderCraftQuest() {
+  const el = $("#craftQuest"); if (!el) return;
+  const e = myEra();
+  if (craftSite) {
+    const bp = craftSite.bp, left = siteLeft(craftSite), all = bp.cells.length, done = all - left.length;
+    const need = {};
+    left.forEach(function (c) { need[c.id] = (need[c.id] || 0) + 1; });
+    const list = Object.keys(need).map(function (id) { return `<span class="cq-need${+id === craftSel ? " on" : ""}">${BLOCKS[id].n} × ${need[id]}</span>`; }).join("");
+    const nx = nextNeed(craftSite);
+    el.innerHTML = `<div class="cq-h">🏗 <b>${bp.n}</b> を 組み立て中　<span class="cq-c">${done} / ${all}</span>` +
+      `<button id="cqCancel" class="ghost cq-cancel">やめる</button></div>` +
+      `<div class="cq-bar"><i style="width:${Math.round(done / all * 100)}%"></i></div>` +
+      `<div class="cq-tip">${nx ? "つぎは <b>" + BLOCKS[nx.id].n + "</b>。ひかっている マスを クリック！" : ""}</div>` +
+      `<div class="cq-needs">のこり：${list}</div>`;
+    const cc = $("#cqCancel"); if (cc) cc.onclick = function () { craftSite = null; renderCraft(); };
+    return;
+  }
+  const cards = BPS.map(function (bp) {
+    const open = bp.era <= e, made = (craft.done || []).indexOf(bp.id) >= 0;
+    const cost = bp.cells.reduce(function (a, c) { return a + BLOCKS[c[3]].cost; }, 0);
+    return `<button class="bp-card${open ? "" : " lock"}" data-bp="${bp.id}"${open ? "" : " disabled"}>` +
+      `<span class="bp-n">${open ? "" : "🔒 "}${bp.n}${made ? " ✅" : ""}</span>` +
+      `<span class="bp-sub">${open ? bp.cells.length + "部品・" + cost + "G" : ERAS[bp.era].cond}</span></button>`;
+  }).join("");
+  const badges = (craft.done || []).map(function (id) { const b = bpById(id); return b ? `<span class="cq-badge">🏅 ${b.ttl}</span>` : ""; }).join("");
+  el.innerHTML = `<div class="cq-h">📜 レオ王：<b>つぎは 何を 建てる？</b>　<small>設計図を えらぶと、はめる場所が ひかるよ</small></div>` +
+    `<div class="bp-list">${cards}</div>` + (badges ? `<div class="cq-badges">${badges}</div>` : "") +
+    `<div class="cq-people">町のひと ${(craft.people || []).length}人 ／ たてもの ${(craft.sites || []).length}けん</div>`;
+  $$("#craftQuest .bp-card").forEach(function (btn) {
+    btn.onclick = function () { startBuilding(btn.dataset.bp); };
+  });
+}
+/* ---- 建てる場所を さがして 組み立てを始める ---- */
+function startBuilding(id) {
+  const bp = bpById(id); if (!bp) return;
+  let spot = null;
+  for (let r = 0; r < 9 && !spot; r++) {
+    for (let y = 1; y < CH_ - 3 && !spot; y++) for (let x = 1; x < CW_ - 3 && !spot; x++) {
+      if (siteFits(bp, x, y)) spot = { x: x, y: y };
+    }
+  }
+  if (!spot) { craftMsg("町が いっぱいだよ"); return; }
+  craftSite = { bp: bp, x: spot.x, y: spot.y };
+  craftSel = nextNeed(craftSite).id;
+  craftMsg("「" + bp.n + "」の 場所を とったよ。" + bp.tip);
+  craftCenterOn(spot.x, spot.y);
+  renderCraft();
+}
+function craftCenterOn(x, y) {
+  const cv = $("#craftCanvas"); if (!cv) return;
+  camX = cv.width / 2 - isoX(x, y) * camScale();
+  camY = cv.height / 2 - isoY(x, y, 3) * camScale();
+}
+function craftCenterOnHero() { craftCenterOn(craftSite ? craftSite.x : CW_ >> 1, craftSite ? craftSite.y : CH_ >> 1); }
+/* ---- 部品のパレット ---- */
 function renderCraftPalette() {
   const el = $("#craftPalette"); if (!el) return;
+  const need = {};
+  if (craftSite) siteLeft(craftSite).forEach(function (c) { need[c.id] = (need[c.id] || 0) + 1; });
   let html = "";
   for (let e = 0; e < ERAS.length; e++) {
-    const open = eraOpen(e);
+    const open = eraOpen(e), inEra = [];
+    for (let i = 1; i < BLOCKS.length; i++) if (BLOCKS[i].era === e) inEra.push(i);
+    if (!inEra.length) continue;
     html += '<div class="era' + (open ? "" : " locked") + '"><div class="era-h">' +
       (open ? "" : "🔒 ") + ERAS[e].n + '<small>' + (open ? "つかえる" : ERAS[e].cond) + '</small></div><div class="era-b">';
-    for (let i = 1; i < BLOCKS.length; i++) {
-      const bk = BLOCKS[i]; if (bk.era !== e) continue;
-      html += '<button class="blk' + (i === craftSel ? " sel" : "") + (open ? "" : " lock") + '" data-b="' + i + '">' +
+    inEra.forEach(function (i) {
+      const bk = BLOCKS[i];
+      html += '<button class="blk' + (i === craftSel ? " sel" : "") + (open ? "" : " lock") + (need[i] ? " need" : "") + '" data-b="' + i + '">' +
         '<span class="blk-chip" style="background-image:url(' + (CHIP[i] || "") + ')"></span>' +
-        '<span class="blk-n">' + bk.n + '</span><span class="blk-c">' + (open ? bk.cost + "G" : "🔒") + '</span></button>';
-    }
+        '<span class="blk-n">' + bk.n + '</span><span class="blk-c">' + (open ? bk.cost + "G" : "🔒") + '</span>' +
+        (need[i] ? '<span class="blk-need">あと' + need[i] + '</span>' : "") + '</button>';
+    });
     html += '</div></div>';
   }
   el.innerHTML = html;
@@ -2277,57 +2417,25 @@ function renderCraftPalette() {
     btn.addEventListener("click", function () {
       const i = +btn.dataset.b, bk = BLOCKS[i];
       if (!eraOpen(bk.era)) return craftMsg("「" + bk.n + "」は " + ERAS[bk.era].cond + "すると つかえるよ");
-      craftSel = i; craftBreak = false; renderCraft();
+      craftSel = i; renderCraft();
     });
   });
 }
-function craftBuiltCount() { return (craft && craft.built) || 0; }  // 自分で置いた数（地形は数えない）
-/* ---- レオ王のお願い（目的）---- */
-const questDone = (q) => (craft.done || []).indexOf(q.id) >= 0;
-const questHave = (n) => ((craft.placed || {})[n] || 0);
-const questOK = (q) => Object.keys(q.need).every((n) => questHave(n) >= q.need[n]);
-function currentQuest() {
-  const e = myEra();
-  return QUESTS.find((q) => q.era <= e && !questDone(q)) || null;   // いま挑戦できる、いちばん古いお願い
-}
-function checkQuest() {
-  const q = currentQuest(); if (!q || !questOK(q)) return;
-  craft.done = (craft.done || []).concat([q.id]);
-  saveCraft();
-  craftMsg("🎉 「" + q.n + "」 かんせい！ 称号『" + q.ttl + "』を もらった！");
-  try { bigFanfareSnd(); } catch (e) {}
-}
-function renderCraftQuest() {
-  const el = $("#craftQuest"); if (!el) return;
-  const q = currentQuest();
-  const badges = (craft.done || []).map((id) => { const x = QUESTS.find((v) => v.id === id); return x ? `<span class="cq-badge">🏅 ${x.ttl}</span>` : ""; }).join("");
-  if (!q) {
-    el.innerHTML = `<div class="cq-h">👑 レオ王：<b>ぜんぶ かなえてくれた！ ありがとう</b></div><div class="cq-badges">${badges}</div>`;
-    return;
-  }
-  const bars = Object.keys(q.need).map((n) => {
-    const have = Math.min(questHave(n), q.need[n]), pct = Math.round(have / q.need[n] * 100);
-    return `<div class="cq-item"><span class="cq-n">${n}</span>` +
-      `<span class="cq-bar"><i style="width:${pct}%"></i></span><span class="cq-c">${have} / ${q.need[n]}</span></div>`;
-  }).join("");
-  el.innerHTML = `<div class="cq-h">👑 レオ王の おねがい：<b>${q.n}</b>　<small>ごほうびは 称号『${q.ttl}』</small></div>` +
-    `<div class="cq-tip">${q.tip}</div><div class="cq-items">${bars}</div>` + (badges ? `<div class="cq-badges">${badges}</div>` : "");
-}
+function craftBuiltCount() { return (craft && craft.built) || 0; }
 function renderCraft() {
   const fresh = !craft;
   if (fresh) craft = loadCraft();
   resizeCraftCanvas();
-  if (!SPR[1]) bakeBlocks();          // パレットの見本にも焼いた絵を使うので、先に用意しておく
+  if (!SPR[1]) bakeBlocks();
   if (fresh) craftCenterOnHero();
   craftAnimStart();
   $("#craftGold").textContent = getGold().toLocaleString();
   $("#craftCount").textContent = craftBuiltCount().toLocaleString();
   const el2 = $("#craftEra"); if (el2) el2.textContent = ERAS[myEra()].n;
-  $("#craftMode").textContent = craftBreak ? "⛏ こわす" : "🧱 おく";
-  $("#craftMode").className = "pill" + (craftBreak ? " danger" : "");
+  const md = $("#craftMode"); if (md) { md.textContent = craftSite ? "🏗 組み立て中" : "📜 設計図から えらぶ"; md.className = "pill"; }
   renderCraftQuest(); renderCraftPalette(); drawCraft(); renderGoldPill();
 }
-/* ---- 画面の移動と拡大縮小 ---- */
+
 function craftZoom(f) { const cv = $("#craftCanvas"); if (!cv) return; const cx = cv.width / 2, cy = cv.height / 2;
   const ns = Math.max(0.35, Math.min(1.8, camS * f));
   camX = cx - (cx - camX) * (ns / camS); camY = cy - (cy - camY) * (ns / camS); camS = ns; drawCraft(); }
@@ -2344,19 +2452,22 @@ $("#craftCanvas").addEventListener("pointermove", function (ev) {
 $("#craftCanvas").addEventListener("pointerup", function () { dragging = false; setTimeout(function () { dragMoved = false; }, 0); });
 $("#craftCanvas").addEventListener("pointerleave", function () { dragging = false; craftHover = -1; drawCraft(); });
 $("#craftCanvas").addEventListener("click", craftClick);
-$("#craftMode").addEventListener("click", function () { craftBreak = !craftBreak; renderCraft(); });
+$("#craftMode").addEventListener("click", function () { craftSite = null; renderCraft(); });   // 設計図えらびに もどる
 $("#craftIn").addEventListener("click", function () { craftZoom(1.25); });
 $("#craftOut").addEventListener("click", function () { craftZoom(0.8); });
 $("#craftHome").addEventListener("click", function () { craftCenterOnHero(); drawCraft(); });
 $("#craftUndo").addEventListener("click", function () {
   const a = craftHist.pop(); if (!a) return craftMsg("もどせる ものが ないよ");
-  if (a.t === "p") { craft.cells[cIdx(a.x, a.y, a.z)] = 0; craft.built = Math.max(0, (craft.built || 0) - 1); addGold(BLOCKS[a.id].cost); }
-  else { craft.cells[cIdx(a.x, a.y, a.z)] = a.id; craft.built = (craft.built || 0) + 1; addGold(-Math.floor(BLOCKS[a.id].cost / 2)); }
+  craft.cells[cIdx(a.x, a.y, a.z)] = 0;
+  craft.built = Math.max(0, (craft.built || 0) - 1);
+  const nm = BLOCKS[a.id].n; craft.placed[nm] = Math.max(0, (craft.placed[nm] || 0) - 1);
+  addGold(BLOCKS[a.id].cost);                      // はめ直せるよう、代金はぜんぶ返す
+  craftMsg("「" + nm + "」を もどした（" + BLOCKS[a.id].cost + "G かえってきた）");
   saveCraft(); renderCraft();
 });
 $("#craftReset").addEventListener("click", function () {
-  if (!confirm("世界を つくりなおす？（つかったGOLDは もどりません）")) return;
-  localStorage.removeItem(CRAFT_KEY); craft = null; craftHist = []; renderCraft(); craftCenterOnHero(); drawCraft();
+  if (!confirm("町を さらちに もどす？（つかったGOLDは もどりません）")) return;
+  localStorage.removeItem(CRAFT_KEY); craft = null; craftHist = []; craftSite = null; renderCraft(); craftCenterOnHero(); drawCraft();
 });
 /* ---- 画面いっぱいにする（没入モード）----
    ブラウザの全画面にできればそれを使い、できない環境では画面いっぱいに広げるだけにする。 */
