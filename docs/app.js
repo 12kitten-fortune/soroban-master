@@ -484,6 +484,7 @@ function fanfareSnd() {
   });
 }
 // GOLDをもらったとき「チャリーン♪」
+// GOLDが入ったときの音（レジスター）。GOLDを使うときは 鳴らさない
 function coinSnd(delay = 0) {
   if (delay > 0) { setTimeout(function () { coinSnd(0); }, delay * 1000); return; }
   sfx("coin", function () {
@@ -2546,7 +2547,7 @@ function craftClick(ev) {
   craft.placed = craft.placed || {}; craft.placed[b.n] = (craft.placed[b.n] || 0) + 1;
   craftHist.push({ x: want.x, y: want.y, z: want.z, id: want.id });
   if (craftHist.length > 300) craftHist.shift();
-  addGold(-b.cost); clickSnd(); coinSnd(0.05);
+  addGold(-b.cost); clickSnd();   // GOLDを つかうときは レジの音を鳴らさない（入ったときだけ）
   const left = siteLeft(craftSite);
   if (!left.length) finishBuilding();
   else {
