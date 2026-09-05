@@ -381,8 +381,12 @@
           <div class="card">
             <h3>🔊 音</h3>
             <label class="toggle"><input type="checkbox" id="sndToggle2" /> 効果音を鳴らす</label>
-            <label class="toggle"><input type="checkbox" id="bgmToggle" /> BGMを流す</label>
-            <label class="field">音量 <input type="range" id="volRange" min="0" max="100" step="5" /></label>
+            <div class="field">🎵 BGMの音量
+              <div class="seg" id="bgmSeg">
+                <button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button>
+              </div>
+            </div>
+            <label class="field">効果音の音量 <input type="range" id="volRange" min="0" max="100" step="5" /></label>
             <p class="sub" id="sfxNote"></p>
             <p class="sub">音の出どころ：効果音は <b>効果音ラボ</b>、BGMは <b>魔王魂</b>（どちらも 商用利用OK）</p>
           </div>

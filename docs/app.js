@@ -336,12 +336,22 @@ function sfxPreload() {
   Object.values(SFX_LIST).forEach(function (n) { sfxTry(n, 0); });
 }
 // 材料があれば それを、無ければ 合成音を鳴らす
-function sfx(name, fallback) {
+function sfx(name, fallback, rate) {
   if (!soundOn) return;
   const a = sfxBuf[name];
-  if (a) { try { const c = a.cloneNode(); c.volume = sfxVol; c.play().catch(function () { }); return; } catch (e) { } }
+  if (a) {
+    try {
+      const c = a.cloneNode();
+      c.volume = sfxVol;
+      if (rate) c.playbackRate = Math.max(0.5, Math.min(2.4, rate));   // 高さを変える（連鎖で上がる）
+      c.play().catch(function () { });
+      return;
+    } catch (e) { }
+  }
   if (fallback) { try { fallback(); } catch (e) { } }
 }
+// ペンタトニックの音程ぶんだけ 再生速度を上げる＝音が階段状に上がる
+const sfxRateFor = (step) => Math.pow(2, SCALE_PENTA[Math.max(0, Math.min(SCALE_PENTA.length - 1, step | 0))] / 12);
 let sfxVol = 0.8;
 /* ---- 音階（ペンタトニック）。どの段でも きれいに上がっていく ---- */
 const SCALE_PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36];
@@ -360,8 +370,11 @@ function chord(t0, root, kind, dur, vol) {
 }
 
 /* ---- BGM（材料があれば鳴る。無ければ 何も起きない） ---- */
-const BGM_KEY = "soroban_bgm", VOL_KEY = "soroban_vol";
-let bgmOn = localStorage.getItem(BGM_KEY) !== "off";   // 材料が入ったので はじめから流す（設定で止められる）
+const BGM_KEY = "soroban_bgm", VOL_KEY = "soroban_vol", BGML_KEY = "soroban_bgmlv";
+// BGMの音量：0=切 1=小 2=中 3=大
+const BGM_STEPS = [0, 0.10, 0.22, 0.38];
+let bgmLevel = (function () { const v = parseInt(localStorage.getItem(BGML_KEY), 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 2; })();
+let bgmOn = bgmLevel > 0;
 let bgmEl = null, bgmName = "";
 sfxVol = (function () { const v = parseFloat(localStorage.getItem(VOL_KEY)); return isFinite(v) ? v : 0.8; })();
 function bgmPlay(name) {
@@ -382,17 +395,27 @@ function bgmPlay(name) {
   };
   try {
     tryNext();
+    const target = BGM_STEPS[bgmLevel] || 0;
     let v = 0;                                  // そっと 音を上げる
     const id = setInterval(function () {
       if (!bgmEl) return clearInterval(id);
-      v = Math.min(sfxVol * 0.32, v + 0.02); bgmEl.volume = v;
-      if (v >= sfxVol * 0.32) clearInterval(id);
+      v = Math.min(target, v + 0.02); bgmEl.volume = v;
+      if (v >= target) clearInterval(id);
     }, 90);
   } catch (e) { bgmEl = null; }
 }
 function bgmStop() { if (bgmEl) { try { bgmEl.pause(); } catch (e) { } } bgmEl = null; bgmName = ""; }
-function setBgm(on) { bgmOn = !!on; localStorage.setItem(BGM_KEY, on ? "on" : "off"); if (!on) bgmStop(); }
-function setVol(v) { sfxVol = Math.max(0, Math.min(1, v)); localStorage.setItem(VOL_KEY, String(sfxVol)); if (bgmEl) bgmEl.volume = sfxVol * 0.32; }
+function setBgm(on) { setBgmLevel(on ? (bgmLevel || 2) : 0); }
+// BGMの音量を 切・小・中・大 から えらぶ
+function setBgmLevel(n) {
+  bgmLevel = Math.max(0, Math.min(3, n | 0));
+  bgmOn = bgmLevel > 0;
+  try { localStorage.setItem(BGML_KEY, String(bgmLevel)); localStorage.setItem(BGM_KEY, bgmOn ? "on" : "off"); } catch (e) { }
+  if (!bgmOn) bgmStop();
+  else if (bgmEl) bgmEl.volume = BGM_STEPS[bgmLevel];
+  else { sfxPreload(); bgmPlay(bgmName || "bgm_study"); }
+}
+function setVol(v) { sfxVol = Math.max(0, Math.min(1, v)); localStorage.setItem(VOL_KEY, String(sfxVol)); }
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v) {
   if (v === "puzzle") bgmPlay("bgm_puzzle");
@@ -566,10 +589,15 @@ $("#quitBtn").addEventListener("click", quitSession);
 // 効果音のON/OFF
 function renderSound() { $("#soundToggle").textContent = soundOn ? "🔊 音あり" : "🔇 音なし"; }
 (function () {
-  const a = $("#sndToggle2"), b = $("#bgmToggle"), v = $("#volRange");
+  const a = $("#sndToggle2"), v = $("#volRange");
   if (!a) return;
-  a.addEventListener("change", function () { soundOn = a.checked; localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); renderSound(); if (!soundOn) bgmStop(); else bgmForView("settings"); });
-  b.addEventListener("change", function () { setBgm(b.checked); if (b.checked) { sfxPreload(); bgmPlay("bgm_study"); } });
+  a.addEventListener("change", function () {
+    soundOn = a.checked; localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); renderSound();
+    if (!soundOn) bgmStop(); else { sfxPreload(); bgmPlay("bgm_study"); }
+  });
+  $$("#bgmSeg button").forEach(function (b) {
+    b.addEventListener("click", function () { setBgmLevel(+b.dataset.lv); renderSound2(); });
+  });
   v.addEventListener("input", function () { setVol(+v.value / 100); });
   v.addEventListener("change", function () { sfx("coin", function () { coinSnd(0); }); });
 })();
@@ -757,9 +785,10 @@ $("#todayStart").addEventListener("click", () => startRoutine(GRADES[+$("#todayG
 const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
 // 音の設定（効果音・BGM・音量）
 function renderSound2() {
-  const a = $("#sndToggle2"), b = $("#bgmToggle"), v = $("#volRange"), n = $("#sfxNote");
+  const a = $("#sndToggle2"), v = $("#volRange"), n = $("#sfxNote");
   if (!a) return;
-  a.checked = soundOn; b.checked = bgmOn; v.value = Math.round(sfxVol * 100);
+  a.checked = soundOn; v.value = Math.round(sfxVol * 100);
+  $$("#bgmSeg button").forEach(function (b) { b.classList.toggle("on", +b.dataset.lv === bgmLevel); });
   const have = Object.keys(sfxBuf).length;
   n.innerHTML = have
     ? "音の材料を " + have + " 個 よみこみ ました。"
@@ -2970,8 +2999,8 @@ function pzBlast(c, i, out, fired, opt) {
     if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired, { at: base + (d || 0) + 60 });   // 巻きこまれた物は 少し遅れて発動
   };
   const sp = opt.as || t.sp;
-  if (sp === "rh" || sp === "rv") sfx("rocket");
-  else if (sp === "tnt" || sp === "cross") sfx("boom");
+  if (sp === "rh" || sp === "rv") sfx("rocket", null, 1.5);      // 琴を速く＝シャーッ
+  else if (sp === "tnt" || sp === "cross") sfx("boom", null, 0.9);  // 爆発は 少し低く＝重く
   if (sp === "rh") { pzShow({ fx: "rocket", dir: "h", x: x, y: y, at: base }); for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y), Math.abs(k - x) * 26); }
   else if (sp === "rv") { pzShow({ fx: "rocket", dir: "v", x: x, y: y, at: base }); for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k), Math.abs(k - y) * 26); }
   else if (sp === "tnt") {
@@ -3445,7 +3474,8 @@ function pzBurst(i, kind, n) {
 // 連鎖の音。半音ではなく ペンタトニック（ヨナ抜き）で上げるので、何段でも濁らない
 function pzTone(step, big) {
   if (!soundOn) return;
-  if (sfxBuf["pop"] && !big) return sfx("pop");
+  // しゃきん！ 連鎖するほど 少しだけ高くする（上げすぎると あほっぽくなる）
+  if (sfxBuf["pop"]) return sfx("pop", null, 1 + Math.min(6, step) * 0.045);
   try {
     const c = ensureAudio(), t = c.currentTime;
     const f = noteHz(step);

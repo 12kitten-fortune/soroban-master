@@ -889,3 +889,10 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .value-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 #playSorobanWrap .sub { font-size: 13px; }
 #answerBtn { font-size: 20px; padding: 14px 34px; }
+
+/* ---- 3段階のえらびボタン（BGMの音量など） ---- */
+.seg { display: inline-flex; gap: 0; border: 2px solid var(--line); border-radius: 999px; overflow: hidden; margin-left: 8px; vertical-align: middle; }
+.seg button { background: #fff; color: #6b5a45; border: none; border-right: 2px solid var(--line); padding: 8px 18px; font-size: 15px; font-weight: 700; }
+.seg button:last-child { border-right: none; }
+.seg button.on { background: linear-gradient(180deg, var(--navy-hi), var(--navy)); color: #fff; }
+.field { display: block; margin: 10px 0; font-size: 15px; }
