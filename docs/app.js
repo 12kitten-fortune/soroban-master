@@ -2986,18 +2986,21 @@ const PZ_ITEMS = [
 function pzLevel(n) {
   const kinds = n < 4 ? 4 : 5;                                   // はじめは4種、4面目から5種
   const target = PZ_KINDS[(n - 1) % kinds].k;                    // 集める絵がらは 面ごとに かわる
-  const moves = Math.max(18, 30 - Math.floor((n - 1) * 0.6));
-  // 仕掛けの面と ふつうの面を 交互に（3面目で草、5面目で箱がはじめて出る）
+  // 手数は 上の面ほど 少しずつ増える（前は へっていって 18手で頭打ちだった）
+  const moves = 24 + Math.min(12, Math.floor(n / 4));
+  // 目あては「手数×割合」で決める。1手で消せる数には かぎりがあるので、
+  // これを守らないと 何手あっても 届かない面ができてしまう。
+  const hard = Math.min(0.30, n * 0.006);                        // 面が進むほど きつくする
   const kind = n <= 2 ? "color" : ["grass", "color", "box", "color"][(n - 3) % 4];
   if (kind === "grass") {
-    const need = Math.min(34, 8 + n * 2);
+    const need = Math.round(moves * (0.28 + hard * 0.3));   // 草は ねらって消しにくいので ひかえめに
     return { n, kinds, target, need, moves, goal: "grass", grass: need, box: 0 };
   }
   if (kind === "box") {
-    const need = Math.min(14, 3 + Math.floor(n / 2));
+    const need = Math.max(3, Math.round(moves * (0.15 + hard * 0.2)));  // 箱は となりで消す必要があるので さらに ひかえめに
     return { n, kinds, target, need, moves, goal: "box", grass: 0, box: need };
   }
-  return { n, kinds, target, need: 18 + Math.floor((n - 1) * 2.5), moves, goal: "color", grass: 0, box: 0 };
+  return { n, kinds, target, need: Math.round(moves * (0.50 + hard)), moves, goal: "color", grass: 0, box: 0 };
 }
 /* ---- 仕掛け（障害物）----
    草：玉が その上で消えると はがれる（動きは じゃましない）
@@ -3005,12 +3008,24 @@ function pzLevel(n) {
 const PZ_BLOCK = { box: { n: "木箱", hp: 1 }, stone: { n: "石の箱", hp: 2 } };
 function pzMakeStage(lv) {
   const floor = new Array(PZ_W * PZ_H).fill(0), block = new Array(PZ_W * PZ_H).fill(null);
-  if (lv.grass) {                                   // 草は 下のほうに かたまりで
+  if (lv.grass) {
+    // 草は ばらまかず、かたまりで置く（ねらって消せるように・芝生らしく見えるように）
     let put = 0, guard = 0;
-    while (put < lv.grass && guard++ < 500) {
-      const x = Math.floor(Math.random() * PZ_W), y = 2 + Math.floor(Math.random() * (PZ_H - 2));
-      const i = pzIdx(x, y); if (floor[i]) continue;
+    let cx = 1 + Math.floor(Math.random() * (PZ_W - 2)), cy = 3 + Math.floor(Math.random() * (PZ_H - 4));
+    const q = [pzIdx(cx, cy)];
+    while (put < lv.grass && guard++ < 900) {
+      if (!q.length) {                               // かたまりが とぎれたら 別の場所から
+        cx = 1 + Math.floor(Math.random() * (PZ_W - 2)); cy = 3 + Math.floor(Math.random() * (PZ_H - 4));
+        q.push(pzIdx(cx, cy));
+      }
+      const i = q.shift();
+      if (i == null || floor[i]) continue;
       floor[i] = 1; put++;
+      const x = i % PZ_W, y = (i / PZ_W) | 0;
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+        const nx = x + d[0], ny = y + d[1];
+        if (nx >= 0 && ny >= 2 && nx < PZ_W && ny < PZ_H && !floor[pzIdx(nx, ny)]) q.push(pzIdx(nx, ny));
+      });
     }
   }
   if (lv.box) {                                     // 箱は ばらばらに（上2段には置かない＝詰まないように）
@@ -3746,6 +3761,7 @@ async function pzFinale() {
 }
 /* ---------- あそび中に使える道具バー（画面の下・ロイヤルマッチと同じ位置） ---------- */
 const PZ_TOOLS = [
+  { id: "moves", n: "手数+5", em: "⏱", cost: 30, tip: "のこり手数を 5 ふやす", now: true },
   { id: "hammer", n: "ハンマー", em: "🔨", cost: 25, tip: "すきな玉を 1つ こわす" },
   { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "その場所を ロケットにして 発射" },
   { id: "prop", n: "プロペラ", em: "🚁", cost: 50, tip: "その場所を プロペラにして 発射" },
@@ -3766,11 +3782,26 @@ function pzRenderTools() {
 function pzArm(id) {
   if (!pz || pz.busy || pz.done) return;
   const t = PZ_TOOLS.find((x) => x.id === id);
+  if (t && t.now) return pzUseNow(t);                 // 手数+5 のように その場で効く道具
   if (pzArmed === id) { pzArmed = null; pzRenderTools(); $("#pzToolTip").textContent = ""; return; }
   if (!pzToolStock(id) && getGold() < t.cost) { pzMsg("GOLDが たりない。そろばんで かせごう！", "ng"); return; }
   pzArmed = id;
   pzRenderTools();
   $("#pzToolTip").textContent = t.n + "：" + t.tip + (pzToolStock(id) ? "" : "（つかうと " + t.cost + "G）");
+}
+// マスをえらばずに すぐ効く道具（手数+5）
+function pzUseNow(t) {
+  const stock = pzToolStock(t.id);
+  if (!stock) {
+    if (getGold() < t.cost) { pzMsg("GOLDが たりないよ", "ng"); return; }
+    addGold(-t.cost);
+  } else { const d = pzLoad(); d.items[t.id] = stock - 1; pzSave(d); }
+  if (t.id === "moves") {
+    pz.moves += 5;
+    pzMsg("手数を 5 ふやした！", "ok");
+    try { sfx("coin", function () { coinSnd(0); }); } catch (e) { }
+  }
+  pzRenderHud(); pzRenderTools();
 }
 // 道具をつかう（手数は へらない）
 async function pzUseTool(i) {
@@ -3878,9 +3909,14 @@ async function pzCeremony(st, cleared) {
     '<div class="pz-gifts" id="pzGifts"></div>' +
     '<div class="pz-res-btns" id="pzBtns"></div>';
   if (!cleared) {
-    $("#pzTally").innerHTML = 'あと <b>' + Math.max(0, pz.lv.need - pz.got) + "</b> こ だったね<br><span class=\"sub\">スコア " + (pz.score || 0).toLocaleString() + "</span>";
+    $("#pzTally").innerHTML = 'あと <b>' + Math.max(0, pz.lv.need - pz.got) + "</b> こ だったね<br><span class=\"sub\">スコア " + (pz.score || 0).toLocaleString() + "</span>" +
+      (getGold() >= PZ_CONT_COST
+        ? '<button id="pzCont" class="big-cta pz-cont">⏱ ＋5手 つづける（' + PZ_CONT_COST + 'G）</button>' +
+          '<div class="sub">いまの ばんめんの まま つづきます</div>'
+        : "");
     try { wrongSnd(); } catch (e) { }
     pzCeremonyButtons(false);
+    const ct = $("#pzCont"); if (ct) ct.onclick = pzContinue;
     return;
   }
   // ② 星が1つずつ とんでくる
@@ -3945,6 +3981,18 @@ function pzCeremonyButtons(cleared) {
     ' <button id="pzHome" class="ghost">やめる</button>';
   const ag = $("#pzAgain"); if (ag) ag.onclick = () => { pz = null; renderPuzzle(); };
   $("#pzHome").onclick = () => { pz = null; renderPuzzle(); };
+}
+// 手数ぎれから GOLDを払って つづける（盤はそのまま）
+const PZ_CONT_COST = 40;
+function pzContinue() {
+  if (!pz || getGold() < PZ_CONT_COST) return;
+  addGold(-PZ_CONT_COST);
+  pz.moves = 5; pz.done = false; pz.busy = false;
+  if (!pzHasMove(pz.cells)) pzReshuffle();
+  const ov = $("#pzOver"); ov.classList.add("hidden"); ov.innerHTML = "";
+  pzSync(); pzRenderHud(); pzRenderTools();
+  pzMsg("＋5手！ もうひとふんばり", "ok");
+  try { sfx("coin", function () { coinSnd(0); }); } catch (e) { }
 }
 /* 1面の終わり（記録は すぐ／演出は そのあと） */
 function pzFinish(done) {

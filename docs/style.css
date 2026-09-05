@@ -916,3 +916,4 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   border: 1px solid var(--royal-gold); border-radius: 999px; padding: 3px 12px; }
 .song-main { font-size: 12px; padding: 6px 12px; background: transparent; color: var(--frame); border: 1px solid var(--line); }
 .song-badge.fixed { background: #e3ecff; border-color: #7ba0e0; color: #24487a; }
+.pz-cont { margin-top: 10px; background: linear-gradient(180deg,#e0b84a,#c9a227); color: #3a2a00; }
