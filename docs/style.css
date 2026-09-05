@@ -680,3 +680,43 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   background: radial-gradient(circle at 35% 30%, #fff, #fff6c9 40%, rgba(255,255,255,.15) 70%);
   box-shadow: 0 0 12px rgba(255,255,255,.9); }
 .pz-t.sp .pz-mark { opacity: .55; }
+
+/* ---- 消したときの 気持ちよさ ---- */
+.pz-fx { position: absolute; left: 0; top: 0; width: var(--pzt); height: var(--pzt);
+  transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0);
+  display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 6; }
+.pz-pts { font-weight: 800; color: #fff; font-size: calc(var(--pzt) * .34); text-shadow: 0 2px 4px rgba(0,0,0,.5); animation: pzup .85s ease-out forwards; }
+@keyframes pzup { 0% { opacity: 0; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(.6); }
+  25% { opacity: 1; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt) - 6px), 0) scale(1.15); }
+  100% { opacity: 0; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt) - 34px), 0) scale(1); } }
+.pz-praise { font-weight: 900; font-size: calc(var(--pzt) * .46); color: #ffd35b; -webkit-text-stroke: 2px #7a4a00;
+  paint-order: stroke fill; white-space: nowrap; animation: pzpraise 1s cubic-bezier(.2,1.7,.4,1) forwards; z-index: 7; }
+@keyframes pzpraise { 0% { opacity: 0; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt)), 0) scale(.3) rotate(-8deg); }
+  35% { opacity: 1; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt) - 10px), 0) scale(1.2) rotate(3deg); }
+  100% { opacity: 0; transform: translate3d(calc(var(--x) * var(--pzt)), calc(var(--y) * var(--pzt) - 40px), 0) scale(1) rotate(0); } }
+.pz-p { position: absolute; left: 0; top: 0; width: calc(var(--pzt) * .2); height: calc(var(--pzt) * .2); border-radius: 50%;
+  background: var(--pc); pointer-events: none; z-index: 5; animation: pzpart .6s ease-out forwards; animation-delay: var(--pd, 0ms);
+  transform: translate3d(calc(var(--x) * var(--pzt) + var(--pzt) * .4), calc(var(--y) * var(--pzt) + var(--pzt) * .4), 0); }
+@keyframes pzpart { 0% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(calc(var(--x) * var(--pzt) + var(--pzt) * .4 + var(--dx) * 46px), calc(var(--y) * var(--pzt) + var(--pzt) * .4 + var(--dy) * -46px + 30px), 0) scale(.4); } }
+.pz-score-w { font-size: 15px; color: #8a7560; }
+.pz-score-w b { font-size: 20px; color: var(--navy); display: inline-block; font-variant-numeric: tabular-nums; }
+.pz-score-w b.pop, .pz-goal.pop { animation: pzbump .3s cubic-bezier(.2,1.8,.4,1); }
+@keyframes pzbump { 50% { transform: scale(1.3); } }
+/* ---- ごほうびの儀式 ---- */
+.pz-star { font-size: 44px; color: #dcd6c8; display: inline-block; margin: 0 4px; }
+.pz-star.on { color: var(--royal-gold); text-shadow: 0 0 18px rgba(212,175,55,.9); }
+.pz-star.fly { animation: pzstar .5s cubic-bezier(.2,1.8,.4,1); }
+@keyframes pzstar { 0% { transform: scale(0) rotate(-140deg); opacity: 0; } 70% { transform: scale(1.5) rotate(10deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+.pz-tally { font-size: 17px; margin: 6px 0; }
+.pz-tally b { font-size: 26px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.pz-meter { margin-top: 10px; font-size: 13px; color: #8a7560; }
+.pz-meter b { font-size: 20px; color: var(--royal-gold); margin: 0 6px; }
+.pz-meter-bar { display: block; height: 10px; background: #ece3d2; border-radius: 999px; overflow: hidden; margin: 4px 0; }
+.pz-meter-bar u { display: block; height: 100%; background: linear-gradient(90deg,#e0b84a,#d4af37); }
+.pz-chest { font-size: 54px; display: inline-block; animation: pzchest .5s ease-in-out infinite alternate; }
+.pz-chest.open { animation: pzopen .6s cubic-bezier(.2,1.8,.4,1) forwards; }
+@keyframes pzchest { to { transform: scale(1.08) rotate(3deg); } }
+@keyframes pzopen { 0% { transform: scale(1); } 40% { transform: scale(1.5) rotate(-8deg); } 100% { transform: scale(1.15); } }
+.pz-gift-item { font-size: 18px; font-weight: 800; color: var(--navy); margin-top: 6px; animation: pzstar .5s cubic-bezier(.2,1.8,.4,1); }
+.pz-stock { font-weight: 700; color: var(--ok); font-size: 13px; }

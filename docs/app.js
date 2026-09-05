@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-37"; // 最新反映の確認用
+const BUILD = "2026-09-05-38"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2760,7 +2760,7 @@ function pzStart(lvNo, items) {
       }
     }
   });
-  pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0 };
+  pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0, score: 0 };
   return pz;
 }
 /* ---- 入れかえ（画面側は 1手ずつ 呼んで アニメーションさせる） ---- */
@@ -2880,6 +2880,7 @@ function pzRenderHud() {
   const face = pz.lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
   $("#pzGoal").innerHTML = face + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>";
   $("#pzMoves").innerHTML = "のこり <b>" + Math.max(0, pz.moves) + "</b> 手";
+  const sc = $("#pzScore"); if (sc) sc.textContent = (pz.score || 0).toLocaleString();
   $("#pzLv").textContent = "レベル " + pz.lv.n;
   const bar = $("#pzBar"); if (bar) bar.style.width = Math.min(100, Math.round(pz.got / pz.lv.need * 100)) + "%";
 }
@@ -2894,26 +2895,124 @@ function pzShake(strong) {
   b.classList.add(strong ? "shake-b" : "shake");
   setTimeout(() => b.classList.remove("shake", "shake-b"), 400);
 }
-/* ---- 1回ぶん消す（消える→落ちる を見せる） ---- */
+/* ---------- 気持ちよさの演出（点数・つぶ・音・ほめ言葉） ---------- */
+const PZ_PRAISE = ["", "", "いいね！", "すごい！", "さいこう！", "でんせつ！", "しんきろく！"];
+function pzFx(i, html, cls, life) {
+  const el = $("#pzBoard"); if (!el) return;
+  const d = document.createElement("div");
+  d.className = "pz-fx " + (cls || "");
+  d.innerHTML = html;
+  d.style.setProperty("--x", i % PZ_W);
+  d.style.setProperty("--y", (i / PZ_W) | 0);
+  el.appendChild(d);
+  setTimeout(() => d.remove(), life || 900);
+}
+// 消えた所から つぶが とび散る
+function pzBurst(i, kind, n) {
+  const el = $("#pzBoard"); if (!el) return;
+  const kd = pzKind(kind);
+  for (let p = 0; p < (n || 5); p++) {
+    const d = document.createElement("i");
+    d.className = "pz-p";
+    d.style.setProperty("--x", i % PZ_W);
+    d.style.setProperty("--y", (i / PZ_W) | 0);
+    d.style.setProperty("--dx", (Math.random() * 2 - 1).toFixed(2));
+    d.style.setProperty("--dy", (-Math.random() * 1.4 - .3).toFixed(2));
+    d.style.setProperty("--pc", kd.g);
+    d.style.setProperty("--pd", (p * 18) + "ms");
+    el.appendChild(d);
+    setTimeout(() => d.remove(), 700);
+  }
+}
+// 連鎖が進むほど 音が上がる（うれしさが積み上がる）
+function pzTone(step, big) {
+  try {
+    const c = ensureAudio(), t = c.currentTime;
+    const f = 523 * Math.pow(2, Math.min(step, 12) / 12);
+    tone(f, t, big ? 0.22 : 0.12, "triangle", big ? 0.2 : 0.14);
+    if (big) tone(f * 1.5, t + 0.06, 0.2, "sine", 0.12);
+  } catch (e) { }
+}
+function pzGoalPop() {
+  const g = $("#pzGoal"); if (!g) return;
+  g.classList.remove("pop"); void g.offsetWidth; g.classList.add("pop");
+}
+function pzScoreAdd(n, i) {
+  pz.score = (pz.score || 0) + n;
+  const s = $("#pzScore"); if (s) { s.textContent = pz.score.toLocaleString(); s.classList.remove("pop"); void s.offsetWidth; s.classList.add("pop"); }
+  if (i != null) pzFx(i, "+" + n, "pz-pts");
+}
+/* ---- 1回ぶん消す（消える→つぶが散る→落ちる） ---- */
 async function pzCascadeAnim(swapAt, chain) {
   const r = pzCollect(pz.cells, swapAt);
   if (!r) return null;
+  const pts = r.gone.size * 10 * Math.min(chain, 5);
+  let mid = -1;
   r.gone.forEach((i) => {
     const t = pz.cells[i]; if (!t) return;
+    if (mid < 0) mid = i;
     const n = pzNodes[t.id]; if (!n) return;
     n.classList.add("pop");
     n.style.setProperty("--d", (Math.abs(i % PZ_W - (swapAt != null ? swapAt % PZ_W : 4)) * 12) + "ms");
+    pzBurst(i, t.k, r.gone.size > 12 ? 3 : 5);
   });
+  pzTone(chain * 2, r.big);
   if (r.big) pzShake(false);
-  try { chain > 1 ? correctSnd() : clickSnd(); } catch (e) { }
+  if (chain >= 2) {
+    pzFx(mid < 0 ? 27 : mid, PZ_PRAISE[Math.min(chain, PZ_PRAISE.length - 1)], "pz-praise", 1000);
+    pzMsg(chain + "れんさ！", "ok");
+  }
   await pzWait(chain > 1 ? 150 : 175);
   pzApply(pz.cells, r);
   pzFall(pz.cells, pz.lv.kinds);
-  pz.got += r.counts[pz.lv.target] || 0;
+  const got = r.counts[pz.lv.target] || 0;
+  pz.got += got;
+  pzScoreAdd(pts, mid);
+  if (got) pzGoalPop();
+  const left = pz.lv.need - pz.got;
+  if (left > 0 && left <= 2) pzMsg("あと " + left + " こ！", "ok");
   pzSync();
   pzRenderHud();
   await pzWait(200);
   return r;
+}
+/* ---- 手数が余ってクリアしたとき：のこりが ロケットになって 自動で発射（フィナーレ） ---- */
+async function pzFinale() {
+  const left = Math.min(pz.moves, 8);
+  if (left <= 0) return;
+  pzMsg("のこり " + pz.moves + " 手が ロケットに！", "ok");
+  await pzWait(500);
+  for (let k = 0; k < left; k++) {
+    const pool = [];
+    for (let i = 0; i < pz.cells.length; i++) if (pz.cells[i] && !pz.cells[i].sp) pool.push(i);
+    if (!pool.length) break;
+    const i = pool[Math.floor(Math.random() * pool.length)];
+    pz.cells[i].sp = Math.random() < 0.5 ? "rh" : "rv";
+    pzSync();
+    await pzWait(90);
+    const gone = new Set();
+    pzBlast(pz.cells, i, gone, null, {});
+    gone.forEach((j) => {
+      const t = pz.cells[j]; if (!t) return;
+      const n = pzNodes[t.id]; if (n) n.classList.add("pop");
+      pzBurst(j, t.k, 3);
+    });
+    pzTone(6 + k * 2, true);
+    pzShake(k >= 4);
+    await pzWait(150);
+    gone.forEach((j) => { pz.cells[j] = null; });
+    pzFall(pz.cells, pz.lv.kinds);
+    pzScoreAdd(gone.size * 20, i);
+    pzSync();
+    await pzWait(140);
+  }
+  // フィナーレのあとの そろいも 片づける
+  let guard = 0, r;
+  while ((r = pzCollect(pz.cells, null)) && guard++ < 8) {
+    pzApply(pz.cells, r); pzFall(pz.cells, pz.lv.kinds);
+    pzScoreAdd(r.gone.size * 10);
+    pzSync(); await pzWait(160);
+  }
 }
 /* ---- 玉をえらぶ・入れかえる ---- */
 async function pzTry(a, b) {
@@ -2948,47 +3047,136 @@ async function pzTry(a, b) {
   if (done) setTimeout(() => pzFinish(done), 260);
 }
 function pzAdj(a, b) { return Math.abs(a % PZ_W - b % PZ_W) + Math.abs(((a / PZ_W) | 0) - ((b / PZ_W) | 0)) === 1; }
-/* ---- 1面の終わり ---- */
+/* ---- クリアの ごほうびの儀式（ここが いちばん うれしい所） ---- */
+const PZ_CHEST_EVERY = 3;                                  // 何レベルごとに たからばこが出るか
+function pzGiveItem(d, id, n) { d.items = d.items || {}; d.items[id] = (d.items[id] || 0) + (n || 1); }
+async function pzCeremony(st, cleared) {
+  const ov = $("#pzOver");
+  ov.classList.remove("hidden");
+  const d = pzLoad();
+  // ① 見出し
+  ov.innerHTML = '<div class="pz-res-h ' + (cleared ? "ok" : "ng") + '">' +
+    (cleared ? "レベル " + pz.lv.n + " クリア！" : "手数ぎれ…") + "</div>" +
+    '<div class="pz-stars" id="pzStarRow"></div>' +
+    '<div class="pz-tally" id="pzTally"></div>' +
+    '<div class="pz-gifts" id="pzGifts"></div>' +
+    '<div class="pz-res-btns" id="pzBtns"></div>';
+  if (!cleared) {
+    $("#pzTally").innerHTML = 'あと <b>' + Math.max(0, pz.lv.need - pz.got) + "</b> こ だったね<br><span class=\"sub\">スコア " + (pz.score || 0).toLocaleString() + "</span>";
+    try { wrongSnd(); } catch (e) { }
+    pzCeremonyButtons(false);
+    return;
+  }
+  // ② 星が1つずつ とんでくる
+  const row = $("#pzStarRow");
+  for (let i = 0; i < 3; i++) {
+    const on = i < st;
+    const sp = document.createElement("span");
+    sp.className = "pz-star" + (on ? " on" : "");
+    sp.textContent = on ? "★" : "☆";
+    row.appendChild(sp);
+    if (on) { pzTone(4 + i * 3, true); sp.classList.add("fly"); }
+    await pzWait(on ? 330 : 120);
+  }
+  // ③ スコアを かぞえ上げる
+  const tal = $("#pzTally");
+  const total = pz.score || 0;
+  tal.innerHTML = 'スコア <b id="pzCount">0</b>';
+  const cnt = $("#pzCount");
+  const steps = 18;
+  for (let i = 1; i <= steps; i++) {
+    cnt.textContent = Math.round(total * i / steps).toLocaleString();
+    if (i % 3 === 0) pzTone(i, false);
+    await pzWait(35);
+  }
+  cnt.textContent = total.toLocaleString();
+  cnt.classList.add("pop");
+  // ④ 星のたまり具合（メーター）
+  d.star = (d.star || 0) + st;
+  pzSave(d);
+  const nextAt = Math.ceil(d.star / 9) * 9;
+  tal.innerHTML += '<div class="pz-meter"><span>あつめた ★</span><b>' + d.star + "</b>" +
+    '<i class="pz-meter-bar"><u style="width:' + Math.round((d.star % 9) / 9 * 100) + '%"></u></i>' +
+    "<small>つぎの ごほうびまで あと " + Math.max(1, nextAt - d.star) + " ★</small></div>";
+  await pzWait(420);
+  // ⑤ たからばこ（3レベルごと）
+  if (pz.lv.n % PZ_CHEST_EVERY === 0) {
+    const gif = $("#pzGifts");
+    gif.innerHTML = '<div class="pz-chest" id="pzChest">🎁</div><div class="sub">たからばこ！</div>';
+    try { bigFanfareSnd(); } catch (e) { }
+    await pzWait(700);
+    const pick = PZ_ITEMS[Math.floor(Math.random() * PZ_ITEMS.length)];
+    const num = 1 + (st >= 3 ? 1 : 0);
+    pzGiveItem(d, pick.id, num); pzSave(d);
+    $("#pzChest").classList.add("open");
+    gif.innerHTML = '<div class="pz-chest open">🎁</div>' +
+      '<div class="pz-gift-item">' + pick.em + " <b>" + pick.n + " ×" + num + "</b> を もらった！</div>" +
+      '<div class="sub">つぎのレベルで タダで つかえるよ</div>';
+    try { coinSnd(0); } catch (e) { }
+    await pzWait(500);
+  } else if (st >= 3) {
+    pzGiveItem(d, PZ_ITEMS[0].id, 1); pzSave(d);
+    $("#pzGifts").innerHTML = '<div class="pz-gift-item">★3 ボーナス！ 🚀 <b>ロケット ×1</b> を もらった！</div>';
+    await pzWait(400);
+  }
+  pzCeremonyButtons(true);
+}
+function pzCeremonyButtons(cleared) {
+  const g = getGold();
+  $("#pzBtns").innerHTML =
+    (g >= PZ_PLAY_COST ? '<button id="pzAgain" class="big-cta">▶ ' + (cleared ? "つぎの レベル" : "もう一度") + "（" + PZ_PLAY_COST + "G）</button>"
+      : '<div class="pz-need">GOLDが たりない。そろばんで かせごう！</div>') +
+    ' <button id="pzHome" class="ghost">やめる</button>';
+  const ag = $("#pzAgain"); if (ag) ag.onclick = () => { pz = null; renderPuzzle(); };
+  $("#pzHome").onclick = () => { pz = null; renderPuzzle(); };
+}
+/* 1面の終わり（記録は すぐ／演出は そのあと） */
 function pzFinish(done) {
   const d = pzLoad(), st = pzStars();
-  let msg = "";
   if (done === "win") {
     d.stars[pz.lv.n] = Math.max(d.stars[pz.lv.n] || 0, st);
     d.lv = Math.max(d.lv, pz.lv.n + 1);
     d.best = Math.max(d.best || 0, pz.lv.n);
     pzSave(d);
     try { bigFanfareSnd(); } catch (e) { }
-    msg = '<div class="pz-res-h ok">🎉 レベル ' + pz.lv.n + ' クリア！</div>' +
-      '<div class="pz-stars">' + '<span>★</span>'.repeat(st) + "☆".repeat(3 - st) + "</div>" +
-      '<div class="sub">のこり ' + pz.moves + " 手</div>";
-  } else {
-    try { wrongSnd(); } catch (e) { }
-    msg = '<div class="pz-res-h ng">手数ぎれ…</div><div class="sub">あと ' + Math.max(0, pz.lv.need - pz.got) + " こ だったね</div>";
   }
-  const g = getGold();
-  msg += '<div class="pz-res-btns">' +
-    (g >= PZ_PLAY_COST ? '<button id="pzAgain">▶ ' + (done === "win" ? "つぎの レベル" : "もう一度") + "（" + PZ_PLAY_COST + "G）</button>"
-      : '<div class="sub">GOLDが たりない。そろばんで かせごう！</div>') +
-    ' <button id="pzHome" class="ghost">やめる</button></div>';
-  $("#pzOver").innerHTML = msg;
-  $("#pzOver").classList.remove("hidden");
-  const ag = $("#pzAgain"); if (ag) ag.onclick = () => { pz = null; renderPuzzle(); };
-  $("#pzHome").onclick = () => { pz = null; renderPuzzle(); };
+  (async () => {
+    try {
+      if (done === "win") await pzFinale();
+      await pzCeremony(st, done === "win");
+    } catch (e) {
+      // 演出でつまずいても、先へ進めなくならないようにする
+      const ov = $("#pzOver");
+      ov.classList.remove("hidden");
+      ov.innerHTML = '<div class="pz-res-h ' + (done === "win" ? "ok" : "ng") + '">' +
+        (done === "win" ? "レベル " + pz.lv.n + " クリア！" : "手数ぎれ…") + '</div><div class="pz-res-btns" id="pzBtns"></div>';
+      pzCeremonyButtons(done === "win");
+    }
+  })();
 }
 /* ---- あそぶ前の画面 ---- */
+// 支払う GOLD（もらった持ちものは タダ）
+function pzBuyCost() {
+  const rec = pzLoad();
+  return Object.keys(pzBuy).reduce(function (a, k) {
+    const it = PZ_ITEMS.find((i) => i.id === k) || { cost: 0 };
+    const stock = (rec.items && rec.items[k]) || 0;
+    return a + Math.max(0, (pzBuy[k] || 0) - stock) * it.cost;
+  }, 0);
+}
 function pzRenderLobby() {
   const d = pzLoad(), lv = pzLevel(d.lv), g = getGold();
   const kd = pzKind(lv.target);
   const face = lv.target === "bead" ? '<i class="pz-bead sm"></i>' : '<i class="pz-mark sm k-' + kd.k + '">' + kd.s + "</i>";
   const items = PZ_ITEMS.map((it) => {
     const n = pzBuy[it.id] || 0;
+    const stock = (d.items && d.items[it.id]) || 0;
     return '<div class="pz-item"><span class="pz-em">' + it.em + '</span><span class="pz-in"><b>' + it.n + "</b><small>" + it.tip + "</small></span>" +
-      '<span class="pz-ic">' + it.cost + "G</span>" +
-      '<button class="pz-buy" data-it="' + it.id + '"' + (g < it.cost ? " disabled" : "") + ">＋</button>" +
+      (stock ? '<span class="pz-stock">もっている ' + stock + '</span>' : '<span class="pz-ic">' + it.cost + "G</span>") +
+      '<button class="pz-buy" data-it="' + it.id + '"' + (!stock && g < it.cost ? " disabled" : "") + ">＋</button>" +
       '<span class="pz-have">' + (n ? "×" + n : "") + "</span></div>";
   }).join("");
-  const buyCost = Object.keys(pzBuy).reduce((a, k) => a + (pzBuy[k] || 0) * (PZ_ITEMS.find((i) => i.id === k) || {}).cost, 0);
-  const total = PZ_PLAY_COST + buyCost;
+  const total = PZ_PLAY_COST + pzBuyCost();
   const stars = [];
   for (let i = Math.max(1, d.lv - 4); i < d.lv; i++) stars.push('<span class="pz-past">' + i + "：" + "★".repeat(d.stars[i] || 0) + "</span>");
   $("#pzLobby").innerHTML =
@@ -3002,23 +3190,32 @@ function pzRenderLobby() {
     '<p class="sub">※ パズルでは GOLDは 増えません。GOLDが 増えるのは そろばんの れんしゅうと ランキングの ごほうびだけ。</p>';
   $$("#pzLobby .pz-buy").forEach((b) => {
     b.onclick = () => {
-      const it = PZ_ITEMS.find((i) => i.id === b.dataset.it);
-      const cur = Object.keys(pzBuy).reduce((a, k) => a + (pzBuy[k] || 0) * (PZ_ITEMS.find((i) => i.id === k) || {}).cost, 0);
+      const it = PZ_ITEMS.find((i) => i.id === b.dataset.it), rec = pzLoad();
+      const stock = (rec.items && rec.items[it.id]) || 0;
+      const used = pzBuy[it.id] || 0;
+      if (used < stock) { pzBuy[it.id] = used + 1; return pzRenderLobby(); }   // もらった分は タダ
+      const cur = pzBuyCost();
       if (getGold() < PZ_PLAY_COST + cur + it.cost) return pzMsg("GOLDが たりないよ", "ng");
-      pzBuy[it.id] = Math.min(3, (pzBuy[it.id] || 0) + 1);
+      pzBuy[it.id] = Math.min(3, used + 1);
       pzRenderLobby();
     };
   });
   const go = $("#pzGo");
   if (go) go.onclick = () => {
-    const cost = PZ_PLAY_COST + Object.keys(pzBuy).reduce((a, k) => a + (pzBuy[k] || 0) * (PZ_ITEMS.find((i) => i.id === k) || {}).cost, 0);
+    const cost = PZ_PLAY_COST + pzBuyCost();
     if (getGold() < cost) return pzMsg("GOLDが たりないよ", "ng");
     addGold(-cost);
+    const rec = pzLoad(); rec.items = rec.items || {};
     const list = [];
-    Object.keys(pzBuy).forEach((k) => { for (let i = 0; i < (pzBuy[k] || 0); i++) list.push(k); });
+    Object.keys(pzBuy).forEach((k) => {
+      const used = pzBuy[k] || 0;
+      const take = Math.min(used, rec.items[k] || 0);
+      rec.items[k] = (rec.items[k] || 0) - take;                 // もらった分から先に つかう
+      for (let i = 0; i < used; i++) list.push(k);
+    });
+    rec.plays = (rec.plays || 0) + 1; pzSave(rec);
     pzStart(pzLoad().lv, list);
     pzBuy = {};
-    const rec = pzLoad(); rec.plays = (rec.plays || 0) + 1; pzSave(rec);
     renderPuzzle();
   };
 }
