@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-36"; // 最新反映の確認用
+const BUILD = "2026-09-05-37"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2517,8 +2517,9 @@ const PZ_KINDS = [
 ];
 // アイテム（GOLDで買って、はじめから盤に置く）
 const PZ_ITEMS = [
-  { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "たて か よこ を 1れつ 消す" },
-  { id: "bomb", n: "ばくだん", em: "💣", cost: 60, tip: "まわり 3×3 を 消す" },
+  { id: "rocket", n: "ロケット", em: "🚀", sp: "rh", cost: 40, tip: "たて か よこ を 1れつ 消す" },
+  { id: "prop", n: "プロペラ", em: "🚁", sp: "prop", cost: 50, tip: "ねらいの 玉へ とんでいく" },
+  { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: "まわり 3×3 を ばくはつ" },
 ];
 // レベル（目あて と 手数）。だんだん むずかしくなる
 function pzLevel(n) {
@@ -2544,21 +2545,23 @@ function pzMakeBoard(kinds) {
     const bad = {};
     if (x >= 2 && c[pzIdx(x - 1, y)].k === c[pzIdx(x - 2, y)].k) bad[c[pzIdx(x - 1, y)].k] = 1;
     if (y >= 2 && c[pzIdx(x, y - 1)].k === c[pzIdx(x, y - 2)].k) bad[c[pzIdx(x, y - 1)].k] = 1;
+    // 2×2 の四角も 作らない（置いたそばから 消えてしまうため）
+    if (x >= 1 && y >= 1 && c[pzIdx(x - 1, y)].k === c[pzIdx(x - 1, y - 1)].k && c[pzIdx(x - 1, y)].k === c[pzIdx(x, y - 1)].k) bad[c[pzIdx(x - 1, y)].k] = 1;
     const ok = [];
     for (let i = 0; i < kinds; i++) if (!bad[PZ_KINDS[i].k]) ok.push(PZ_KINDS[i].k);
     c[pzIdx(x, y)] = pzNewTile(ok[Math.floor(Math.random() * ok.length)]);
   }
   return c;
 }
-/* ---- そろっている所をさがす（たて・よこ 3つ以上） ---- */
-function pzFindMatches(c) {
-  const hit = new Set(), runs = [];
+/* ---- そろっている所をさがす（たて・よこ3つ以上、および 2×2の四角） ---- */
+function pzRuns(c) {
+  const runs = [], sq = [];
   for (let y = 0; y < PZ_H; y++) {
     let s = 0;
     for (let x = 1; x <= PZ_W; x++) {
       const same = x < PZ_W && c[pzIdx(x, y)] && c[pzIdx(s, y)] && c[pzIdx(x, y)].k === c[pzIdx(s, y)].k;
       if (!same) {
-        if (x - s >= 3) { runs.push({ dir: "h", x: s, y: y, len: x - s, k: c[pzIdx(s, y)].k }); for (let i = s; i < x; i++) hit.add(pzIdx(i, y)); }
+        if (x - s >= 3) { const cells = []; for (let i = s; i < x; i++) cells.push(pzIdx(i, y)); runs.push({ dir: "h", len: x - s, k: c[pzIdx(s, y)].k, cells: cells }); }
         s = x;
       }
     }
@@ -2568,38 +2571,148 @@ function pzFindMatches(c) {
     for (let y = 1; y <= PZ_H; y++) {
       const same = y < PZ_H && c[pzIdx(x, y)] && c[pzIdx(x, s)] && c[pzIdx(x, y)].k === c[pzIdx(x, s)].k;
       if (!same) {
-        if (y - s >= 3) { runs.push({ dir: "v", x: x, y: s, len: y - s, k: c[pzIdx(x, s)].k }); for (let i = s; i < y; i++) hit.add(pzIdx(x, i)); }
+        if (y - s >= 3) { const cells = []; for (let i = s; i < y; i++) cells.push(pzIdx(x, i)); runs.push({ dir: "v", len: y - s, k: c[pzIdx(x, s)].k, cells: cells }); }
         s = y;
       }
     }
   }
-  return { hit, runs };
+  // 2×2の四角（プロペラのもと）
+  for (let y = 0; y + 1 < PZ_H; y++) for (let x = 0; x + 1 < PZ_W; x++) {
+    const a = c[pzIdx(x, y)], b = c[pzIdx(x + 1, y)], d = c[pzIdx(x, y + 1)], e = c[pzIdx(x + 1, y + 1)];
+    if (a && b && d && e && a.k === b.k && a.k === d.k && a.k === e.k)
+      sq.push({ dir: "sq", len: 4, k: a.k, cells: [pzIdx(x, y), pzIdx(x + 1, y), pzIdx(x, y + 1), pzIdx(x + 1, y + 1)] });
+  }
+  return runs.concat(sq);
 }
-/* ---- アイテムを使ったときに消えるマス ---- */
-function pzBlast(c, i, out, fired) {
-  fired = fired || new Set();
-  const t = c[i]; if (!t || !t.sp || fired.has(i)) return;
+function pzFindMatches(c) {
+  const all = pzRuns(c), hit = new Set();
+  all.forEach((r) => r.cells.forEach((i) => hit.add(i)));
+  return { hit: hit, runs: all };
+}
+/* つながっている並びを ひとかたまりにして、どの特殊ピースが生まれるか決める
+   ・たて と よこ が交わる（T字・L字）→ TNT
+   ・まっすぐ5つ以上           → 光の玉
+   ・まっすぐ4つ               → ロケット（並びと同じ向き）
+   ・2×2の四角                 → プロペラ                             */
+function pzGroups(c, swapAt) {
+  const runs = pzRuns(c);
+  if (!runs.length) return [];
+  const used = runs.map(() => false), groups = [];
+  for (let i = 0; i < runs.length; i++) {
+    if (used[i]) continue;
+    const g = [i]; used[i] = true;
+    const cells = new Set(runs[i].cells);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (let j = 0; j < runs.length; j++) {
+        if (used[j] || runs[j].k !== runs[i].k) continue;
+        if (runs[j].cells.some((x) => cells.has(x))) { used[j] = true; g.push(j); runs[j].cells.forEach((x) => cells.add(x)); grew = true; }
+      }
+    }
+    const parts = g.map((x) => runs[x]);
+    const hasH = parts.some((p) => p.dir === "h"), hasV = parts.some((p) => p.dir === "v");
+    const maxLen = Math.max.apply(null, parts.map((p) => p.len));
+    const line = parts.filter((p) => p.dir !== "sq").sort((a, b) => b.len - a.len)[0];
+    let sp = null, at = null;
+    if (hasH && hasV) {                                   // T字・L字
+      sp = "tnt";
+      const h = parts.find((p) => p.dir === "h"), v = parts.find((p) => p.dir === "v");
+      at = h.cells.find((x) => v.cells.indexOf(x) >= 0);
+    } else if (line && line.len >= 5) { sp = "disco"; at = line.cells[(line.len / 2) | 0]; }
+    else if (line && line.len === 4) { sp = line.dir === "h" ? "rh" : "rv"; at = line.cells[1]; }
+    else if (!line && parts.some((p) => p.dir === "sq")) { sp = "prop"; at = parts[0].cells[0]; }
+    if (sp && swapAt != null && cells.has(swapAt)) at = swapAt;      // 動かした玉の場所に生まれる
+    groups.push({ k: runs[i].k, cells: Array.from(cells), sp: sp, at: at, size: cells.size });
+  }
+  return groups;
+}
+/* ---- 特殊ピースの効きめ ---- */
+function pzTargetsOf(c, kind) {
+  const list = [];
+  for (let i = 0; i < c.length; i++) if (c[i] && c[i].k === kind) list.push(i);
+  return list;
+}
+function pzBlast(c, i, out, fired, opt) {
+  fired = fired || new Set(); opt = opt || {};
+  const t = c[i]; if (!t || (!t.sp && !opt.force) || fired.has(i)) return;
   fired.add(i); out.add(i);
   const x = i % PZ_W, y = Math.floor(i / PZ_W);
-  // 巻きこまれたアイテムも つづけて発動する（連鎖）
-  const add = (j) => { if (j == null || !c[j]) return; out.add(j); if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired); };
-  if (t.sp === "rh") for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y));
-  else if (t.sp === "rv") for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k));
-  else if (t.sp === "bomb") for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (pzIn(x + dx, y + dy)) add(pzIdx(x + dx, y + dy));
+  const add = (j) => { if (j == null || j < 0 || j >= c.length || !c[j]) return; out.add(j); if (c[j].sp && !fired.has(j)) pzBlast(c, j, out, fired, {}); };
+  const sp = opt.as || t.sp;
+  if (sp === "rh") for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y));
+  else if (sp === "rv") for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k));
+  else if (sp === "tnt") { const r = opt.big ? 2 : 1; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (pzIn(x + dx, y + dy)) add(pzIdx(x + dx, y + dy)); }
+  else if (sp === "cross") { for (let k = 0; k < PZ_W; k++) add(pzIdx(k, y)); for (let k = 0; k < PZ_H; k++) add(pzIdx(x, k)); }
+  else if (sp === "prop") {
+    const n = opt.count || 1;
+    for (let p = 0; p < n; p++) {
+      const want = pzTargetsOf(c, opt.aim || (pz && pz.lv ? pz.lv.target : null)).filter((j) => !out.has(j));
+      const pool = want.length ? want : c.map((v, j) => j).filter((j) => c[j] && !out.has(j));
+      if (!pool.length) break;
+      const j = pool[Math.floor(Math.random() * pool.length)];
+      add(j);
+      const jx = j % PZ_W, jy = (j / PZ_W) | 0;                       // 着地のまわりも すこし
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach((d) => { if (pzIn(jx + d[0], jy + d[1])) add(pzIdx(jx + d[0], jy + d[1])); });
+    }
+  }
+  else if (sp === "disco") {
+    const kind = opt.color || (function () {
+      const cnt = {}; c.forEach((v) => { if (v && !v.sp) cnt[v.k] = (cnt[v.k] || 0) + 1; });
+      return Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    })();
+    for (let j = 0; j < c.length; j++) if (c[j] && c[j].k === kind) add(j);
+  }
 }
-/* ---- 消す → 上から落ちてくる → 空きを埋める（1回ぶん） ---- */
+/* ---- 特殊ピース同士を入れかえたとき（コンボ） ---- */
+function pzCombo(c, a, b, out) {
+  const A = c[a], B = c[b];
+  if (!A || !B) return false;
+  const sa = A.sp, sb = B.sp;
+  if (!sa && !sb) return false;
+  const isR = (s) => s === "rh" || s === "rv";
+  const fired = new Set();
+  if (sa === "disco" && sb === "disco") { for (let j = 0; j < c.length; j++) out.add(j); return "全部 消えた！"; }
+  if (sa === "disco" || sb === "disco") {
+    const other = sa === "disco" ? B : A, at = sa === "disco" ? a : b;
+    if (other.sp) {                                   // 光の玉 × 特殊 → 同じ色が ぜんぶ その特殊になって 一斉発動
+      const kind = other.k;
+      const list = pzTargetsOf(c, kind);
+      out.add(at); out.add(sa === "disco" ? b : a);
+      list.forEach((j) => { if (c[j]) pzBlast(c, j, out, fired, { as: other.sp, force: true }); });
+      return "光の玉 × " + (other.sp === "tnt" ? "TNT" : other.sp === "prop" ? "プロペラ" : "ロケット") + "！";
+    }
+    pzBlast(c, at, out, fired, { as: "disco", color: other.k });      // 光の玉 × ふつう → その色 ぜんぶ
+    out.add(sa === "disco" ? b : a);
+    return "同じ色を ぜんぶ 消した！";
+  }
+  if (isR(sa) && isR(sb)) { pzBlast(c, b, out, fired, { as: "cross", force: true }); out.add(a); return "ロケット × ロケット！"; }
+  if (sa === "tnt" && sb === "tnt") { pzBlast(c, b, out, fired, { as: "tnt", big: true, force: true }); out.add(a); return "TNT × TNT！"; }
+  if (sa === "prop" && sb === "prop") { pzBlast(c, b, out, fired, { as: "prop", count: 3, force: true }); out.add(a); return "プロペラが 3機！"; }
+  if ((isR(sa) && sb === "tnt") || (sa === "tnt" && isR(sb))) {        // ロケット × TNT → 3れつ ＋ 3ぎょう
+    const x = b % PZ_W, y = (b / PZ_W) | 0;
+    for (let d = -1; d <= 1; d++) {
+      for (let k = 0; k < PZ_W; k++) if (pzIn(k, y + d)) out.add(pzIdx(k, y + d));
+      for (let k = 0; k < PZ_H; k++) if (pzIn(x + d, k)) out.add(pzIdx(x + d, k));
+    }
+    out.add(a);
+    return "ロケット × TNT！";
+  }
+  // 片方だけ特殊 → ふつうに発動
+  [a, b].forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, out, fired, {}); });
+  return true;
+}
 // 消える所と 生まれるアイテムを 調べるだけ（まだ盤は変えない＝アニメーションのため）
 function pzCollect(c, swapAt) {
-  const { hit, runs } = pzFindMatches(c);
-  if (!hit.size) return null;
-  const gone = new Set(hit);
-  hit.forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, gone); });   // 巻きこまれたアイテムも発動
-  const made = [];
-  runs.forEach((r) => {
-    if (r.len < 4) return;
-    const at = swapAt != null && gone.has(swapAt) ? swapAt : pzIdx(r.dir === "h" ? r.x + ((r.len / 2) | 0) : r.x, r.dir === "h" ? r.y : r.y + ((r.len / 2) | 0));
-    made.push({ at: at, sp: r.len >= 5 ? "bomb" : (r.dir === "h" ? "rv" : "rh"), k: r.k });
+  const groups = pzGroups(c, swapAt);
+  if (!groups.length) return null;
+  const gone = new Set(), made = [];
+  groups.forEach((g) => {
+    g.cells.forEach((i) => gone.add(i));
+    if (g.sp) made.push({ at: g.at, sp: g.sp, k: g.k });
   });
+  const fired = new Set();
+  Array.from(gone).forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, gone, fired, {}); });   // 巻きこまれた特殊も発動
   const counts = {};
   gone.forEach((i) => { if (c[i]) counts[c[i].k] = (counts[c[i].k] || 0) + 1; });
   return { gone: gone, made: made, counts: counts, big: gone.size >= 6 };
@@ -2640,7 +2753,11 @@ function pzStart(lvNo, items) {
   (items || []).forEach(function (it) {
     for (let t = 0; t < 60; t++) {
       const i = Math.floor(Math.random() * PZ_W * PZ_H);
-      if (cells[i] && !cells[i].sp) { cells[i].sp = it === "bomb" ? "bomb" : (Math.random() < 0.5 ? "rh" : "rv"); break; }
+      if (cells[i] && !cells[i].sp) {
+        const d = PZ_ITEMS.find((q) => q.id === it);
+        cells[i].sp = d ? (d.sp === "rh" ? (Math.random() < 0.5 ? "rh" : "rv") : d.sp) : "rh";
+        break;
+      }
     }
   });
   pz = { cells: cells, lv: lv, moves: lv.moves, got: 0, sel: -1, busy: false, done: false, combo: 0 };
@@ -2659,8 +2776,9 @@ function pzBeginSwap(a, b) {
 // ② アイテムを直接動かしたときは その場で発動
 function pzFireSpecials(a, b) {
   const gone = new Set();
-  [a, b].forEach((i) => { if (pz.cells[i] && pz.cells[i].sp) pzBlast(pz.cells, i, gone); });
+  const label = pzCombo(pz.cells, a, b, gone);
   if (!gone.size) return null;
+  pz.comboText = typeof label === "string" ? label : "";
   let got = 0;
   gone.forEach((i) => { if (pz.cells[i] && pz.cells[i].k === pz.lv.target) got++; });
   const list = Array.from(gone);
@@ -2716,9 +2834,11 @@ let pzBuy = {};                 // 買ったアイテム { rocket:1, bomb:0 }
 let pzNodes = {};               // 玉のid → 画面の要素
 const pzWait = (ms) => new Promise((r) => setTimeout(r, ms));
 const pzKind = (k) => PZ_KINDS.find((x) => x.k === k) || PZ_KINDS[0];
+const PZ_SP_ICON = { rh: "🚀", rv: "🚀", tnt: "💣", prop: "🚁", disco: "✨" };
 function pzFaceHTML(t) {
   const face = t.k === "bead" ? '<i class="pz-bead"></i>' : '<i class="pz-mark">' + pzKind(t.k).s + "</i>";
-  const sp = t.sp === "bomb" ? '<b class="pz-sp">💣</b>' : t.sp ? '<b class="pz-sp' + (t.sp === "rv" ? " pz-v" : "") + '">🚀</b>' : "";
+  if (t.sp === "disco") return '<i class="pz-disco"></i>';                       // 光の玉は 色を持たない見た目
+  const sp = t.sp ? '<b class="pz-sp sp-' + t.sp + '">' + (PZ_SP_ICON[t.sp] || "") + "</b>" : "";
   return face + sp;
 }
 /* 盤面を いまの状態に合わせる。位置だけ変えるので CSS が動きを付けてくれる */
@@ -2732,7 +2852,7 @@ function pzSync(instant) {
     let n = pzNodes[t.id];
     if (!n) {
       n = document.createElement("div");
-      n.className = "pz-t k-" + t.k + (t.sp ? " sp" : "");
+      n.className = "pz-t k-" + t.k + (t.sp ? " sp sp-" + t.sp : "");
       n.innerHTML = pzFaceHTML(t);
       n.style.setProperty("--x", x);
       n.style.setProperty("--y", instant ? y : y - PZ_H);   // 上から 落ちてくる
@@ -2742,7 +2862,7 @@ function pzSync(instant) {
     } else {
       n.style.setProperty("--x", x);
       n.style.setProperty("--y", y);
-      if (t.sp && !n.classList.contains("sp")) { n.classList.add("sp", "born"); n.innerHTML = pzFaceHTML(t); }
+      if (t.sp && !n.classList.contains("sp")) { n.classList.add("sp", "sp-" + t.sp, "born"); n.innerHTML = pzFaceHTML(t); }
     }
     n.dataset.i = i;
     n.classList.toggle("sel", pz.sel === i);
@@ -2811,6 +2931,7 @@ async function pzTry(a, b) {
   await pzWait(150);
   const f = pzFireSpecials(a, b);
   if (f) {
+    if (pz.comboText) pzMsg(pz.comboText, "ok");
     pzShake(true);
     try { bigFanfareSnd(); } catch (e) { }
     pzSync(); pzRenderHud();
