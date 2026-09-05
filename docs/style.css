@@ -896,3 +896,11 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .seg button:last-child { border-right: none; }
 .seg button.on { background: linear-gradient(180deg, var(--navy-hi), var(--navy)); color: #fff; }
 .field { display: block; margin: 10px 0; font-size: 15px; }
+
+/* ---- 上のバーの 音量ボタン（GOLDのとなり） ---- */
+.vol-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--card);
+  border: 1px solid var(--line); border-radius: 20px; padding: 3px 8px 3px 12px; }
+.vol-pill > b { font-size: 15px; line-height: 1; }
+.seg.sm { border-width: 1px; margin-left: 0; }
+.seg.sm button { padding: 4px 9px; font-size: 12px; border-right-width: 1px; }
+@media (max-width: 700px) { .vol-pill > b { font-size: 13px; } .seg.sm button { padding: 4px 7px; font-size: 11px; } }

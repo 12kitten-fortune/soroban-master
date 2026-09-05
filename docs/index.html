@@ -41,7 +41,8 @@
           <h2 id="pageTitle">級・段を選ぶ</h2>
           <div class="topbar-right">
             <span id="goldPill" class="pill gold"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>0</b></span>
-            <button id="soundToggle" class="pill">🔊 音あり</button>
+            <span class="vol-pill" title="効果音の音量"><b>🔊</b><span class="seg sm vol-seg" data-kind="sfx"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></span></span>
+            <span class="vol-pill" title="BGMの音量"><b>🎵</b><span class="seg sm vol-seg" data-kind="bgm"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></span></span>
             <button id="examInfoBtn" class="pill">🎓 検定内容について</button>
             <div class="avatar-mini"><span id="avatarMini">🧒</span><div><b id="nameMini">そろ太くん</b><br><small id="rankMini">未取得</small></div></div>
           </div>
@@ -380,13 +381,13 @@
           </div>
           <div class="card">
             <h3>🔊 音</h3>
-            <label class="toggle"><input type="checkbox" id="sndToggle2" /> 効果音を鳴らす</label>
-            <div class="field">🎵 BGMの音量
-              <div class="seg" id="bgmSeg">
-                <button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button>
-              </div>
+            <div class="field">🔊 効果音の音量
+              <div class="seg vol-seg" data-kind="sfx"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></div>
             </div>
-            <label class="field">効果音の音量 <input type="range" id="volRange" min="0" max="100" step="5" /></label>
+            <div class="field">🎵 BGMの音量
+              <div class="seg vol-seg" data-kind="bgm"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></div>
+            </div>
+            <p class="sub">画面いちばん上の GOLD のとなりでも 調整できます。</p>
             <p class="sub" id="bgmSongs"></p>
             <p class="sub" id="sfxNote"></p>
             <p class="sub">音の出どころ：効果音は <b>効果音ラボ</b>、BGMは <b>魔王魂</b>（どちらも 商用利用OK）</p>

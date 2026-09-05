@@ -401,7 +401,25 @@ let bgmLevel = (function () { const v = parseInt(localStorage.getItem(BGML_KEY),
 let bgmOn = bgmLevel > 0;
 let bgmEl = null, bgmName = "";
 const bgmCache = {};        // よみこんだ曲を とっておく入れもの
-sfxVol = (function () { const v = parseFloat(localStorage.getItem(VOL_KEY)); return isFinite(v) ? v : 0.8; })();
+// 効果音の音量：0=切 1=小 2=中 3=大
+const SFX_STEPS = [0, 0.35, 0.7, 1.0];
+let sfxLevel = (function () { const v = parseInt(localStorage.getItem(VOL_KEY), 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 2; })();
+sfxVol = SFX_STEPS[sfxLevel];
+function setSfxLevel(n) {
+  sfxLevel = Math.max(0, Math.min(3, n | 0));
+  sfxVol = SFX_STEPS[sfxLevel];
+  soundOn = sfxLevel > 0;
+  try { localStorage.setItem(VOL_KEY, String(sfxLevel)); localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); } catch (e) { }
+  if (!soundOn) bgmStop(); else { sfxPreload(); }
+  renderVolSegs();
+}
+// 上のバーと 設定画面、どちらのボタンも 同じ状態にする
+function renderVolSegs() {
+  $$(".vol-seg").forEach(function (seg) {
+    const lv = seg.dataset.kind === "bgm" ? bgmLevel : sfxLevel;
+    seg.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", +b.dataset.lv === lv); });
+  });
+}
 function bgmPlay(name) {
   if (!bgmOn || !soundOn) return bgmStop();
   if (bgmName === name && bgmEl) return;
@@ -448,7 +466,7 @@ function setBgmLevel(n) {
   else if (bgmEl) bgmEl.volume = BGM_STEPS[bgmLevel];
   else { sfxPreload(); bgmPlay(bgmName || "bgm_study"); }
 }
-function setVol(v) { sfxVol = Math.max(0, Math.min(1, v)); localStorage.setItem(VOL_KEY, String(sfxVol)); }
+
 /* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
 const BGM_LIST = [
   { f: "bgm1", n: "ファンタジー1" },
@@ -631,25 +649,15 @@ $("#examInfoBtn").addEventListener("click", () => showView("lesson"));
 $("#startBtn").addEventListener("click", () => startSession(subject));
 $("#quitBtn").addEventListener("click", quitSession);
 // 効果音のON/OFF
-function renderSound() { $("#soundToggle").textContent = soundOn ? "🔊 音あり" : "🔇 音なし"; }
-(function () {
-  const a = $("#sndToggle2"), v = $("#volRange");
-  if (!a) return;
-  a.addEventListener("change", function () {
-    soundOn = a.checked; localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off"); renderSound();
-    if (!soundOn) bgmStop(); else { sfxPreload(); bgmPlay("bgm_study"); }
-  });
-  $$("#bgmSeg button").forEach(function (b) {
-    b.addEventListener("click", function () { setBgmLevel(+b.dataset.lv); renderSound2(); });
-  });
-  v.addEventListener("input", function () { setVol(+v.value / 100); });
-  v.addEventListener("change", function () { sfx("coin", function () { coinSnd(0); }); });
-})();
-$("#soundToggle").addEventListener("click", () => {
-  soundOn = !soundOn;
-  localStorage.setItem(SOUND_KEY, soundOn ? "on" : "off");
-  renderSound();
-  if (soundOn) clickSnd(); // ONにしたら確認音
+function renderSound() { renderVolSegs(); }
+
+// 上のバー・設定画面の どちらのボタンでも 音量を変えられる
+document.addEventListener("click", function (e) {
+  const b = e.target.closest ? e.target.closest(".vol-seg button") : null;
+  if (!b) return;
+  const kind = b.parentNode.dataset.kind, lv = +b.dataset.lv;
+  if (kind === "bgm") { setBgmLevel(lv); renderVolSegs(); }
+  else { setSfxLevel(lv); if (lv > 0) sfx("click", function () { clickSnd(); }); }
 });
 
 /* ---------- グリッド ---------- */
@@ -829,21 +837,15 @@ $("#todayStart").addEventListener("click", () => startRoutine(GRADES[+$("#todayG
 const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
 // 音の設定（効果音・BGM・音量）
 function renderSound2() {
-  const a = $("#sndToggle2"), v = $("#volRange"), n = $("#sfxNote");
-  if (!a) return;
-  a.checked = soundOn; v.value = Math.round(sfxVol * 100);
-  $$("#bgmSeg button").forEach(function (b) { b.classList.toggle("on", +b.dataset.lv === bgmLevel); });
-  const have = Object.keys(sfxBuf).length;
+  renderVolSegs();
+  const n = $("#sfxNote"), songs = $("#bgmSongs");
   const cur = bgmName ? (BGM_LIST.find((b) => b.f === bgmName) || {}).n : null;
-  const songs = $("#bgmSongs");
   if (songs) {
     songs.innerHTML = "パズルの曲は ステージごとに 入れかわります（" + BGM_LIST.length + "曲）：" +
-      BGM_LIST.map(function (b, i) { return (b.f === bgmName ? "<b>♪" + b.n + "</b>" : b.n); }).join("　→　") +
+      BGM_LIST.map(function (b) { return (b.f === bgmName ? "<b>♪" + b.n + "</b>" : b.n); }).join("　→　") +
       (cur ? "<br>いま流れているのは <b>" + cur + "</b>" : "");
   }
-  n.innerHTML = have
-    ? "音の材料を " + have + " 個 よみこみ ました。"
-    : "いまは アプリが その場で音を作っています。<b>assets/sfx/</b> に mp3 を置くと、そちらが鳴ります（correct / wrong / clear / coin / pop / rocket / levelup / star / bgm_study / bgm_puzzle）。";
+  if (n) n.innerHTML = "音の材料を " + Object.keys(sfxBuf).length + " 個 よみこみました。";
 }
 function renderSettings() {
   renderSound2();
