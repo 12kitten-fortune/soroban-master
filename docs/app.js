@@ -471,16 +471,33 @@ function setBgmLevel(n) {
 const BGM_LIST = [
   { f: "bgm1", n: "ファンタジー1" },
   { f: "bgm2", n: "ファンタジー2" },
+  { f: "bgm3", n: "アコースティック1" },
+  { f: "bgm4", n: "アコースティック2" },
   { f: "bgm_study", n: "ピアノ" },
 ];
-function bgmForStage(lv) { return BGM_LIST[(Math.max(1, lv | 0) - 1) % BGM_LIST.length]; }
+const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
+let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm_study";      // メインの曲（設定で えらべる）
+const bgmName2 = (f) => (BGM_LIST.find((b) => b.f === f) || {}).n || f;
+function setBgmMain(f) {
+  bgmMain = f;
+  try { localStorage.setItem(MAIN_KEY, f); } catch (e) { }
+  bgmStop(); bgmPlay(f);
+}
+/* ステージが始まるたびに 曲を送る。
+   メインの曲を 1回おきに挟むので、メインが いちばん多くかかりつつ 毎回ちがう曲になる。 */
+function bgmNextStage() {
+  let t = parseInt(localStorage.getItem(TURN_KEY), 10); if (!isFinite(t)) t = 0;
+  t++;
+  try { localStorage.setItem(TURN_KEY, String(t)); } catch (e) { }
+  if (t % 2 === 1) return bgmMain;                                  // 奇数回は メインの曲
+  const others = BGM_LIST.filter((b) => b.f !== bgmMain);
+  if (!others.length) return bgmMain;
+  return others[((t / 2 | 0) - 1 + others.length) % others.length].f;
+}
 // 画面に合わせて BGM を切りかえる
-function bgmForView(v) {
-  if (v === "puzzle") {
-    let lv = 1;
-    try { lv = (pz && pz.lv ? pz.lv.n : pzLoad().lv) || 1; } catch (e) { }
-    bgmPlay(bgmForStage(lv).f);
-  } else if (v === "play" || v === "today") bgmPlay("bgm_study");   // 練習中は 落ちついたピアノ
+function bgmForView(v, next) {
+  if (v === "puzzle") bgmPlay(next ? bgmNextStage() : (bgmName || bgmMain));
+  else if (v === "play" || v === "today") bgmPlay(bgmMain);         // 練習中は メインの曲
   else bgmStop();
 }
 
@@ -838,15 +855,29 @@ const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", 
 // 音の設定（効果音・BGM・音量）
 function renderSound2() {
   renderVolSegs();
-  const n = $("#sfxNote"), songs = $("#bgmSongs");
-  const cur = bgmName ? (BGM_LIST.find((b) => b.f === bgmName) || {}).n : null;
+  const songs = $("#bgmSongs"), n = $("#sfxNote");
   if (songs) {
-    songs.innerHTML = "パズルの曲は ステージごとに 入れかわります（" + BGM_LIST.length + "曲）：" +
-      BGM_LIST.map(function (b) { return (b.f === bgmName ? "<b>♪" + b.n + "</b>" : b.n); }).join("　→　") +
-      (cur ? "<br>いま流れているのは <b>" + cur + "</b>" : "");
+    songs.innerHTML = BGM_LIST.map(function (b) {
+      const main = b.f === bgmMain, now = b.f === bgmName;
+      return '<div class="song' + (main ? " main" : "") + '">' +
+        '<button class="song-play" data-f="' + b.f + '">▶</button>' +
+        '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + "</span>" +
+        (main ? '<span class="song-badge">メイン</span>'
+          : '<button class="song-main" data-f="' + b.f + '">メインにする</button>') +
+        "</div>";
+    }).join("");
   }
-  if (n) n.innerHTML = "音の材料を " + Object.keys(sfxBuf).length + " 個 よみこみました。";
+  if (n) n.innerHTML = "メインの曲は 練習中に流れ、パズルでは 1ステージおきに かかります。" +
+    "ほかの曲は ステージごとに 順ぐりで 入れかわります。";
 }
+// 曲を ためし聞き／メインに する
+document.addEventListener("click", function (e) {
+  if (!e.target.closest) return;
+  const p = e.target.closest(".song-play");
+  if (p) { bgmStop(); bgmPlay(p.dataset.f); renderSound2(); return; }
+  const m = e.target.closest(".song-main");
+  if (m) { setBgmMain(m.dataset.f); renderSound2(); }
+});
 function renderSettings() {
   renderSound2();
   const p = profile();
@@ -3968,7 +3999,7 @@ function renderPuzzle() {
     pzRenderLobby();
   } else {
     lob.classList.add("hidden"); brd.classList.remove("hidden");
-    bgmForView("puzzle");                      // ステージに合わせて 曲を変える
+    bgmForView("puzzle", true);                // ステージごとに 曲を送る
     pzArmed = null;
     pzResetBoard(); pzRenderHud(); pzRenderTools();
     pzTipFor(pz.lv);

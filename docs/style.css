@@ -904,3 +904,14 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .seg.sm { border-width: 1px; margin-left: 0; }
 .seg.sm button { padding: 4px 9px; font-size: 12px; border-right-width: 1px; }
 @media (max-width: 700px) { .vol-pill > b { font-size: 13px; } .seg.sm button { padding: 4px 7px; font-size: 11px; } }
+
+/* ---- 曲えらび（設定画面） ---- */
+.song { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 2px solid var(--line);
+  border-radius: 12px; margin: 6px 0; background: #fff; }
+.song.main { border-color: var(--royal-gold); background: #fffaf0; }
+.song-play { width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 15px; background: var(--navy); }
+.song-n { flex: 1; font-weight: 700; font-size: 15px; color: #2b2b2b; }
+.song-n small { color: var(--ok); font-weight: 400; }
+.song-badge { font-size: 12px; font-weight: 800; color: #7a5a12; background: #ffe9a8;
+  border: 1px solid var(--royal-gold); border-radius: 999px; padding: 3px 12px; }
+.song-main { font-size: 12px; padding: 6px 12px; background: transparent; color: var(--frame); border: 1px solid var(--line); }
