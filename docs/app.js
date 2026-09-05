@@ -416,10 +416,20 @@ function setBgmLevel(n) {
   else { sfxPreload(); bgmPlay(bgmName || "bgm_study"); }
 }
 function setVol(v) { sfxVol = Math.max(0, Math.min(1, v)); localStorage.setItem(VOL_KEY, String(sfxVol)); }
+/* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
+const BGM_LIST = [
+  { f: "bgm1", n: "ファンタジー1" },
+  { f: "bgm2", n: "ファンタジー2" },
+  { f: "bgm_study", n: "ピアノ" },
+];
+function bgmForStage(lv) { return BGM_LIST[(Math.max(1, lv | 0) - 1) % BGM_LIST.length]; }
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v) {
-  if (v === "puzzle") bgmPlay("bgm_puzzle");
-  else if (v === "play" || v === "today") bgmPlay("bgm_study");
+  if (v === "puzzle") {
+    let lv = 1;
+    try { lv = (pz && pz.lv ? pz.lv.n : pzLoad().lv) || 1; } catch (e) { }
+    bgmPlay(bgmForStage(lv).f);
+  } else if (v === "play" || v === "today") bgmPlay("bgm_study");   // 練習中は 落ちついたピアノ
   else bgmStop();
 }
 
@@ -790,6 +800,13 @@ function renderSound2() {
   a.checked = soundOn; v.value = Math.round(sfxVol * 100);
   $$("#bgmSeg button").forEach(function (b) { b.classList.toggle("on", +b.dataset.lv === bgmLevel); });
   const have = Object.keys(sfxBuf).length;
+  const cur = bgmName ? (BGM_LIST.find((b) => b.f === bgmName) || {}).n : null;
+  const songs = $("#bgmSongs");
+  if (songs) {
+    songs.innerHTML = "パズルの曲は ステージごとに 入れかわります（" + BGM_LIST.length + "曲）：" +
+      BGM_LIST.map(function (b, i) { return (b.f === bgmName ? "<b>♪" + b.n + "</b>" : b.n); }).join("　→　") +
+      (cur ? "<br>いま流れているのは <b>" + cur + "</b>" : "");
+  }
   n.innerHTML = have
     ? "音の材料を " + have + " 個 よみこみ ました。"
     : "いまは アプリが その場で音を作っています。<b>assets/sfx/</b> に mp3 を置くと、そちらが鳴ります（correct / wrong / clear / coin / pop / rocket / levelup / star / bgm_study / bgm_puzzle）。";
@@ -3887,6 +3904,7 @@ function renderPuzzle() {
     pzRenderLobby();
   } else {
     lob.classList.add("hidden"); brd.classList.remove("hidden");
+    bgmForView("puzzle");                      // ステージに合わせて 曲を変える
     pzArmed = null;
     pzResetBoard(); pzRenderHud(); pzRenderTools();
     pzTipFor(pz.lv);
