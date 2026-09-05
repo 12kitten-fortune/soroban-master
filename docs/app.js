@@ -253,9 +253,40 @@ function kingdomLevel() { try { if (!craft) craft = loadCraft(); return 1 + Math
 function gradeGoldMult(grade) {
   if (!grade) return 1;
   const i = GRADES.findIndex((x) => x.key === grade.key);
-  return i < 0 ? 1 : +(1 + i * 0.11).toFixed(2);
+  // 上の級ほど 1問に時間がかかるので、報酬も それに近づける（20級=1.0 … 五段=6.3）
+  return i < 0 ? 1 : +(1 + i * 0.22).toFixed(2);
 }
-function goldForSection({ correct, N, bestUpdated, completed, grade }) {
+/* ---- かんたんな級ばかり回して GOLDを稼ぐのを ふせぐ ----
+   ① 自分の級より下は 報酬が減る（合格ずみの級は 練習にはなるが 稼ぎにはならない）
+   ② 同じ級・同じ種目を その日に くり返すほど 減る
+   どちらも「ちょうどよい難しさを 少しずつ」に 報酬を寄せるための仕組み。 */
+const gradeIdxOf = (grade) => GRADES.findIndex((x) => x.key === (grade && grade.key));
+function fitMult(grade) {
+  const gi = gradeIdxOf(grade); if (gi < 0) return { m: 1, label: "" };
+  const aim = myRankIdx() + 1;                    // つぎに目指す級＝いまの適正
+  const d = gi - aim;
+  if (d >= 1) return { m: 1.2, label: "上の級に ちょうせん ×1.2" };
+  if (d === 0) return { m: 1, label: "" };
+  if (d === -1) return { m: 0.75, label: "合格ずみの級 ×0.75" };
+  if (d === -2) return { m: 0.5, label: "やさしい級 ×0.5" };
+  return { m: 0.15, label: "ずっと下の級 ×0.15" };
+}
+const DAILY_KEY = "soroban_daily";
+function dailyCount(key, add) {
+  let d = {};
+  try { d = JSON.parse(localStorage.getItem(DAILY_KEY) || "{}"); } catch (e) { }
+  if (d.d !== today()) d = { d: today(), c: {} };
+  d.c = d.c || {};
+  const n = d.c[key] || 0;
+  if (add) { d.c[key] = n + 1; try { localStorage.setItem(DAILY_KEY, JSON.stringify(d)); } catch (e) { } }
+  return n;
+}
+function repeatMult(subj, grade, count) {
+  const t = [1, 0.7, 0.5, 0.3];
+  const m = t[Math.min(count, t.length - 1)];
+  return { m: m, label: m < 1 ? "きょう " + (count + 1) + "回目 ×" + m : "" };
+}
+function goldForSection({ correct, N, bestUpdated, completed, grade, subj, count }) {
   let g = correct * 2; const lines = [`正解 ${correct}問 ＋${correct * 2}`];
   const acc = N ? correct / N : 0;
   if (acc >= 0.9) { g += 20; lines.push("高正答率(90%↑) ＋20"); }
@@ -264,7 +295,11 @@ function goldForSection({ correct, N, bestUpdated, completed, grade }) {
   if (completed) { g += 10; lines.push("完走 ＋10"); }
   const m = gradeGoldMult(grade);
   if (m > 1) { g = Math.round(g * m); lines.push(`${grade.key}ボーナス ×${m}`); }
-  return { g, lines };
+  const fit = fitMult(grade);
+  if (fit.m !== 1) { g = Math.round(g * fit.m); if (fit.label) lines.push(fit.label); }
+  const rep = repeatMult(subj, grade, count || 0);
+  if (rep.m !== 1) { g = Math.round(g * rep.m); if (rep.label) lines.push(rep.label); }
+  return { g: Math.max(1, g), lines };
 }
 // 1日1回の連続学習ボーナス（その日の最初の学習で付与）
 function dailyBonusOnce() {
@@ -1080,7 +1115,12 @@ function finishSession() {
   }
   msg += report;
   if (completed) { // GOLDは学習の成果としてのみ付与
-    const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed, grade: session.grade });
+    // 合格ずみの級は「級ごと」に数える（種目を変えて 回数をリセットできないように）
+    const below = gradeIdxOf(session.grade) <= myRankIdx();
+    const dkey = below ? session.grade.key + "_low" : session.grade.key + "_" + session.subj;
+    const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed,
+      grade: session.grade, subj: session.subj, count: dailyCount(dkey) });
+    dailyCount(dkey, true);
     let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
     addGold(earned);
     msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
@@ -1188,7 +1228,9 @@ function finishRoutineSection() {
   const el = playElapsed();
   routineState.sections.push({ label: session.label, subj: session.subj, correct: session.correct, N: session.N, sec: el, items: session.results });
   logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
-  const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true, grade: session.grade });
+  // 本日の練習は メニューどおりなので 反復のへらしは かけない（1日1回の想定）
+  const { g } = goldForSection({ correct: session.correct, N: session.N, bestUpdated: false, completed: true,
+    grade: session.grade, subj: session.subj, count: 0 });
   routineState.gold = (routineState.gold || 0) + g;
   correctSnd();
   session = null;
@@ -1247,7 +1289,10 @@ function finishRoutine() {
   const last = rs.sections[rs.sections.length - 1];
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  goldLines.push("🏁 本日の練習 やりきった ＋" + routineBonus);
+  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned + routineBonus} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  const routineBonus = Math.round(60 * gradeGoldMult(rs.grade));   // 本日の練習を やりきったごほうび
+  addGold(routineBonus);
   const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   fxCelebrate(3, "🏁 本日の練習 かんりょう！", acc >= 90 ? "正答率 " + acc + "%　パーフェクト！" : "毎日 つづけているのが すごい");
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
@@ -1817,7 +1862,10 @@ function finishFlashSet(res) {
         : `<div class="fs-best sub">正答率70%以上で 自己ベストに 記録されるよ</div>`)) +
     `</div>`;
   // 報酬は他の種目とまったく同じ計算（正解・正答率・自己ベスト・完走 × 級の倍率）
-  const { g, lines } = goldForSection({ correct, N, bestUpdated: r.improved, completed: true, grade: flashGrade });
+  const fkey = (gradeIdxOf(flashGrade) <= myRankIdx() ? flashGrade.key + "_low" : flashGrade.key + "_flash");
+  const { g, lines } = goldForSection({ correct, N, bestUpdated: r.improved, completed: true,
+    grade: flashGrade, subj: "flash", count: dailyCount(fkey) });
+  dailyCount(fkey, true);
   let earned = g;
   if (pass) { earned += 50; lines.push("🎓 検定合格 ＋50"); }
   const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
