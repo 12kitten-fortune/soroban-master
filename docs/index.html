@@ -2,21 +2,33 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover：iPhoneの角の丸みやノッチの内側まで きちんと表示する -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>そろばんキングダム｜SOROBAN KINGDOM</title>
     <meta name="description" content="そろばんで学んで、王国を育てる。子どものためのそろばん学習アプリ。" />
     <meta name="theme-color" content="#16305c" />
+    <meta name="format-detection" content="telephone=no" />
+    <!-- ホーム画面に追加したとき、アプリのように全画面で開く（iPhone / iPad） -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="そろキングダム" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="apple-touch-icon" href="assets/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div class="app">
       <!-- サイドバー -->
       <aside class="sidebar">
-        <div class="brand"><img class="brand-logo" src="assets/logo.png" alt="そろばんキングダム" /></div>
-        <nav class="side-nav">
+        <div class="brand">
+          <img class="brand-logo" src="assets/logo.png" alt="そろばんキングダム" />
+          <!-- スマホのときだけ出る。おしてメニューを開く -->
+          <button id="navToggle" class="nav-toggle" aria-label="メニュー" aria-expanded="false">☰</button>
+        </div>
+        <nav class="side-nav" id="sideNav">
           <button class="nav active" data-view="home">🏠 ホーム</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
           <button class="nav" data-view="battle">⚔️ たいせん</button>

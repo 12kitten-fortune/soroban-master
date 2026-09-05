@@ -5,16 +5,26 @@
   --bg: #f6f2e9; --card: #ffffff; --line: #e6ddc9;
   --navy: #16305c; --navy-hi: #24487a; --royal-gold: #d4af37;
   --side: #16305c; --side-hi: #24487a;
-  /* そろばんの大きさ：画面が広いほど 大きくなる（23桁ぶん入る範囲で） */
-  --bh: clamp(22px, 2.5vw, 34px); --cw: clamp(34px, 3.6vw, 52px);
+  /* そろばんの大きさ：画面が広いほど 大きくなる。
+     ただし 縦がみじかい画面（ノートPC・iPadの横向き）では そろばんが 場所を取りすぎて
+     問題の字が 小さくなってしまうので、高さでも 上限をつける。 */
+  --bh: clamp(22px, min(2.5vw, 3.2vh), 34px); --cw: clamp(34px, min(3.6vw, 4.6vh), 52px);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, "Hiragino Kaku Gothic ProN", sans-serif; background: var(--bg); color: #2b2b2b; }
+/* iPhoneを横にしたとき 文字が勝手に大きくならないようにする */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  font-family: system-ui, "Hiragino Kaku Gothic ProN", sans-serif; background: var(--bg); color: #2b2b2b;
+  -webkit-tap-highlight-color: transparent;      /* 指でおしたとき 青い四角を出さない */
+  overscroll-behavior-y: contain;                /* 下に引っぱって ページが再読み込みされるのを防ぐ */
+}
 button { cursor: pointer; font-family: inherit; }
+/* 指でおしたとき「2回たたくと拡大」の待ち時間（約300ms）をなくす＝反応が速くなる */
+button, .nav, .chip, .grade-cell, summary, label, select, .pill, .song, .seg button { touch-action: manipulation; }
 .hidden { display: none !important; }
 
 /* ---------- レイアウト ---------- */
-.app { display: flex; min-height: 100vh; }
+.app { display: flex; min-height: 100vh; min-height: 100dvh; }
 .sidebar { width: 210px; flex-shrink: 0; background: var(--side); color: #f3ede2; padding: 16px 12px; }
 .brand { font-size: 19px; font-weight: 800; padding: 6px 8px 16px; line-height: 1.3; }
 .brand small { display: block; font-size: 10px; opacity: .6; font-weight: normal; margin-top: 2px; }
@@ -28,7 +38,8 @@ button { cursor: pointer; font-family: inherit; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
 .topbar h2 { font-size: 22px; color: var(--frame); }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
-.pill { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; font-size: 13px; }
+/* button の文字色（白）を そのまま受けつぐと 白い丸の上に白い字になって 読めなくなる */
+.pill { background: var(--card); color: #2b2b2b; border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; font-size: 13px; }
 .avatar-mini { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 30px; padding: 5px 14px 5px 8px; }
 .avatar-mini span { font-size: 26px; }
 .avatar-mini small { color: #8a7560; }
@@ -97,6 +108,8 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .result.ok { color: var(--ok); } .result.ng { color: var(--accent); }
 .result button { margin: 8px 4px 0; }
 .flash-display { font-size: 72px; font-weight: 800; height: 140px; display: flex; align-items: center; justify-content: center; color: var(--frame); font-variant-numeric: tabular-nums; }
+/* 数字ではなく 言葉のとき（「▶ を押してスタート」など）は 小さくして 1行におさめる */
+.flash-display.msg { font-size: 26px; height: 72px; color: #6b5f4c; }
 .flash-display.ok { color: #2e7d5b; animation: flashpop .35s ease; }
 .flash-display.ng { color: var(--accent); animation: flashpop .35s ease; }
 @keyframes flashpop { from { transform: scale(.4); } to { transform: scale(1); } }
@@ -125,7 +138,8 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 
 /* ---------- そろばん ---------- */
 .soroban { display: flex; justify-content: safe center; gap: calc(var(--cw) * 0.09); background: #e9e4d8; border: 12px solid var(--frame); border-radius: 6px; box-shadow: inset 0 0 0 2px #333; padding: 14px 12px; margin: 12px auto; width: fit-content; max-width: 100%; overflow-x: auto; }
-.col { position: relative; width: var(--cw); height: calc(var(--bh) * 7 + 14px); }
+/* flex-shrink を止める。止めないと 画面がせまいとき 桁がつぶれて 珠が重なってしまう */
+.col { position: relative; flex: 0 0 var(--cw); width: var(--cw); height: calc(var(--bh) * 7 + 14px); }
 .col .rod { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 4px; height: 100%; background: linear-gradient(90deg, #999, #eee, #999); border-radius: 2px; }
 .col .bar { position: absolute; left: -1px; right: -1px; top: calc(var(--bh) * 2 + 3px); height: 6px; background: linear-gradient(#333, #000); z-index: 3; }
 .unit-dot { position: absolute; left: 50%; top: calc(var(--bh) * 2 + 3px); width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,.6); transform: translate(-50%, -1px); z-index: 4; }
@@ -291,7 +305,7 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .rh-face { width: 88px; height: auto; }
 .rh-badge { display: inline-block; }
 
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .app { flex-direction: column; }
   .sidebar { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
   .brand { padding: 4px 8px; } .brand-logo { max-width: 130px; }
@@ -921,3 +935,210 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .song.off .song-use { background: var(--accent); color: #fff; border-color: var(--accent); }
 .song-use { font-size: 12px; padding: 6px 12px; background: transparent; color: var(--ok); border: 1px solid var(--ok); }
 .song-n small.ng { color: var(--accent); }
+
+/* ============================================================ スマホ・iPad 対応
+   ・iPhone / iPad の Safari で、指で気持ちよく使えるようにする
+   ・ノッチや ホームバーに 文字が隠れないようにする（safe-area）
+   ・そろばんの珠は 指でおせる大きさを 最優先にする */
+
+/* --- ノッチ・ホームバーの内側に収める --- */
+.sidebar { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.content { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+
+/* --- メニューボタン（スマホのときだけ出る） --- */
+.nav-toggle { display: none; background: var(--side-hi); color: #fff; font-size: 22px; line-height: 1;
+  width: 46px; height: 46px; border-radius: 12px; padding: 0; flex-shrink: 0; }
+
+/* ============================ iPad（たて）・小さめのノートPC ============================ */
+@media (max-width: 900px) {
+  .sidebar { padding-top: max(10px, env(safe-area-inset-top)); position: sticky; top: 0; z-index: 60; }
+  .content { padding: 14px 16px; max-width: none; }
+  .nav { padding: 10px 14px; font-size: 15px; }         /* 指でおせる高さにする */
+  .nav-sec { display: none; }                            /* 横ならびでは 見出しは じゃま */
+  .topbar h2 { font-size: 19px; }
+  .topbar-right { gap: 8px; flex-wrap: wrap; }
+}
+
+/* ============================ スマホ（iPhone） ============================ */
+@media (max-width: 640px) {
+  /* --- メニューは しまっておいて、☰ で開く --- */
+  .sidebar { padding: max(6px, env(safe-area-inset-top)) 10px 8px; }
+  .brand { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 2px 0; }
+  .brand-logo { max-width: 150px; }
+  .nav-toggle { display: block; }
+  .side-nav { display: none; width: 100%; margin-top: 6px; }
+  .side-nav.open { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .side-nav.open .nav-sec { display: block; grid-column: 1 / -1; padding: 6px 4px 0; }
+  .nav { font-size: 15px; padding: 12px 10px; text-align: center; background: rgba(255,255,255,.08); }
+
+  /* --- 本文まわり --- */
+  .content { padding: 12px max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .card { padding: 13px; border-radius: 12px; margin-bottom: 12px; }
+  .topbar { margin-bottom: 10px; gap: 6px; align-items: center; }
+  .topbar h2 { font-size: 17px; flex-shrink: 0; width: 100%; }
+  .topbar-right { gap: 6px; }
+  /* 名前と顔は ホーム画面にも出ているので、せまい画面では 上のバーから外す */
+  .avatar-mini { display: none; }
+  #examInfoBtn { font-size: 12px; padding: 6px 10px; }
+  .pill { font-size: 12px; padding: 6px 10px; }
+
+  /* --- 入力欄は 16px 以上にする（これ未満だと iPhone が 勝手に拡大する） --- */
+  input, select, textarea { font-size: 16px !important; }
+
+  /* --- 級・段えらび --- */
+  .grade-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .grade-cell { padding: 14px 2px; font-size: 15px; }
+  .chip { padding: 9px 13px; font-size: 13px; }
+  #startBtn { width: 100%; font-size: 19px; padding: 15px 0; }
+
+  /* --- そろばん：珠の大きさを 指に合わせる。横にはみ出す分は なぞって動かす --- */
+  :root { --bh: 27px; --cw: 40px; }
+  .soroban { border-width: 7px; padding: 9px 7px; margin: 10px 0; border-radius: 4px;
+    justify-content: flex-start; max-width: none; width: auto;
+    -webkit-overflow-scrolling: touch; }
+  .soroban-value { font-size: 26px; }
+  .value-row { gap: 8px; }
+
+  /* --- 問題 --- */
+  .play-hud { font-size: 15px; gap: 6px; }
+  .marks { font-size: 19px; letter-spacing: 2px; }
+  .mark { font-size: 92px; }
+  .btn-row button, .answer-row button { padding: 12px 18px; font-size: 16px; }
+  #answerBtn, #battleAnswerBtn { font-size: 18px; padding: 13px 26px; }
+
+  /* --- フラッシュ暗算 --- */
+  .flash-display { font-size: 56px; height: 108px; }
+  .signal .lamp { width: 28px; height: 28px; }
+
+  /* --- パズル：盤を 画面いっぱいまで 大きくする（外わく・カードの余白ぶんを ひく） --- */
+  .pz-board { --pzt: min(56px, calc((100vw - 60px) / 8)); border-width: 3px; }
+  /* 王国の見出し：名前と GOLD が かさならないように 折り返す */
+  .kingdom-head { flex-wrap: wrap; gap: 8px; row-gap: 6px; }
+  .kd-title { font-size: 17px; }
+  .gold-badge { font-size: 14px; padding: 6px 12px; white-space: nowrap; }
+  .gold-badge .ico-coin { height: 22px; vertical-align: -6px; }
+  .pz-hud { font-size: 14px; gap: 8px; }
+  .pz-goal, .pz-moves { font-size: 15px; }
+  .pz-goal b, .pz-moves b { font-size: 19px; }
+  .pz-item { padding: 7px 9px; gap: 7px; }
+  .pz-em { font-size: 22px; }
+
+  /* --- たいせん --- */
+  .fighter img { width: 62px; }
+  .hpbar { width: 108px; }
+
+  /* --- 記録の表：はみ出す分は 横になぞる --- */
+  .rec-table { display: block; overflow-x: auto; white-space: nowrap; }
+
+  /* --- ネコの吹き出し・お祝いの文字 --- */
+  .tip-card { padding: 16px 14px; }
+  .fx-main { -webkit-text-stroke-width: 6px; }
+}
+
+/* ============================ さらに小さい端末（iPhone SE など） ============================ */
+@media (max-width: 380px) {
+  :root { --bh: 24px; --cw: 36px; }
+  .grade-grid { grid-template-columns: repeat(3, 1fr); }
+  .flash-display { font-size: 46px; height: 92px; }
+}
+
+/* ============================ スマホを 横にしたとき ============================
+   横向きは そろばんが 全部見えるので いちばん練習しやすい。
+   そのぶん 縦が短いので 上下の余白と 文字を つめる */
+@media (max-height: 480px) and (orientation: landscape) {
+  .sidebar { position: static; }
+  .content { padding-top: 8px; }
+  .topbar { margin-bottom: 6px; }
+  :root { --bh: 20px; --cw: 32px; }
+  .soroban { margin: 6px auto; padding: 6px 6px; border-width: 6px; }
+  .flash-display { font-size: 52px; height: 76px; }
+  .play-hud { margin-bottom: 6px; }
+  .pz-board { --pzt: min(48px, calc((100vh - 190px) / 8)); }
+}
+
+/* ============================ 指で操作するとき ============================ */
+@media (hover: none) {
+  .bead:hover { filter: none; }                    /* 指では ホバーが 残ってしまうので 消す */
+  .nav:hover { background: transparent; }
+  .nav.active:hover { background: var(--gold); }
+  /* 珠・パズルの玉は 長おしで 文字が選ばれたり メニューが出ないようにする */
+  .bead, .pz-t, .pz-board, .col, .soroban { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
+
+/* ============================================================ 練習中・たいせん中の スマホ画面
+   スマホは 縦がせまい。問題を見ながら 珠を動かせないと そろばんにならないので、
+   ・上のロゴや設定ボタンは いったん しまう
+   ・そろばんは 画面の下に すえつける（＝いつでも 指がとどく）
+   ・「こたえる」も そろばんと同じ場所に置く */
+@media (max-width: 900px) {
+  body.playing .sidebar { display: none; }
+}
+/* 横向きのスマホにも 同じことをする（縦がせまいのは 同じなので） */
+@media (max-width: 640px), (max-height: 520px) and (orientation: landscape) {
+  body.playing .topbar { display: none; }
+  body.playing .content { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: 8px; }
+  /* 下にすえつけた そろばんの ぶんだけ すきまを空ける。そうしないと ボタンが かくれる */
+  body.playing .card { margin-bottom: 0; padding-bottom: calc(var(--soroPad, 300px) + 8px); }
+  body.playing #stepsRow { margin-top: 4px; }
+  body.playing #stepsRow button { font-size: 13px; padding: 7px 12px; }
+  body.playing .play-hud { position: sticky; top: 0; z-index: 5; background: var(--card); padding: 2px 0 4px; }
+
+  body.playing #playSorobanWrap, body.playing #battleSorobanWrap {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: var(--card); border-top: 3px solid var(--navy);
+    box-shadow: 0 -4px 16px rgba(0,0,0,.22);
+    padding: 3px max(4px, env(safe-area-inset-right)) max(3px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+    display: grid; grid-template-columns: 1fr auto; grid-template-areas: "s s" "v b";
+    align-items: center; column-gap: 8px;
+  }
+  body.playing #playSorobanWrap > .sub, body.playing #battleSorobanWrap > .sub { display: none; }
+  body.playing #playSorobanWrap > .soroban, body.playing #battleSorobanWrap > .soroban { grid-area: s; margin: 2px 0; border-width: 5px; padding: 6px 5px; }
+  body.playing #playSorobanWrap > .value-row, body.playing #battleSorobanWrap > .value-row { grid-area: v; margin: 0; justify-content: flex-start; gap: 6px; }
+  body.playing #playSorobanWrap > .btn-row, body.playing #battleSorobanWrap > .btn-row { grid-area: b; margin: 0; }
+  body.playing .soroban-value { font-size: 22px; }
+  body.playing #answerBtn, body.playing #battleAnswerBtn { padding: 11px 18px; font-size: 17px; }
+  body.playing #clearSoroban2, body.playing #clearSoroban3 { padding: 7px 10px; font-size: 13px; }
+  /* 答えが正しいか出す ◎× は 問題の上に かぶせる */
+  body.playing .mark { font-size: 84px; }
+}
+
+/* 横向きスマホで 練習しているとき：そろばんの右に「こたえる」を置いて 下の帯を うすくする。
+   （上の まとめて書いた指定より あとに置く。CSSは あとに書いたほうが 勝つため） */
+@media (max-height: 520px) and (orientation: landscape) {
+  body.playing #playSorobanWrap, body.playing #battleSorobanWrap {
+    grid-template-columns: auto 1fr; grid-template-areas: "s v" "s b"; column-gap: 12px; align-items: center;
+  }
+  body.playing #playSorobanWrap > .soroban, body.playing #battleSorobanWrap > .soroban { margin: 0; border-width: 4px; padding: 4px; }
+  body.playing #playSorobanWrap > .value-row, body.playing #battleSorobanWrap > .value-row { align-self: end; }
+  body.playing #playSorobanWrap > .btn-row, body.playing #battleSorobanWrap > .btn-row { align-self: start; justify-content: flex-start; margin-top: 6px; }
+  body.playing #answerBtn, body.playing #battleAnswerBtn { padding: 8px 14px; font-size: 15px; }
+  body.playing .soroban-value { font-size: 18px; }
+}
+
+/* 縦がみじかい画面（ノートPC・iPadの横向き）では、練習中だけ 上のバーを しまう。
+   そのぶん 問題の字を 大きくできる（「もどる」ボタンは 中に残っているので 出られる） */
+@media (min-width: 901px) and (max-height: 900px) {
+  body.playing .topbar { display: none; }
+  body.playing .sidebar { display: none; }   /* 練習中は メニューも しまう（「← もどる」で出られる） */
+  body.playing .content { max-width: none; }
+}
+
+/* ============================================================ 横長で 縦がみじかい画面（iPadの横向き・ノートPC）
+   問題を たてに ならべると そろばんの場所が なくなって、字がどんどん小さくなる。
+   紙の問題を 左に置いて、右に そろばんを置く ＝ 本物と同じ ならべ方にする。 */
+@media (min-width: 1000px) and (max-height: 900px) {
+  body.playing #view-play > .card {
+    display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, max-content);
+    grid-template-areas: "hud hud" "prob soro" "steps soro";
+    column-gap: 22px; align-items: start;
+  }
+  body.playing #view-play > .card > .play-hud { grid-area: hud; }
+  body.playing #playProblemWrap { grid-area: prob; }
+  body.playing #playSorobanWrap { grid-area: soro; align-self: center; min-width: 0; }
+  body.playing #playSorobanWrap > .soroban { max-width: 100%; }
+  body.playing #stepsRow { grid-area: steps; align-self: start; }
+  /* 休憩・一時停止・答え・コツ などは 横いっぱいに置く */
+  body.playing #playPause, body.playing #playRest, body.playing #playInputWrap,
+  body.playing #playFlashWrap, body.playing #steps, body.playing #anzanTip,
+  body.playing #playResult { grid-column: 1 / -1; }
+}

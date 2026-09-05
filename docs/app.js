@@ -11,7 +11,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-44"; // 最新反映の確認用
+const BUILD = "2026-09-05-70"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -338,6 +338,36 @@ function sessionsBetween(from, to) { return allSessions().filter((e) => e.d >= f
 /* ============================================================ そろばん部品 */
 let audioCtx;
 function ensureAudio() { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); return audioCtx; }
+/* iPhone / iPad は「画面を さわるまで 音を鳴らしてはいけない」きまりになっている。
+   最初にさわった一度だけ 音の準備をして、以降は ふつうに鳴るようにする。 */
+let audioUnlocked = false;
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    const c = ensureAudio();
+    if (c.state !== "running" && c.resume) c.resume();
+    // 音のない ごく短い音を1回鳴らして、音の道を開く
+    const s = c.createBufferSource();
+    s.buffer = c.createBuffer(1, 1, 22050);
+    s.connect(c.destination); s.start(0);
+  } catch (e) { }
+  // mp3 のほうも 同じように 一度だけ 開いておく
+  try {
+    Object.keys(sfxBuf).forEach(function (k) {
+      const a = sfxBuf[k]; if (!a) return;
+      const v = a.volume; a.volume = 0;
+      const p = a.play();
+      if (p && p.then) p.then(function () { a.pause(); a.currentTime = 0; a.volume = v; }).catch(function () { a.volume = v; });
+      else { a.pause(); a.currentTime = 0; a.volume = v; }
+    });
+  } catch (e) { }
+  // 画面を開いた直後にBGMを鳴らそうとして 止められていた場合は ここで鳴らし直す
+  try { if (bgmEl && bgmEl.paused) { const p = bgmEl.play(); if (p && p.catch) p.catch(function () { }); } } catch (e) { }
+}
+["pointerdown", "touchend", "keydown"].forEach(function (ev) {
+  window.addEventListener(ev, unlockAudio, { once: false, passive: true });
+});
 function tone(freq, t0, dur, type = "sine", vol = 0.15) {
   if (!soundOn) return;
   const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -660,6 +690,14 @@ function makeSoroban(root, onChange) {
   root.addEventListener("pointerdown", (e) => { if (e.button > 0) return; const b = beadAt(e.clientX, e.clientY); if (!b) return; dragging = true; lastKey = b.key; applyBead(b.c, b.type, b.j); e.preventDefault(); });
   root.addEventListener("pointermove", (e) => { if (!dragging) return; const b = beadAt(e.clientX, e.clientY); if (!b || b.key === lastKey) return; lastKey = b.key; applyBead(b.c, b.type, b.j); });
   window.addEventListener("pointerup", () => { dragging = false; lastKey = null; });
+  window.addEventListener("pointercancel", () => { dragging = false; lastKey = null; });  // スマホで指がはずれたとき
+  // スマホでは そろばんが 画面より広い。開いたとき「一の位」が見えている所まで 横にずらす
+  function centerOnes() {
+    if (root.scrollWidth <= root.clientWidth + 4) return;
+    const col = root.children[ONES_COL]; if (!col) return;
+    const x = col.offsetLeft + col.offsetWidth / 2 - root.clientWidth * 0.72;
+    root.scrollLeft = Math.max(0, Math.min(root.scrollWidth - root.clientWidth, x));
+  }
   function syncTyped() { const p = parts(); let s = p.intStr === "0" ? "" : p.intStr; if (p.fracStr) s = (s || "0") + "." + p.fracStr; return s; }
   function renderTyped() { for (let c = 0; c < COLS; c++) setDigit(c, 0); const [ip = "", fp = ""] = (typed || "").split("."); for (let k = 0; k < ip.length; k++) { const col = ONES_COL - (ip.length - 1 - k); if (col >= 0 && col <= ONES_COL) setDigit(col, +ip[k]); } for (let k = 0; k < fp.length; k++) { const col = ONES_COL + 1 + k; if (col < COLS) setDigit(col, +fp[k]); } emit(); }
   function handleKey(e) {
@@ -670,7 +708,7 @@ function makeSoroban(root, onChange) {
   }
   function clear() { typed = ""; for (let c = 0; c < COLS; c++) setDigit(c, 0); emit(); }
   emit();
-  return { clear, handleKey, value: () => parts() };
+  return { clear, handleKey, value: () => parts(), centerOnes };
 }
 let sorobanParts = { intStr: "0", fracStr: "" };
 const sorobanQuiz = makeSoroban($("#soroban2"), onQuizChange);
@@ -695,6 +733,18 @@ function showView(v) {
   if (v === "puzzle") renderPuzzle();
   if (v === "craft") renderCraft();
   if (v === "parent") renderParent();
+  // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
+  // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
+  document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
+  // スマホでは そろばんが 画面より広い。開いたとき 一の位が見える位置にしておく
+  if (v === "play" || v === "battle") setTimeout(function () { try { sorobanQuiz.centerOnes(); sorobanBattle.centerOnes(); } catch (e) { } fitSoroPad(); }, 30);
+}
+/* 画面の下にすえつけた そろばんの高さぶん、本文の下に すきまを空ける */
+function fitSoroPad() {
+  const w = [$("#playSorobanWrap"), $("#battleSorobanWrap")].find((e) => e && !e.classList.contains("hidden"));
+  const h = w ? Math.round(w.getBoundingClientRect().height) : 0;
+  document.body.style.setProperty("--soroPad", (h || 0) + "px");
+  if (fitLast) fitProblem(null);
 }
 function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
 // 画面を離れるときは進行中のものをすべて破棄する（採点・GOLD付与・記録保存はしない）
@@ -711,9 +761,27 @@ function abandonActivity() {
 $$(".nav").forEach((n) => n.addEventListener("click", () => {
   abandonActivity(); // 画面切り替え前に、走っているタイマーを止めて破棄する
   setActiveNav(n);
+  closeNavDrawer();  // スマホ：えらんだら メニューを しまう
   if (n.dataset.subj) { subject = n.dataset.subj; showView("grades"); updateInfo(); }
   else showView(n.dataset.view);
 }));
+/* ---------- スマホのメニュー（☰ で 開いたり しまったり） ---------- */
+function closeNavDrawer() {
+  const nav = $("#sideNav"), t = $("#navToggle");
+  if (!nav) return;
+  nav.classList.remove("open");
+  if (t) { t.textContent = "☰"; t.setAttribute("aria-expanded", "false"); }
+}
+(function () {
+  const t = $("#navToggle"), nav = $("#sideNav");
+  if (!t || !nav) return;
+  t.addEventListener("click", function () {
+    const open = nav.classList.toggle("open");
+    t.textContent = open ? "✕" : "☰";
+    t.setAttribute("aria-expanded", open ? "true" : "false");
+    clickSnd();
+  });
+})();
 $("#examInfoBtn").addEventListener("click", () => showView("lesson"));
 $("#startBtn").addEventListener("click", () => startSession(subject));
 $("#quitBtn").addEventListener("click", quitSession);
@@ -969,14 +1037,43 @@ function fitProblem(text) {
   const el = $("#playProblem"); if (!el) return;
   if (text != null) fitLast = String(text);
   const lines = Math.max(1, fitLast.split(String.fromCharCode(10)).length);
-  const soroOn = $("#playSorobanWrap") && !$("#playSorobanWrap").classList.contains("hidden");
-  const vh = window.innerHeight || 800;
-  const avail = Math.max(150, vh - (soroOn ? 430 : 250));   // そろばん・ボタン・上の表示のぶんを のぞく
-  const size = Math.max(20, Math.min(46, Math.floor(avail / (lines * 1.42))));
+  const wrap = $("#playSorobanWrap");
+  const soroOn = wrap && !wrap.classList.contains("hidden");
+  // 画面の高さは iPhoneの下のバーで 変わるので、そのときの実寸を使う
+  const vh = (window.visualViewport && window.visualViewport.height) || window.innerHeight || 800;
+  // そろばんの高さは 画面の広さで変わる（スマホでは小さい）ので、決め打ちにせず 実際にはかる
+  // スマホの縦・横どちらも「せまい画面」として あつかう（CSSと同じ条件にそろえる）
+  const narrow = window.innerWidth <= 640 || (window.innerHeight <= 520 && window.innerWidth > window.innerHeight);
+  let soroH = soroOn ? Math.round(wrap.getBoundingClientRect().height) : 0;
+  if (soroOn && soroH < 60) soroH = narrow ? 290 : 400;     // まだ表示されていないときの めやす
+  // 問題が始まる高さを 実際にはかる（スマホでは 上のバーを しまうので そのぶん広くなる）
+  const top = Math.round(el.getBoundingClientRect().top);
+  const head = top > 20 && top < vh ? top : (narrow ? 100 : 250);
+  // そろばんを 画面の下にすえつけているときは「こたえる」も その中にあるので 足さない
+  const playing = document.body.classList.contains("playing");
+  const pinned = narrow && playing && soroOn;
+  // 横長で 縦がみじかい画面では、問題の右に そろばんを 置いている（＝縦に場所を取らない）
+  const side = !narrow && playing && window.innerWidth >= 1000 && vh <= 900;
+  const foot = pinned ? 54 : (narrow ? 96 : 120);   // 「解き方をみる」のぶんを のこす
+  const avail = Math.max(100, vh - head - (side ? 0 : soroH) - (side ? 70 : foot));
+  const size = Math.max(18, Math.min(narrow ? 40 : 46, Math.floor(avail / (lines * 1.42))));
   el.style.fontSize = size + "px";
   el.style.lineHeight = "1.42";
 }
-window.addEventListener("resize", function () { if (fitLast) fitProblem(null); });
+function onViewportChange() {
+  if (fitLast) fitProblem(null);
+  try { sorobanQuiz.centerOnes(); sorobanBattle.centerOnes(); } catch (e) { }
+}
+window.addEventListener("resize", onViewportChange);
+window.addEventListener("orientationchange", function () { setTimeout(onViewportChange, 250); });
+if (window.visualViewport) window.visualViewport.addEventListener("resize", onViewportChange);
+// そろばんが 出たり消えたりするたび、下のすきまを 測りなおす
+(function () {
+  const targets = [$("#playSorobanWrap"), $("#battleSorobanWrap")].filter(Boolean);
+  if (!targets.length || !window.MutationObserver) return;
+  const mo = new MutationObserver(function () { setTimeout(fitSoroPad, 0); });
+  targets.forEach(function (t) { mo.observe(t, { attributes: true, attributeFilter: ["class"] }); });
+})();
 
 /* ============================================================ セッション */
 function startSession(subj) {
@@ -1717,7 +1814,9 @@ function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
   hidePauseUI();
   showView("play");
-  $("#playRest").classList.add("hidden"); $("#playProblemWrap").classList.remove("hidden");
+  $("#playRest").classList.add("hidden");
+  // フラッシュ暗算は 数字を #flashDisplay に出すので、上の問題の場所は 使わない（すきまが空くだけ）
+  $("#playProblemWrap").classList.add("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
   $("#anzanTip").classList.remove("hidden"); // フラッシュ暗算でもコツを出す（ボタンより下に置いてある）
   $("#stepsRow").classList.add("hidden"); $("#steps").classList.add("hidden");
@@ -1725,7 +1824,8 @@ function startFlash(grade) {
   $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
-  $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display"; $("#flashForm").classList.add("hidden");
+  // 数字ではなく 言葉を出すときは 小さめの字にする（大きいままだと 画面からはみ出す）
+  $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display msg"; $("#flashForm").classList.add("hidden");
   const ex = $("#flashExamMode").checked;
   flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
 }
@@ -1924,6 +2024,7 @@ function renderBattle() {
   const rk = JSON.parse(localStorage.getItem(RANK) || "null"); sel.value = rk ? rk.idx : gradeIdx;
   $("#battleSetup").classList.remove("hidden"); $("#battleArena").classList.add("hidden"); $("#battleResult").classList.add("hidden");
   if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null;
+  document.body.classList.remove("playing");   // 上のバーを もどす（メニューに行けるように）
 }
 function battleSubjOf() { return difficulty(battle.grade, battle.subj) ? battle.subj : "anzan"; }
 // あんざん以外（みとり算・かけ算・わり算）は そろばんで答える
@@ -1940,6 +2041,7 @@ function startBattle() {
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
   $("#enemyImg").className = "";
+  document.body.classList.add("playing");      // たたかい中は 上のバーを しまう
   // みとり算・かけ算・わり算はそろばん、あんざんは入力欄
   const useSoro = battleUsesSoroban();
   $("#battleSorobanWrap").classList.toggle("hidden", !useSoro);
