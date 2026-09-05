@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-30"; // 最新反映の確認用
+const BUILD = "2026-09-05-31"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -668,7 +668,7 @@ function startSession(subj) {
   $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", subj !== "anzan"); // あんざんのときだけコツを出す
-  $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(subj) ? "" : "none";
+  $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(subj));
   $("#playGrade").textContent = `${grade.key}／${cf.name}` + (session.timed ? "（検定）" : "（記録）");
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   playTimer = setInterval(tickPlay, 150);
@@ -890,7 +890,7 @@ function startQuizSection(step) {
   $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", step.subj !== "anzan");
-  $("#showSteps").style.display = ["mitori", "kake", "wari"].includes(step.subj) ? "" : "none";
+  $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(step.subj));
   const total = routineState.steps.filter((s) => s.rest == null).length;
   const done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
   $("#playGrade").textContent = `本日の練習 ${done + 1}/${total}：${step.label}`;
@@ -1311,7 +1311,7 @@ function startWeakSession(kind, n) {
   $("#playInputWrap").classList.toggle("hidden", cf.answer !== "input");
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.add("hidden");
-  $("#showSteps").style.display = "";
+  $("#stepsRow").classList.remove("hidden");
   $("#playGrade").textContent = `🎯 にがて克服：${K.n}`;
   $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
   $("#playResult").innerHTML = `<div class="mr-tip">${K.em} ${K.tip}</div>`; $("#playResult").className = "result";
@@ -1368,7 +1368,8 @@ function startFlash(grade) {
   showView("play");
   $("#playRest").classList.add("hidden"); $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
-  $("#anzanTip").classList.remove("hidden"); // フラッシュ暗算でもコツを出す
+  $("#anzanTip").classList.remove("hidden"); // フラッシュ暗算でもコツを出す（ボタンより下に置いてある）
+  $("#stepsRow").classList.add("hidden"); $("#steps").classList.add("hidden");
   $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
