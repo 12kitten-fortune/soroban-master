@@ -5,7 +5,8 @@
   --bg: #f6f2e9; --card: #ffffff; --line: #e6ddc9;
   --navy: #16305c; --navy-hi: #24487a; --royal-gold: #d4af37;
   --side: #16305c; --side-hi: #24487a;
-  --bh: 20px; --cw: 30px;
+  /* そろばんの大きさ：画面が広いほど 大きくなる（23桁ぶん入る範囲で） */
+  --bh: clamp(22px, 2.5vw, 34px); --cw: clamp(34px, 3.6vw, 52px);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: system-ui, "Hiragino Kaku Gothic ProN", sans-serif; background: var(--bg); color: #2b2b2b; }
@@ -75,7 +76,7 @@ button:disabled { opacity: .5; cursor: default; }
 .play-hud { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 18px; font-weight: 700; color: var(--frame); margin-bottom: 12px; }
 #playTimer { color: var(--accent); font-variant-numeric: tabular-nums; }
 .problem-wrap { position: relative; }
-.problem { font-size: 30px; font-variant-numeric: tabular-nums; line-height: 1.5; white-space: pre-line; text-align: center; margin-bottom: 16px; }
+.problem { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.42; letter-spacing: .02em; white-space: pre-line; text-align: center; margin-bottom: 16px; }
 /* 答え合わせの ◎ / × */
 .mark {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(.5);
@@ -109,7 +110,7 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .signal .lamp.on[data-c="yellow"] { background: #f1c40f; opacity: 1; box-shadow: 0 0 14px #f1c40f; }
 .signal .lamp.on[data-c="green"] { background: #2ecc71; opacity: 1; box-shadow: 0 0 14px #2ecc71; }
 .value-row { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
-.soroban-value { font-size: 24px; font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; word-break: break-all; }
+.soroban-value { font-size: 32px; font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; word-break: break-all; }
 
 /* 解き方 */
 .steps { text-align: left; margin-top: 14px; background: #faf7f0; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; }
@@ -123,13 +124,13 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .soro-val { font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; }
 
 /* ---------- そろばん ---------- */
-.soroban { display: flex; justify-content: safe center; gap: 3px; background: #e9e4d8; border: 12px solid var(--frame); border-radius: 6px; box-shadow: inset 0 0 0 2px #333; padding: 14px 12px; margin: 12px auto; width: fit-content; max-width: 100%; overflow-x: auto; }
+.soroban { display: flex; justify-content: safe center; gap: calc(var(--cw) * 0.09); background: #e9e4d8; border: 12px solid var(--frame); border-radius: 6px; box-shadow: inset 0 0 0 2px #333; padding: 14px 12px; margin: 12px auto; width: fit-content; max-width: 100%; overflow-x: auto; }
 .col { position: relative; width: var(--cw); height: calc(var(--bh) * 7 + 14px); }
 .col .rod { position: absolute; left: 50%; top: 0; transform: translateX(-50%); width: 4px; height: 100%; background: linear-gradient(90deg, #999, #eee, #999); border-radius: 2px; }
 .col .bar { position: absolute; left: -1px; right: -1px; top: calc(var(--bh) * 2 + 3px); height: 6px; background: linear-gradient(#333, #000); z-index: 3; }
 .unit-dot { position: absolute; left: 50%; top: calc(var(--bh) * 2 + 3px); width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,.6); transform: translate(-50%, -1px); z-index: 4; }
 .unit-dot.ones { width: 11px; height: 11px; background: var(--accent); box-shadow: 0 0 4px rgba(0,0,0,.7), 0 0 0 2px #fff; }
-.bead { position: absolute; left: 50%; width: 24px; height: calc(var(--bh) - 2px); transform: translateX(-50%); background: linear-gradient(180deg, var(--bead-hi), var(--bead)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); cursor: pointer; transition: top .12s ease; z-index: 2; touch-action: none; }
+.bead { position: absolute; left: 50%; width: calc(var(--cw) * 0.82); height: calc(var(--bh) - 2px); transform: translateX(-50%); background: linear-gradient(180deg, var(--bead-hi), var(--bead)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); cursor: pointer; transition: top .12s ease; z-index: 2; touch-action: none; }
 .bead:hover { filter: brightness(1.2); }
 
 /* レクチャー・設定 */
@@ -461,15 +462,9 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .mr-drill { display: block; width: 100%; margin-top: 12px; background: var(--ok); font-size: 16px; padding: 12px; }
 
 /* ============================================================ 問題が多い級（5級・4級など）で見切れないように */
-/* 広い画面では「問題は左・そろばんは右」に並べて、たてに長くならないようにする */
-@media (min-width: 1000px) {
-  #view-play > .card { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(330px, 470px); gap: 20px; align-items: start; }
-  #view-play > .card > * { grid-column: 1 / -1; }
-  #view-play > .card > .play-hud { grid-row: 1; }
-  #view-play > .card > #playProblemWrap { grid-column: 1; grid-row: 2; margin: 0; }
-  #view-play > .card > #playSorobanWrap { grid-column: 2; grid-row: 2; }
-  #view-play > .card > #playProblemWrap .problem { margin-bottom: 0; }
-}
+/* 問題の字は、のこりの高さに合わせて JS が大きさを決める（fitProblem）。
+   そろばんは 画面の幅をぜんぶ使って 大きく出す。 */
+.problem { margin-bottom: 12px; }
 #stepsRow { margin-top: 10px; }
 /* 数字は右そろえの縦一列（そろばんの見取算と同じ並び）。字の大きさはJSが行数に合わせて決める */
 .problem { max-width: 100%; overflow-wrap: anywhere; }
@@ -885,3 +880,12 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
 .tip-demo .gone { opacity: .18; }
 .tip-ar { font-size: 26px; color: var(--bead-hi); }
 .tip-ok { display: block; width: 100%; margin-top: 14px; font-size: 17px; padding: 12px; background: var(--ok); }
+
+/* ---- 問題とそろばんを 大きく読みやすく ---- */
+#playProblemWrap { min-height: 90px; }
+.problem { color: #1e1e1e; }
+#playInput, #flashInput { font-size: 30px; font-weight: 800; width: 240px; text-align: center; padding: 12px 14px; }
+.answer-row button { font-size: 18px; padding: 12px 24px; }
+.value-row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+#playSorobanWrap .sub { font-size: 13px; }
+#answerBtn { font-size: 20px; padding: 14px 34px; }

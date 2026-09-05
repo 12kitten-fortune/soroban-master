@@ -1,6 +1,7 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
-const COLS = 23, ONES_COL = 11, BH = 20;
+// そろばんの桁：整数11桁＋小数4桁。桁を減らしたぶん、1桁を大きく表示できる
+const COLS = 15, ONES_COL = 10;
 const isUnitPoint = (c) => (c - ONES_COL) % 3 === 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sleepUntil = (t) => new Promise((r) => setTimeout(r, Math.max(0, t - performance.now()))); // 絶対時刻まで待つ（ドリフト防止）
@@ -357,7 +358,15 @@ function makeSoroban(root, onChange) {
     for (let j = 0; j < 4; j++) { const b = document.createElement("div"); b.className = "bead"; b.dataset.col = c; b.dataset.type = "earth"; b.dataset.j = j; col.appendChild(b); earth.push(b); }
     refs.push({ heaven, earth }); root.appendChild(col); renderCol(c);
   }
-  function renderCol(c) { const { heaven, earth } = refs[c]; heaven.style.top = (state[c].heaven ? BH + 2 : 2) + "px"; const e0 = BH * 2 + 9; for (let j = 0; j < 4; j++) earth[j].style.top = e0 + (j < state[c].earth ? j : j + 1) * BH + "px"; }
+  // 珠の位置は CSS の --bh に合わせて計算する（画面の広さで そろばんが大きくなっても ずれない）
+  function renderCol(c) {
+    const { heaven, earth } = refs[c];
+    heaven.style.top = state[c].heaven ? "calc(var(--bh) + 2px)" : "2px";
+    for (let j = 0; j < 4; j++) {
+      const k = 2 + (j < state[c].earth ? j : j + 1);
+      earth[j].style.top = "calc(var(--bh) * " + k + " + 9px)";
+    }
+  }
   function setDigit(c, d) { state[c].heaven = d >= 5; state[c].earth = d % 5; renderCol(c); }
   function digitAt(c) { return (state[c].heaven ? 5 : 0) + state[c].earth; }
   function parts() { let i = "", f = ""; for (let c = 0; c <= ONES_COL; c++) i += digitAt(c); for (let c = ONES_COL + 1; c < COLS; c++) f += digitAt(c); i = i.replace(/^0+/, "") || "0"; f = f.replace(/0+$/, ""); return { intStr: i, fracStr: f, disp: groupInt(i) + (f ? "." + f : "") }; }
@@ -646,12 +655,21 @@ const answerModeFor = (cf) => (cf.answer === "soroban" && useMySoroban() ? "inpu
   el.addEventListener("change", () => { localStorage.setItem(MYSORO, el.checked ? "1" : "0"); updateInfo(); });
 })();
 // 口数が多い級（5級・4級など）でも1画面に収まるよう、行数に合わせて字の大きさを変える
+// 問題の字は「のこっている高さ」に合わせて決める。
+// 口数が少ないときは 大きく、多いときだけ 小さくして 見切れを防ぐ。
+let fitLast = "";
 function fitProblem(text) {
   const el = $("#playProblem"); if (!el) return;
-  const lines = String(text || "").split("\n").length;
-  el.style.fontSize = lines >= 13 ? "17px" : lines >= 10 ? "20px" : lines >= 7 ? "24px" : "";
-  el.style.lineHeight = lines >= 7 ? "1.32" : "";
+  if (text != null) fitLast = String(text);
+  const lines = Math.max(1, fitLast.split(String.fromCharCode(10)).length);
+  const soroOn = $("#playSorobanWrap") && !$("#playSorobanWrap").classList.contains("hidden");
+  const vh = window.innerHeight || 800;
+  const avail = Math.max(150, vh - (soroOn ? 430 : 250));   // そろばん・ボタン・上の表示のぶんを のぞく
+  const size = Math.max(20, Math.min(46, Math.floor(avail / (lines * 1.42))));
+  el.style.fontSize = size + "px";
+  el.style.lineHeight = "1.42";
 }
+window.addEventListener("resize", function () { if (fitLast) fitProblem(null); });
 
 /* ============================================================ セッション */
 function startSession(subj) {
