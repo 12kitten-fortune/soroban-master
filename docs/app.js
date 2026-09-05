@@ -376,25 +376,34 @@ const BGM_STEPS = [0, 0.10, 0.22, 0.38];
 let bgmLevel = (function () { const v = parseInt(localStorage.getItem(BGML_KEY), 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 2; })();
 let bgmOn = bgmLevel > 0;
 let bgmEl = null, bgmName = "";
+const bgmCache = {};        // よみこんだ曲を とっておく入れもの
 sfxVol = (function () { const v = parseFloat(localStorage.getItem(VOL_KEY)); return isFinite(v) ? v : 0.8; })();
 function bgmPlay(name) {
   if (!bgmOn || !soundOn) return bgmStop();
   if (bgmName === name && bgmEl) return;
   bgmStop();
+  // 一度よみこんだ曲は とっておく（ステージを行き来しても 読み直さない＝通信の無駄をなくす）
+  if (bgmCache[name]) {
+    bgmEl = bgmCache[name]; bgmName = name; bgmEl.loop = true; bgmEl.volume = 0;
+    try { bgmEl.currentTime = 0; } catch (e) { }
+    const pc = bgmEl.play(); if (pc && pc.catch) pc.catch(function () { });
+  } else {
   let ext = 0;
   const tryNext = function () {
     if (ext >= SFX_EXT.length) {
       bgmEl = null; bgmName = "";
-      if (name !== "bgm_study") bgmPlay("bgm_study");     // 専用のBGMが無ければ 練習用を流す
+      if (name !== "bgm_study") bgmPlay("bgm_study");     // その曲が無ければ 練習用を流す
       return;
     }
     bgmEl = new Audio(SFX_DIR + name + "." + SFX_EXT[ext++]);
     bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
     bgmEl.addEventListener("error", tryNext, { once: true });
+    bgmEl.addEventListener("canplay", function () { bgmCache[name] = bgmEl; }, { once: true });
     const p2 = bgmEl.play(); if (p2 && p2.catch) p2.catch(function () { });
   };
+  tryNext();
+  }
   try {
-    tryNext();
     const target = BGM_STEPS[bgmLevel] || 0;
     let v = 0;                                  // そっと 音を上げる
     const id = setInterval(function () {
