@@ -10,7 +10,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-42"; // 最新反映の確認用
+const BUILD = "2026-09-05-43"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -3015,35 +3015,11 @@ let pzNodes = {};               // 玉のid → 画面の要素
 const pzWait = (ms) => new Promise((r) => setTimeout(r, ms));
 const pzKind = (k) => PZ_KINDS.find((x) => x.k === k) || PZ_KINDS[0];
 const PZ_SP_ICON = { rh: "🚀", rv: "🚀", tnt: "💣", prop: "🚁", disco: "✨" };
-// 玉は「色ちがい」ではなく「形ちがい」。さらに面取り・つや・内側の影を重ねて 立体の物に見せる。
-const PZ_PATH = {
-  spade: "M50 6 C 28 30, 8 44, 8 60 A 17 17 0 0 0 41 70 L 34 93 L 66 93 L 59 70 A 17 17 0 0 0 92 60 C 92 44, 72 30, 50 6 Z",
-  heart: "M50 93 C 17 68, 5 50, 5 34 A 21 21 0 0 1 50 24 A 21 21 0 0 1 95 34 C 95 50, 83 68, 50 93 Z",
-  dia: "M50 4 L94 50 L50 96 L6 50 Z",
-  club: "M42 60 L34 94 L66 94 L58 60 Z M50 6 A 19 19 0 0 1 67 35 A 19 19 0 1 1 67 65 A 19 19 0 0 1 33 65 A 19 19 0 1 1 33 35 A 19 19 0 0 1 50 6 Z",
-  bead: "M50 7 L93 39 L76 91 L24 91 L8 39 Z",
-};
-// 内側に入れる 面取りの線（宝石らしさ・木目らしさ）
-const PZ_FACET = {
-  spade: '<path d="M50 22 C 36 40, 22 50, 22 59" stroke="rgba(255,255,255,.45)" stroke-width="5" fill="none" stroke-linecap="round"/>',
-  heart: '<path d="M28 34 A 12 12 0 0 1 45 32" stroke="rgba(255,255,255,.5)" stroke-width="6" fill="none" stroke-linecap="round"/>',
-  dia: '<path d="M50 4 L50 96 M6 50 L94 50" stroke="rgba(255,255,255,.28)" stroke-width="3"/><path d="M50 22 L72 50 L50 78 L28 50 Z" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="3"/>',
-  club: '<circle cx="50" cy="25" r="10" fill="rgba(255,255,255,.28)"/>',
-  bead: '<path d="M18 39 L82 39" stroke="rgba(0,0,0,.35)" stroke-width="4"/><rect x="44" y="34" width="12" height="12" rx="3" fill="rgba(60,30,0,.55)"/>',
-};
+// 玉の絵：いただいた素材（宝石のしずくと 金の星）を切り出して 色ちがいにしたもの
+const PZ_IMG = { heart: "pz_gem_red", dia: "pz_gem", club: "pz_gem_green", spade: "pz_gem_purple", bead: "pz_star" };
 function pzFaceHTML(t) {
   if (t.sp === "disco") return '<i class="pz-disco"></i>';              // 光の玉は 色を持たない見た目
-  const p = PZ_PATH[t.k] || PZ_PATH.dia;
-  const face =
-    '<svg class="pz-svg" viewBox="0 0 100 100" aria-hidden="true">' +
-    // 影 → 本体 → 内側の影 → 面取り → つや の順に重ねる
-    '<path d="' + p + '" fill="rgba(0,0,0,.35)" transform="translate(0 5)"/>' +
-    '<path d="' + p + '" fill="url(#g-' + t.k + ')" stroke="url(#s-' + t.k + ')" stroke-width="6" stroke-linejoin="round"/>' +
-    '<path d="' + p + '" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="3" transform="translate(0 3) scale(.98) translate(1 0)"/>' +
-    (PZ_FACET[t.k] || "") +
-    '<ellipse cx="35" cy="28" rx="14" ry="8" fill="rgba(255,255,255,.7)" transform="rotate(-26 35 28)"/>' +
-    '<ellipse cx="63" cy="22" rx="5" ry="3" fill="rgba(255,255,255,.5)" transform="rotate(-26 63 22)"/>' +
-    "</svg>";
+  const face = '<img class="pz-img" src="assets/' + (PZ_IMG[t.k] || PZ_IMG.dia) + '.png" alt="" draggable="false">';
   const sp = t.sp ? '<b class="pz-sp sp-' + t.sp + '">' + (PZ_SP_ICON[t.sp] || "") + "</b>" : "";
   return face + sp;
 }
@@ -3106,8 +3082,7 @@ function pzGoalIcon() {
   if (!pz) return "";
   if (pz.lv.goal === "grass") return '<i class="pz-fl sm"></i>';
   if (pz.lv.goal === "box") return '<i class="pz-bk box sm"></i>';
-  const t = { k: pz.lv.target };
-  return '<span class="pz-mini">' + pzFaceHTML(t) + "</span>";
+  return '<img class="pz-mini" src="assets/' + (PZ_IMG[pz.lv.target] || PZ_IMG.dia) + '.png" alt="">';
 }
 function pzRenderHud() {
   if (!pz) return;
@@ -3485,7 +3460,7 @@ function pzRenderLobby() {
   const d = pzLoad(), lv = pzLevel(d.lv), g = getGold();
   const face = lv.goal === "grass" ? '<i class="pz-fl sm"></i> 草を'
     : lv.goal === "box" ? '<i class="pz-bk box sm"></i> 箱を'
-    : '<span class="pz-mini">' + pzFaceHTML({ k: lv.target }) + '</span> を';
+    : '<img class="pz-mini" src="assets/' + (PZ_IMG[lv.target] || PZ_IMG.dia) + '.png" alt=""> を';
   const items = PZ_ITEMS.map((it) => {
     const n = pzBuy[it.id] || 0;
     const stock = (d.items && d.items[it.id]) || 0;

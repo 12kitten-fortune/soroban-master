@@ -620,10 +620,9 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   background: rgba(255,255,255,.10);
   transition: transform .12s ease, box-shadow .12s ease;
 }
-/* 玉の形（王冠・盾…のように、形そのもので見分ける） */
-.pz-svg { position: relative; width: 88%; height: 88%; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
-.pz-gloss { fill: rgba(255,255,255,.55); }
-.pz-t:active::before { transform: scale(.92); }
+/* 玉の絵（いただいた素材から作ったもの） */
+.pz-img { position: relative; width: 96%; height: 96%; object-fit: contain; pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.4)); }
 .pz-t.k-spade { --c: #3a3a46; --g: #5b5b6b; }
 .pz-t.k-heart { --c: #d0342c; --g: #e8695f; }
 .pz-t.k-dia { --c: #2b6fd0; --g: #5d9ae8; }
@@ -798,8 +797,7 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
     linear-gradient(180deg, rgba(255,255,255,.3), rgba(0,0,0,.35)),
     repeating-linear-gradient(45deg, #8a8a8a 0 7px, #787878 7px 14px), #7d7d7d; }
 .pz-bk.sm { position: static; width: 22px; height: 22px; display: inline-block; vertical-align: -4px; transform: none; }
-.pz-mini { display: inline-block; width: 26px; height: 26px; vertical-align: -6px; }
-.pz-mini .pz-svg { width: 100%; height: 100%; }
+.pz-mini { display: inline-block; width: 28px; height: 28px; vertical-align: -7px; object-fit: contain; }
 .pz-ok { color: var(--ok); font-size: 20px; }
 
 /* ============================================================ パズルの画面づくり（城の広間） */
