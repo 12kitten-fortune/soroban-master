@@ -322,6 +322,8 @@ const SFX_LIST = {
   tile_red: "tile_red",     // 赤
   tile_purple: "tile_purple", // 紫
   tile_green: "tile_green",   // 緑
+  // ⚔️ たいせん：敵のやられ声（たおすたびに 変わる）と ほめ言葉
+  down1: "down1", down2: "down2", down3: "down3", down4: "down4", praise: "praise",
 };
 const sfxBuf = {};                       // 読みこんだ音
 let sfxTried = false;
@@ -1911,6 +1913,15 @@ function enemyAnim(cls, ms) {
   const img = $("#enemyImg"); img.className = cls;
   setTimeout(() => { if (img.className === cls) img.className = ""; }, ms);
 }
+// 敵の やられ声。前と同じ声は 続けて出さない
+let lastDown = -1;
+const DOWN_SND = ["down1", "down2", "down3", "down4"];
+function enemyDownSnd() {
+  let i = Math.floor(Math.random() * DOWN_SND.length);
+  if (i === lastDown) i = (i + 1) % DOWN_SND.length;
+  lastDown = i;
+  sfx(DOWN_SND[i], function () { correctSnd(); });
+}
 function battleAnswer(val) {
   if (!battle || !battle.running) return;
   battle.atts++;
@@ -1919,7 +1930,9 @@ function battleAnswer(val) {
     if (battle.hp <= 0) {                       // たおした → たおれてから次の敵が登場
       battle.kills++; battle.hp = ENEMY_HP;
       battleFx(`たおした！ ＋${Math.round(GOLD_PER_KILL * gradeGoldMult(battle.grade))} GOLD`, "kill");
-      correctSnd(); coinSnd(0.18); // 1匹たおす＝GOLD獲得なのでチャリーン
+      enemyDownSnd();                 // 敵の やられ声（毎回ちがう）
+      coinSnd(0.55);                  // GOLDの音は 声のあとに
+      if (battle.kills % 3 === 0) setTimeout(function () { sfx("praise"); }, 1000);   // 3匹ごとに ほめてくれる
       const img = $("#enemyImg"); img.className = "down";
       setTimeout(() => { if (!battle || !battle.running) return; img.className = "appear"; setEnemyIdentity(); }, 650);
     } else {                                    // こうげき命中
