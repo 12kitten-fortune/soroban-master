@@ -11,7 +11,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-70"; // 最新反映の確認用
+const BUILD = "2026-09-05-80"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -325,12 +325,17 @@ function nextGoalHint() {
 const SESSIONS = "soroban_sessions";
 function logSession(subj, N, correct, sumSec, pauses, results) {
   const l = JSON.parse(localStorage.getItem(SESSIONS) || "[]");
-  const e = { d: today(), subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 };
+  const g = (typeof currentGrade === "function" && currentGrade()) || null;
+  const e = { d: today(), t: Date.now(), g: (session && session.grade && session.grade.key) || (g && g.key) || "",
+    subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 };
   // まちがえた問題は「何をどう間違えたか」まで残す（あとで週ごとのクセを出すため）
   const miss = (results || []).filter((r) => !r.ok).slice(0, 8).map((r) => ({ q: r.compact, u: r.user, a: r.ans, k: missKind(r) }));
   if (miss.length) e.miss = miss;
   l.push(e);
-  localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-1500)));
+  // 1件はおよそ200バイト。6000件でも 約1.2MB で、ブラウザの上限(5MB前後)に とどかない。
+  // 1日4セットなら 4年分のこる。
+  try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-6000))); }
+  catch (err) { try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-2000))); } catch (e2) { } }
 }
 const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
 function sessionsBetween(from, to) { return allSessions().filter((e) => e.d >= from && e.d <= to); }
@@ -489,6 +494,7 @@ function renderVolSegs() {
     const lv = seg.dataset.kind === "bgm" ? bgmLevel : sfxLevel;
     seg.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", +b.dataset.lv === lv); });
   });
+  if (typeof renderSndMini === "function") renderSndMini();   // れんしゅう中の ちいさなボタンも そろえる
 }
 function bgmPlay(name) {
   if (!bgmOn) return bgmStop();     // BGMは 自分の設定だけで 決まる
@@ -536,7 +542,8 @@ function setBgmLevel(n) {
   try { localStorage.setItem(BGML_KEY, String(bgmLevel)); localStorage.setItem(BGM_KEY, bgmOn ? "on" : "off"); } catch (e) { }
   if (!bgmOn) bgmStop();
   else if (bgmEl) bgmEl.volume = BGM_STEPS[bgmLevel];
-  else { sfxPreload(); bgmPlay(bgmName || "bgm_study"); }
+  else { sfxPreload(); bgmPlay(bgmName || bgmMain || "bgm_study"); }
+  renderVolSegs();
 }
 
 /* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
@@ -575,11 +582,37 @@ function bgmNextStage() {
   const order = use.indexOf(bgmMain) >= 0 ? [bgmMain].concat(use.filter((f) => f !== bgmMain)) : use;
   return order[t % order.length] || bgmMain;
 }
+/* ---- れんしゅう中（みとり算・かけ算など）の BGM ----
+   "off"＝鳴らさない／"rotate"＝セットごとに 曲がかわる／それ以外＝その曲だけ */
+const STUDY_KEY = "soroban_bgmstudy", STURN_KEY = "soroban_bgmsturn";
+let bgmStudy = localStorage.getItem(STUDY_KEY) || "rotate";
+function setBgmStudy(v) {
+  bgmStudy = v;
+  try { localStorage.setItem(STUDY_KEY, v); } catch (e) { }
+  bgmStop();
+  const pv = $("#view-play");
+  if (pv && !pv.classList.contains("hidden")) bgmForStudy(true);   // れんしゅう中なら すぐ 切りかえる
+}
+function bgmNextStudy() {
+  let t = parseInt(localStorage.getItem(STURN_KEY), 10); if (!isFinite(t)) t = 0;
+  try { localStorage.setItem(STURN_KEY, String(t + 1)); } catch (e) { }
+  const use = bgmUsable().map((b) => b.f);
+  return use[t % use.length] || bgmMain;
+}
+function bgmForStudy(next) {
+  if (bgmStudy === "off") return bgmStop();
+  if (bgmStudy !== "rotate") return bgmPlay(bgmStudy);
+  bgmPlay(next || !bgmName ? bgmNextStudy() : bgmName);
+}
+// いま れんしゅう中の BGM が 何かを 言葉で返す（設定の 見出し用）
+function bgmStudyLabel() {
+  return bgmStudy === "off" ? "鳴らさない" : bgmStudy === "rotate" ? "毎回かえる" : bgmName2(bgmStudy);
+}
 // 画面に合わせて BGM を切りかえる
 function bgmForView(v, next) {
   if (v === "puzzle") bgmPlay(next ? bgmNextStage() : (bgmName || bgmMain));
   else if (v === "battle") bgmPlay(BGM_BATTLE.f);                   // たいせんは 専用の曲
-  else if (v === "play" || v === "today") bgmPlay(bgmMain);         // 練習中は メインの曲
+  else if (v === "play" || v === "today") bgmForStudy(next);        // れんしゅう中は 学習用の曲
   else bgmStop();
 }
 
@@ -786,7 +819,29 @@ $("#examInfoBtn").addEventListener("click", () => showView("lesson"));
 $("#startBtn").addEventListener("click", () => startSession(subject));
 $("#quitBtn").addEventListener("click", quitSession);
 // 効果音のON/OFF
-function renderSound() { renderVolSegs(); }
+function renderSound() { renderVolSegs(); renderSndMini(); }
+
+/* ---- れんしゅう中・たいせん中の ちいさな音ボタン（上のバーが しまわれていても 切れる） ----
+   おすたびに 大 → 中 → 小 → 切 → 大 と まわる。いまの状態は 文字で見えるようにする。 */
+const LV_MARK = ["切", "小", "中", "大"];
+function renderSndMini() {
+  $$(".snd-btn").forEach(function (b) {
+    const bgm = b.dataset.kind === "bgm";
+    const lv = bgm ? bgmLevel : sfxLevel;
+    b.innerHTML = (bgm ? "🎵" : "🔊") + '<i>' + LV_MARK[lv] + "</i>";
+    b.classList.toggle("off", lv === 0);
+    b.title = (bgm ? "BGM" : "効果音") + "：" + LV_MARK[lv] + "（おすと かわる）";
+  });
+}
+document.addEventListener("click", function (e) {
+  const b = e.target.closest ? e.target.closest(".snd-btn") : null;
+  if (!b) return;
+  const bgm = b.dataset.kind === "bgm";
+  const lv = bgm ? bgmLevel : sfxLevel;
+  const next = lv === 0 ? 3 : lv - 1;                  // 大→中→小→切→大
+  bgm ? setBgmLevel(next) : setSfxLevel(next);
+  renderSound();
+});
 
 // 上のバー・設定画面の どちらのボタンでも 音量を変えられる
 document.addEventListener("click", function (e) {
@@ -960,6 +1015,121 @@ function renderRecords() {
   $("#recordsTable").innerHTML = rows
     ? `<table class="rec-table"><tr><th>級・段</th><th>みとり</th><th>かけ</th><th>わり</th><th>あんざん</th></tr>${rows}</table>`
     : `<p class="sub">まだ種目別の記録がありません。練習を完走するとタイムが記録されます。</p>`;
+  renderWeekRank();
+  renderRecLog();
+}
+
+/* ============================================================ やった記録（ぜんぶ）
+   これまで logSession で ためていたのに どこにも出していなかった。
+   1回ずつ ぜんぶ 見られるようにする。 */
+let recFilter = "all";
+const SUBJ_EM = { mitori: "🧮", kake: "✏️", wari: "➗", anzan: "💭", flash: "⚡" };
+const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : k);
+function renderRecLog() {
+  const box = $("#recLog"); if (!box) return;
+  const all = allSessions().slice().reverse();          // 新しいものが 上
+  // しぼりこみボタン
+  const counts = {};
+  all.forEach((e) => { counts[e.subj] = (counts[e.subj] || 0) + 1; });
+  const kinds = ["mitori", "kake", "wari", "anzan", "flash"].filter((k) => counts[k]);
+  $("#recFilter").innerHTML =
+    '<button class="chip' + (recFilter === "all" ? " active" : "") + '" data-rf="all">ぜんぶ ' + all.length + "回</button>" +
+    kinds.map((k) => '<button class="chip' + (recFilter === k ? " active" : "") + '" data-rf="' + k + '">' +
+      SUBJ_EM[k] + " " + subjName(k) + " " + counts[k] + "回</button>").join("");
+  $$("#recFilter .chip").forEach((b) => { b.onclick = () => { recFilter = b.dataset.rf; renderRecLog(); }; });
+
+  const list = recFilter === "all" ? all : all.filter((e) => e.subj === recFilter);
+  // まとめ
+  const N = list.reduce((a, e) => a + e.N, 0), C = list.reduce((a, e) => a + e.correct, 0);
+  const T = list.reduce((a, e) => a + (e.sec || 0), 0);
+  $("#recSummary").innerHTML = list.length
+    ? `ぜんぶで <b>${list.length}回</b>　といた問題 <b>${N}問</b>　正解 <b>${C}問</b>（正答率 ${N ? Math.round((C / N) * 100) : 0}%）　合計 <b>${fmtMin(T)}</b>`
+    : "まだ記録がありません。";
+  const show = list.slice(0, 80);
+  const trs = show.map(function (e) {
+    const acc = e.N ? Math.round((e.correct / e.N) * 100) : 0;
+    const miss = (e.miss || []).length;
+    return `<tr><td>${e.d}</td><td>${SUBJ_EM[e.subj] || ""} ${subjName(e.subj)}</td><td>${e.g || "—"}</td>` +
+      `<td>${e.correct}/${e.N}</td><td class="${acc >= 90 ? "acc-hi" : acc < 70 ? "acc-lo" : ""}">${acc}%</td>` +
+      `<td>${e.sec ? fmtClock(e.sec) : "—"}</td><td>${e.avg ? e.avg.toFixed(1) + "秒" : "—"}</td>` +
+      `<td>${miss ? '<span class="rec-miss">' + miss + "問</span>" : "—"}</td></tr>`;
+  }).join("");
+  box.innerHTML = show.length
+    ? `<table class="rec-table"><tr><th>日付</th><th>種目</th><th>級・段</th><th>正解</th><th>正答率</th><th>時間</th><th>1問</th><th>まちがい</th></tr>${trs}</table>` +
+      (list.length > show.length ? `<p class="sub">新しい ${show.length}回 を出しています（ぜんぶで ${list.length}回）</p>` : "")
+    : "";
+}
+
+/* ============================================================ 今週のランキング
+   サーバーが要らない やり方にする：
+   ・その週に かせいだ「がんばりポイント」を 週ごとに ならべて 順位をつける（自分の中の 歴代ランキング）
+   ・級ごとの 検定の 制限時間と くらべて 実力ランク（S/A/B/C）を出す＝「全国の目安」との くらべ方 */
+function weekKeyOf(dstr) {
+  const d = new Date(dstr + "T00:00:00");
+  const day = (d.getDay() + 6) % 7;                       // 月曜はじまり
+  d.setDate(d.getDate() - day);
+  // toISOString だと 時差のぶん 1日ずれるので、その土地の日付で 組み立てる
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function weekPoints() {
+  const w = {};
+  allSessions().forEach(function (e) {
+    const k = weekKeyOf(e.d);
+    if (!w[k]) w[k] = { k, N: 0, C: 0, sec: 0, sets: 0, days: {} };
+    w[k].N += e.N; w[k].C += e.correct; w[k].sec += e.sec || 0; w[k].sets++; w[k].days[e.d] = 1;
+  });
+  return Object.values(w).map(function (x) {
+    const acc = x.N ? x.C / x.N : 0;
+    // といた数 ＋ 正解×2 ＋ 正答率ボーナス ＋ つづけた日数ボーナス
+    x.days = Object.keys(x.days).length;
+    x.pt = Math.round(x.N + x.C * 2 + acc * 100 + x.days * 30);
+    x.acc = Math.round(acc * 100);
+    return x;
+  }).sort((a, b) => b.pt - a.pt);
+}
+// 検定の制限時間と くらべた 実力ランク
+function skillRank() {
+  const t = allTimes(), out = [];
+  GRADES.forEach(function (g) {
+    ["mitori", "kake", "wari", "anzan"].forEach(function (sj) {
+      const best = t[`${g.key}_${sj}`]; if (best == null) return;
+      const lim = (SUBJECT[sj] || {}).limit || 420;
+      const r = best / lim;                                 // 小さいほど 速い
+      const rank = r <= 0.35 ? "S" : r <= 0.55 ? "A" : r <= 0.8 ? "B" : "C";
+      out.push({ g: g.key, sj, best, lim, rank, r });
+    });
+  });
+  return out.sort((a, b) => a.r - b.r).slice(0, 6);
+}
+function renderWeekRank() {
+  const box = $("#recRank"); if (!box) return;
+  const ws = weekPoints();
+  if (!ws.length) { box.innerHTML = '<p class="sub">練習すると ここに ランキングが 出ます。</p>'; return; }
+  const thisWeek = weekKeyOf(today());
+  const idx = ws.findIndex((x) => x.k === thisWeek);
+  const me = idx >= 0 ? ws[idx] : null;
+  const head = me
+    ? `<div class="rank-now">今週は 歴代 <b>${idx + 1}位</b> ／ ${ws.length}週　<span class="rank-pt">${me.pt} ポイント</span></div>` +
+      (idx === 0 ? '<div class="rank-cheer">🏆 じぶんの 最高記録を こうしん中！</div>'
+        : `<div class="rank-cheer">あと <b>${ws[idx - 1].pt - me.pt}</b> ポイントで ${idx}位！</div>`)
+    : '<div class="rank-now">今週は まだ 0ポイント。1セットやると のります。</div>';
+  const rows = ws.slice(0, 8).map(function (x, i) {
+    const now = x.k === thisWeek;
+    return `<tr class="${now ? "rank-me" : ""}"><td>${i + 1}位</td><td>${x.k} の週${now ? "（今週）" : ""}</td>` +
+      `<td><b>${x.pt}</b></td><td>${x.sets}セット</td><td>${x.N}問</td><td>${x.acc}%</td><td>${x.days}日</td></tr>`;
+  }).join("");
+  const sk = skillRank();
+  const skHTML = sk.length
+    ? '<h4 class="rank-h">🎖 実力ランク（検定の 制限時間と くらべて）</h4>' +
+      '<table class="rec-table"><tr><th>級・段</th><th>種目</th><th>じぶんのタイム</th><th>検定の制限</th><th>ランク</th></tr>' +
+      sk.map((x) => `<tr><td>${x.g}</td><td>${subjName(x.sj)}</td><td>${fmtClock(x.best)}</td><td>${fmtClock(x.lim)}</td>` +
+        `<td><span class="rk rk-${x.rank}">${x.rank}</span></td></tr>`).join("") + "</table>" +
+      '<p class="sub">S＝制限時間の35%以内　A＝55%以内　B＝80%以内　C＝それ以上。検定は「時間内に とける」ことが 合格の めやすです。</p>'
+    : "";
+  box.innerHTML = head +
+    '<table class="rec-table"><tr><th></th><th>週</th><th>ポイント</th><th>セット</th><th>問題</th><th>正答率</th><th>日数</th></tr>' + rows + "</table>" +
+    '<p class="sub">ポイント＝といた数 ＋ 正解×2 ＋ 正答率 ＋ つづけた日数×30</p>' + skHTML;
 }
 function renderToday() {
   const sel = $("#todayGrade");
@@ -974,7 +1144,14 @@ $("#todayStart").addEventListener("click", () => startRoutine(GRADES[+$("#todayG
 const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
 // 音の設定（効果音・BGM・音量）
 function renderSound2() {
-  renderVolSegs();
+  renderVolSegs(); renderSndMini();
+  const sb = $("#studyBgm");
+  if (sb) {
+    sb.innerHTML = '<option value="off">鳴らさない</option><option value="rotate">毎回かえる（おすすめ）</option>' +
+      BGM_LIST.map((b) => '<option value="' + b.f + '">' + b.n + " だけ</option>").join("");
+    sb.value = bgmStudy;
+    sb.onchange = function () { setBgmStudy(sb.value); renderSound2(); };
+  }
   const songs = $("#bgmSongs"), n = $("#sfxNote");
   if (songs) {
     songs.innerHTML = BGM_LIST.concat([BGM_BATTLE]).map(function (b) {
@@ -1085,6 +1262,7 @@ function startSession(subj) {
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
+  bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
@@ -1324,6 +1502,7 @@ function startQuizSection(step) {
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
+  bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
@@ -1389,8 +1568,9 @@ function finishRoutine() {
   localStorage.setItem(ROUTINE, JSON.stringify(hist.slice(-200)));
   logStudy(totalTime); touchStreak();
   const sectionsGold = rs.gold || 0, completeBonus = 100;
-  const goldLines = [`練習でためた ＋${sectionsGold}`, `本日の練習 完了 ＋${completeBonus}`];
-  let earned = sectionsGold + completeBonus;
+  const routineBonus = Math.round(60 * gradeGoldMult(rs.grade));   // 本日の練習を やりきったごほうび
+  const goldLines = [`練習でためた ＋${sectionsGold}`, `本日の練習 完了 ＋${completeBonus}`, `🏁 やりきった ＋${routineBonus}`];
+  let earned = sectionsGold + completeBonus + routineBonus;
   const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
   addGold(earned);
   renderProfile(); bigFanfareSnd(); coinSnd(1.4);
@@ -1403,10 +1583,7 @@ function finishRoutine() {
   const last = rs.sections[rs.sections.length - 1];
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  goldLines.push("🏁 本日の練習 やりきった ＋" + routineBonus);
-  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned + routineBonus} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
-  const routineBonus = Math.round(60 * gradeGoldMult(rs.grade));   // 本日の練習を やりきったごほうび
-  addGold(routineBonus);
+  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
   fxCelebrate(3, "🏁 本日の練習 かんりょう！", acc >= 90 ? "正答率 " + acc + "%　パーフェクト！" : "毎日 つづけているのが すごい");
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
@@ -1751,6 +1928,7 @@ function startWeakSession(kind, n) {
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
+  bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.toggle("hidden", cf.answer !== "soroban");
@@ -1814,6 +1992,7 @@ function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
   hidePauseUI();
   showView("play");
+  bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
   $("#playRest").classList.add("hidden");
   // フラッシュ暗算は 数字を #flashDisplay に出すので、上の問題の場所は 使わない（すきまが空くだけ）
   $("#playProblemWrap").classList.add("hidden");
@@ -2896,7 +3075,6 @@ function craftBuiltCount() { return (craft && craft.built) || 0; }
 function renderCraft() {
   const fresh = !craft;
   if (fresh) craft = loadCraft();
-  resizeCraftCanvas();
   if (!SPR[1]) bakeBlocks();
   if (fresh) craftCenterOnHero();
   craftAnimStart();
@@ -2946,7 +3124,7 @@ function craftFullOn() { return document.body.classList.contains("craft-full"); 
 function setCraftFull(on) {
   document.body.classList.toggle("craft-full", !!on);
   const b = $("#craftFull"); if (b) b.textContent = on ? "⛶ もどす" : "⛶ 大きくする";
-  setTimeout(function () { if (craft) { resizeCraftCanvas(); drawCraft(); } }, 60);   // 大きさが変わってから描き直す
+  setTimeout(function () { if (craft && typeof drawCraft === "function") drawCraft(); }, 60);   // 大きさが変わってから描き直す
 }
 $("#craftFull").addEventListener("click", function () {
   const v = $("#view-craft");
@@ -2965,7 +3143,8 @@ document.addEventListener("fullscreenchange", function () {
 // 画面の大きさが変わったら、canvasも作りなおす（ぼやけ防止）
 (function () {
   const cv = $("#craftCanvas"); if (!cv) return;
-  const on = function () { if (craft && resizeCraftCanvas()) drawCraft(); };
+  // クラフトは やめたので、のこっている画面だけ 描き直す（無い関数は 呼ばない）
+  const on = function () { if (typeof craft !== "undefined" && craft && typeof drawCraft === "function") drawCraft(); };
   window.addEventListener("resize", on);
   if (window.ResizeObserver) new ResizeObserver(on).observe(cv);
 })();

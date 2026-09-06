@@ -1142,3 +1142,34 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   body.playing #playFlashWrap, body.playing #steps, body.playing #anzanTip,
   body.playing #playResult { grid-column: 1 / -1; }
 }
+
+/* ============================================================ れんしゅう中の 音ボタン
+   上のバーを しまっていても、ここから 効果音・BGM を 切れるようにする */
+.snd-mini { display: inline-flex; gap: 6px; }
+.snd-mini.center { display: flex; justify-content: center; margin: 8px 0; }
+.snd-btn { display: inline-flex; align-items: center; gap: 3px; background: var(--card); color: #2b2b2b;
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; font-size: 15px; line-height: 1; }
+.snd-btn i { font-style: normal; font-size: 12px; font-weight: 800; color: var(--navy); }
+.snd-btn.off { background: #efe9dd; color: #9a8d78; }
+.snd-btn.off i { color: var(--accent); }
+
+/* ============================================================ 記録：やった記録・ランキング */
+.acc-hi { color: var(--ok); font-weight: 700; }
+.acc-lo { color: var(--accent); font-weight: 700; }
+.rec-miss { color: var(--accent); font-weight: 700; }
+.rank-now { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+.rank-now b { font-size: 26px; color: var(--accent); }
+.rank-pt { font-size: 14px; color: #8a7560; font-weight: normal; margin-left: 8px; }
+.rank-cheer { font-size: 14px; color: #b5651d; margin-bottom: 10px; }
+.rank-h { font-size: 15px; color: var(--navy); margin: 16px 0 6px; }
+.rec-table tr.rank-me { background: #fff7e0; }
+.rec-table tr.rank-me td { font-weight: 700; }
+.rk { display: inline-block; min-width: 26px; padding: 2px 8px; border-radius: 8px; font-weight: 800; color: #fff; }
+.rk-S { background: linear-gradient(180deg,#ffd76a,#d99a2b); color: #4a3400; }
+.rk-A { background: #d9534f; } .rk-B { background: #4a90d9; } .rk-C { background: #8a8071; }
+#recFilter { margin-bottom: 10px; }
+@media (max-width: 640px) {
+  #recLog .rec-table, #recRank .rec-table { font-size: 12px; }
+  #recLog .rec-table th, #recLog .rec-table td { padding: 5px 6px; }
+  .rank-now { font-size: 16px; } .rank-now b { font-size: 22px; }
+}

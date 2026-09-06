@@ -138,6 +138,7 @@
               <span id="playTimer">⏱ 0:00.0</span>
               <button id="pauseBtn" class="pill hidden">⏸ 一時停止</button>
               <span id="playProgress">0 / 0</span>
+              <span class="snd-mini"><button class="snd-btn" data-kind="sfx" title="効果音">🔊</button><button class="snd-btn" data-kind="bgm" title="BGM">🎵</button></span>
             </div>
             <div class="problem-wrap" id="playProblemWrap">
               <div id="playProblem" class="problem"></div>
@@ -245,6 +246,16 @@
           <div class="card">
             <h3>自己ベストタイム（級・段 × 種目）</h3>
             <div id="recordsTable"></div>
+          </div>
+          <div class="card">
+            <h3>🏆 今週のランキング</h3>
+            <div id="recRank"></div>
+          </div>
+          <div class="card">
+            <h3>🧾 やった記録（ぜんぶ）</h3>
+            <div id="recSummary" class="sub"></div>
+            <div class="chips" id="recFilter"></div>
+            <div id="recLog"></div>
           </div>
         </div>
 
@@ -365,6 +376,7 @@
             </div>
             <form id="battleForm" class="answer-row"><input id="battleInput" type="number" inputmode="numeric" placeholder="こたえ" autocomplete="off" /><button type="submit">こたえる</button></form>
             <div id="battleFx" class="battle-fx"></div>
+            <span class="snd-mini center"><button class="snd-btn" data-kind="sfx" title="効果音">🔊</button><button class="snd-btn" data-kind="bgm" title="BGM">🎵</button></span>
             <button id="battleQuit" class="ghost">やめる</button>
           </div>
 
@@ -399,7 +411,10 @@
             <div class="field">🎵 BGMの音量
               <div class="seg vol-seg" data-kind="bgm"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></div>
             </div>
-            <p class="sub">画面いちばん上の GOLD のとなりでも 調整できます。</p>
+            <div class="field">📖 れんしゅう中のBGM（みとり算・かけ算などのとき）
+              <select id="studyBgm"></select>
+            </div>
+            <p class="sub">画面いちばん上の GOLD のとなりでも 調整できます。れんしゅう中は 問題の上の 🔊 🎵 でも 切りかえられます。</p>
             <p class="sub" id="bgmSongs"></p>
             <p class="sub" id="sfxNote"></p>
             <p class="sub">音の出どころ：効果音は <b>効果音ラボ</b>、BGMは <b>魔王魂</b>（どちらも 商用利用OK）</p>
