@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-06-110"; // 最新反映の確認用
+const BUILD = "2026-09-06-120"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -90,59 +90,6 @@ function flashPaceMs(g) {
   if (g.band === "dan") return Math.max(300, 620 - g.dan * 32); // 初段≈588 … 十段≈300（速い）
   return Math.round(650 + (g.kyu - 1) / 19 * 400); // 1級≈650 … 20級≈1050（易しいほどゆっくり）
 }
-/* ============================================================ プレミアム（保護者向け 有料プラン）
-   ★サーバーを持たない作りなので、次のやり方にしている：
-     1. 保護者が Stripe の支払いリンクで 買う
-     2. こちらから「ひらくコード」を メールで わたす
-     3. アプリに 入れると ずっと つかえる（その端末に おぼえる）
-   コードは この中の合言葉(salt)で 計算して 確かめるので、通信は いらない。
-   ※ブラウザの中だけで 確かめるので、本気で 破ろうと思えば 破れる。
-     ちゃんと守りたくなったら Cloudflare Workers（無料枠）で 確かめる形に できる。 */
-const PRO = {
-  on: true,                       // 有料プランの しくみを つかうか
-  price: 1500,                    // 円（買い切り）
-  link: "",                       // ← Stripe の「支払いリンク」を ここに貼る
-  freeKyu: 10,                    // 何級まで 無料か（10級まで＝入門〜初級は ぜんぶ無料）
-  salt: "sorobankingdom-2026-09",  // コードの合言葉。変えると 前のコードは つかえなくなる
-};
-const PRO_KEY = "soroban_pro";
-const PRO_ALPHA = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";   // まぎらわしい I・O は 使わない
-function proSum(body) {
-  let h = 2166136261 >>> 0;
-  const src = PRO.salt + "|" + body;
-  for (let i = 0; i < src.length; i++) { h ^= src.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
-  let out = "";
-  for (let i = 0; i < 4; i++) { out += PRO_ALPHA[h % PRO_ALPHA.length]; h = Math.floor(h / PRO_ALPHA.length) + 7919; }
-  return out;
-}
-function proNorm(c) {
-  let x = String(c || "").toUpperCase().replace(/[^0-9A-Z]/g, "").replace(/I/g, "1").replace(/O/g, "0");
-  if (x.length === 14 && x.slice(0, 2) === "SK") x = x.slice(2);   // 「SK-」から 入れても 読めるように
-  return x;
-}
-function proCheck(code) {
-  const c = proNorm(code);
-  if (c.length !== 12) return false;
-  return proSum(c.slice(0, 8)) === c.slice(8);
-}
-function proSaved() { try { return JSON.parse(localStorage.getItem(PRO_KEY) || "null"); } catch (e) { return null; } }
-function isPro() {
-  if (!PRO.on) return true;                    // しくみを 止めているときは ぜんぶ ひらく
-  const s = proSaved();
-  return !!(s && s.code && proCheck(s.code));
-}
-function proUnlock(code) {
-  if (!proCheck(code)) return false;
-  try { localStorage.setItem(PRO_KEY, JSON.stringify({ code: proNorm(code), at: today() })); }
-  catch (e) { console.error("プレミアムの保存に失敗", e); return false; }
-  return true;
-}
-// その級が 無料で つかえるか（段位・9級から上は プレミアム）
-function gradeOpen(g) {
-  if (!PRO.on || isPro()) return true;
-  return g.band === "kyu" && g.kyu >= PRO.freeKyu;
-}
-
 const SUBJECT = {
   mitori: { name: "みとり算", answer: "soroban", N: 10, per: 10, pass: 70, limit: 420 },
   kake: { name: "かけ算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
@@ -832,7 +779,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", pro: "プレミアム" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん" };
 function showView(v) {
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
@@ -845,7 +792,6 @@ function showView(v) {
   if (v === "battle") renderBattle();
   if (v === "puzzle") renderPuzzle();
   if (v === "parent") renderParent();
-  if (v === "pro") renderPro();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
   document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
@@ -941,10 +887,8 @@ function renderGrid() {
   for (let i = GRADES.length - 1; i >= 0; i--) {
     const g = GRADES[i];
     const cell = document.createElement("button");
-    const open = gradeOpen(g);
-    cell.className = `grade-cell ${gradeColor(g)}` + (i === gradeIdx ? " sel" : "") + (open ? "" : " locked");
-    cell.innerHTML = g.key + (open ? "" : ' <span class="lock">👑</span>');
-    cell.title = open ? "" : "プレミアム（保護者プラン）で ひらきます";
+    cell.className = `grade-cell ${gradeColor(g)}` + (i === gradeIdx ? " sel" : "");
+    cell.textContent = g.key;
     cell.onclick = () => { gradeIdx = i; renderGrid(); updateInfo(); };
     grid.appendChild(cell);
   }
@@ -969,25 +913,10 @@ function updateInfo() {
   let info = `<b>${g.key}／${cf.name}</b>：${specText(g, subject)}`;
   if (cf.answer !== "flash") info += `　｜ ${cf.N}もん・${cf.limit / 60}分いない・${cf.pass}点で ごうかく`;
   if (g.band === "dan" || g.kyu > 15) info += ` <span class="note">※目安</span>`;
-  // 検定モードは プレミアム
-  const em = $("#examMode");
-  if (em && PRO.on) {
-    const lock = !isPro();
-    em.disabled = lock; if (lock) em.checked = false;
-    em.parentNode.classList.toggle("locked", lock);
-    if (lock && !em.parentNode.querySelector(".lock")) {
-      const sp = document.createElement("span"); sp.className = "lock"; sp.textContent = " 👑"; em.parentNode.appendChild(sp);
-    }
-  }
   const L = lessonFor(g, subject);
   if (L) info += ' <button id="lessonBtn" class="ghost lesson-btn">📖 この級の 解きかたを 見る</button>';
-  const open = gradeOpen(g);
-  if (!open) info += '<div class="pro-note">👑 この級は <b>プレミアム</b>で ひらきます（' +
-    PRO.freeKyu + "級までは ずっと無料）</div>";
   $("#gradeInfo").innerHTML = info;
   $("#timerToggleWrap").style.display = cf.answer === "flash" ? "none" : "";
-  const sb = $("#startBtn");
-  if (sb) { sb.textContent = open ? "▶ はじめる（Enter）" : "👑 プレミアムを 見る"; sb.classList.toggle("locked", !open); }
   const lb = $("#lessonBtn"); if (lb && L) lb.onclick = () => tipShow(L.t, L.b);
 }
 $$(".chip").forEach((c) => c.addEventListener("click", () => { if (c.disabled) return; subject = c.dataset.subj; updateInfo(); }));
@@ -1041,26 +970,9 @@ function weakProfile(days) {
     .map((k) => ({ k, n: tally[k] })).sort((a, b) => b.n - a.n);
 }
 
-// プレミアムへの ごあんない（きつく言わない・1回だけ 見せる）
-function proTease(what) {
-  return '<div class="pro-tease">👑 <b>' + what + '</b> は プレミアムで つかえます' +
-    ' <button class="pro-tease-go">くわしく見る</button></div>';
-}
-document.addEventListener("click", function (e) {
-  const b = e.target.closest ? e.target.closest(".pro-tease-go") : null;
-  if (!b) return;
-  showView("pro"); setActiveNav(document.querySelector('.nav[data-view="pro"]'));
-});
 function renderWeakMenu() {
   const el = $("#weakMenu"); if (!el) return;
   const w = weakProfile(14);
-  if (PRO.on && !isPro()) {
-    el.innerHTML = w.length
-      ? '<div class="wm-h">🎯 きみの にがて克服メニュー</div>' +
-        '<div class="wm-none">にがてが <b>' + w.length + "つ</b> 見つかっています。</div>" + proTease("にがて克服メニュー")
-      : '<div class="wm-none">まちがえた記録が たまると、ここに <b>にがて克服メニュー</b> が出ます。</div>';
-    return;
-  }
   if (!w.length) { el.innerHTML = '<div class="wm-none">まちがえた記録が たまると、ここに <b>にがて克服メニュー</b> が出ます。</div>'; return; }
   const rows = w.slice(0, 3).map((x) => {
     const K = MISS_KINDS[x.k] || MISS_KINDS.other;
@@ -1077,13 +989,6 @@ function accBySubject(sessions) {
   return m;
 }
 function renderParent() {
-  if (PRO.on && !isPro()) {
-    const box = $("#parentSummary");
-    if (box) box.innerHTML = '<p class="sub">1週間ごとの といた数・正答率・のびぐあい、種目ごとの 得意と にがて、' +
-      'おうちでの 声かけの ヒントを まとめて お見せします。</p>' + proTease("保護者レポート");
-    ["#parentWeek", "#parentSubjects", "#parentAdvice"].forEach(function (id) { const e = $(id); if (e) e.innerHTML = ""; });
-    return;
-  }
   const s = loadStat(), rk = rankText();
   const to = today(), from = daysAgo(6), pfrom = daysAgo(13), pto = daysAgo(7);
   const thisWeek = sessionsBetween(from, to), lastWeek = sessionsBetween(pfrom, pto);
@@ -1155,13 +1060,6 @@ const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : k);
 function renderRecLog() {
   const box = $("#recLog"); if (!box) return;
   const all = allSessions().slice().reverse();          // 新しいものが 上
-  if (PRO.on && !isPro()) {                              // 無料は 直近7回まで
-    const few = all.slice(0, 7);
-    $("#recFilter").innerHTML = "";
-    $("#recSummary").innerHTML = "ぜんぶで <b>" + all.length + "回</b> やりました（無料では 新しい7回まで 見られます）";
-    box.innerHTML = recLogTable(few) + proTease("やった記録 ぜんぶ");
-    return;
-  }
   // しぼりこみボタン
   const counts = {};
   all.forEach((e) => { counts[e.subj] = (counts[e.subj] || 0) + 1; });
@@ -1240,7 +1138,6 @@ function skillRank() {
 }
 function renderWeekRank() {
   const box = $("#recRank"); if (!box) return;
-  if (PRO.on && !isPro()) { box.innerHTML = '<p class="sub">週ごとの ポイントを ならべて、じぶんの 歴代ランキングが 見られます。検定の制限時間と くらべた 実力ランク（S/A/B/C）も 出ます。</p>' + proTease("今週のランキング・実力ランク"); return; }
   const ws = weekPoints();
   if (!ws.length) { box.innerHTML = '<p class="sub">練習すると ここに ランキングが 出ます。</p>'; return; }
   const thisWeek = weekKeyOf(today());
@@ -1270,8 +1167,7 @@ function renderWeekRank() {
 }
 function renderToday() {
   const sel = $("#todayGrade");
-  // ひらいていない級には かぎマークを つける（えらんでも プレミアム画面へ 行くだけ）
-  sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}${gradeOpen(g) ? "" : "　👑"}</option>`).join("");
+  sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join("");
   sel.dataset.filled = "1";
   const rk = JSON.parse(localStorage.getItem(RANK) || "null");
   sel.value = rk ? rk.idx : gradeIdx;
@@ -1318,6 +1214,7 @@ document.addEventListener("click", function (e) {
 });
 function renderSettings() {
   renderSound2();
+  const cr = $("#setCredit"); if (cr) cr.innerHTML = creditHTML();
   const p = profile();
   $("#nameInput").value = p.name;
   $("#avatarPicker").innerHTML = AVATARS.map((a) => `<button data-a="${a}" class="${a === p.avatar ? "sel" : ""}">${a}</button>`).join("");
@@ -1391,7 +1288,6 @@ if (window.visualViewport) window.visualViewport.addEventListener("resize", onVi
 /* ============================================================ セッション */
 function startSession(subj) {
   const grade = currentGrade();
-  if (!gradeOpen(grade)) { showView("pro"); setActiveNav(document.querySelector('.nav[data-view="pro"]')); return; }
   if (subj === "flash") return startFlash(grade);
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
   const cf = SUBJECT[subj];
@@ -1624,7 +1520,6 @@ function buildSteps(grade) {
   return out;
 }
 function startRoutine(grade) {
-  if (!gradeOpen(grade)) { showView("pro"); setActiveNav(document.querySelector('.nav[data-view="pro"]')); return; }
   const steps = buildSteps(grade);
   if (!steps.length) { alert("この級では本日の練習を実施できません"); return; }
   routineState = { grade, steps, stepIdx: 0, sections: [], gold: 0 };
@@ -2351,8 +2246,7 @@ const ENEMIES = [
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
   const sel = $("#battleGrade");
-  // ひらいていない級には 👑 を つける（えらんでも プレミアム画面へ 行くだけ）
-  sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}${gradeOpen(g) ? "" : "　👑"}</option>`).join("");
+  sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join("");
   const rk = JSON.parse(localStorage.getItem(RANK) || "null"); sel.value = rk ? rk.idx : gradeIdx;
   $("#battleSetup").classList.remove("hidden"); $("#battleArena").classList.add("hidden"); $("#battleResult").classList.add("hidden");
   if (battleTimer) { clearInterval(battleTimer); battleTimer = null; } battle = null;
@@ -2370,7 +2264,6 @@ function battleProblem() {
 function startBattle() {
   const grade = GRADES[+$("#battleGrade").value], subj = $("#battleSubj").value, dur = +$("#battleTime").value;
   if (!grade) return;
-  if (!gradeOpen(grade)) { showView("pro"); setActiveNav(document.querySelector('.nav[data-view="pro"]')); return; }
   battle = { grade, subj, dur, you: 0, atts: 0, kills: 0, hp: ENEMY_HP, life: PLAYER_HP, cur: null, endAt: performance.now() + dur * 1000, running: true };
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
@@ -3869,82 +3762,7 @@ $("#homeStartBtn").addEventListener("click", () => { const g = homeGrade(); tipO
 $("#homeToKingdom").addEventListener("click", () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); });
 $("#homeToRecords").addEventListener("click", () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); });
 
-/* ============================================================ プレミアム画面 */
-// 事業者の情報（特定商取引法で 出すことが 決まっている）。ここを うめてください。
-const SELLER = {
-  name: "（氏名または屋号）",
-  addr: "（住所。求めがあれば すぐ知らせる、という書き方も 認められています）",
-  tel: "（電話番号。同上）",
-  mail: "（連絡先メールアドレス）",
-};
-const PRO_FEATURES = [
-  ["20級〜10級（入門〜初級）の れんしゅう", true, true],
-  ["フラッシュ暗算・あんざん", true, true],
-  ["パズル・たいせん", true, true],
-  ["まちがえ方の クセの 見立て", true, true],
-  ["9級〜1級・初段〜十段（かけ算・わり算をふくむ）", false, true],
-  ["検定モード（全問こたえてから 採点）", false, true],
-  ["1問ずつの 図解つき 解説", false, true],
-  ["にがて克服メニュー", false, true],
-  ["やった記録 ぜんぶ・今週のランキング・実力ランク", false, true],
-  ["保護者レポート", false, true],
-];
-function renderPro() {
-  const pro = isPro();
-  const st = $("#proStatus");
-  if (st) st.innerHTML = !PRO.on ? "いまは ぜんぶ 無料で つかえます"
-    : pro ? '<b class="pro-ok">✓ つかえます</b>　ありがとうございます！'
-      : PRO.freeKyu + "級までは ずっと無料。それより上を ひらくプランです。";
-  const tb = $("#proTable");
-  if (tb) tb.innerHTML = '<table class="rec-table pro-tbl"><tr><th>できること</th><th>むりょう</th><th>👑 プレミアム</th></tr>' +
-    PRO_FEATURES.map((f) => "<tr><td class=\"pro-f\">" + f[0] + "</td><td>" + (f[1] ? "○" : "—") + "</td><td>" + (f[2] ? "○" : "—") + "</td></tr>").join("") +
-    "</table>";
-  const buy = $("#proBuy");
-  if (buy) {
-    if (!PRO.on || pro) buy.classList.add("hidden");
-    else {
-      buy.classList.remove("hidden");
-      buy.innerHTML = '<div class="pro-price">' + PRO.price.toLocaleString() + ' <small>円（買い切り・ずっとつかえます）</small></div>' +
-        (PRO.link
-          ? '<a class="big-cta pro-cta" href="' + PRO.link + '" target="_blank" rel="noopener">👑 プレミアムを 買う</a>' +
-            '<p class="sub">お支払いは Stripe（クレジットカード）です。お支払いのあと、ご登録のメールに「ひらくコード」を お送りします。</p>'
-          : '<div class="pro-soon">準備中です（お支払いリンクを 用意しています）</div>' +
-            '<p class="sub">※ 開発メモ：app.js の <b>PRO.link</b> に Stripe の支払いリンクを 貼ると、ここが 購入ボタンに 変わります。</p>');
-    }
-  }
-  const law = $("#proLaw");
-  if (law) law.innerHTML =
-    "<p><b>販売事業者</b>：" + SELLER.name + "</p>" +
-    "<p><b>所在地</b>：" + SELLER.addr + "</p>" +
-    "<p><b>電話番号</b>：" + SELLER.tel + "</p>" +
-    "<p><b>メールアドレス</b>：" + SELLER.mail + "</p>" +
-    "<p><b>販売価格</b>：" + PRO.price.toLocaleString() + "円（税込）</p>" +
-    "<p><b>商品代金以外の必要料金</b>：インターネット接続にかかる通信料は お客様のご負担です。</p>" +
-    "<p><b>お支払い方法</b>：クレジットカード（Stripe）</p>" +
-    "<p><b>お支払い時期</b>：ご注文時</p>" +
-    "<p><b>引き渡し時期</b>：お支払い確認後、3日以内に「ひらくコード」をメールでお送りします。</p>" +
-    "<p><b>返品・キャンセル</b>：デジタル商品のため、コードをお送りしたあとの返品・返金はお受けできません。" +
-    "コードが使えない場合は、上のメールアドレスまでご連絡ください。</p>" +
-    "<p><b>動作環境</b>：Safari / Chrome / Edge の最新版。iPhone・iPad・Android・パソコンで つかえます。</p>" +
-    '<p class="note">※ ここは 法律で 出すことが 決まっている項目です。SELLER（app.js）を うめてから 販売してください。</p>';
-  const cr = creditHTML();
-  const c1 = $("#proCredit"); if (c1) c1.innerHTML = cr;
-  const c2 = $("#setCredit"); if (c2) c2.innerHTML = cr;
-  const inp = $("#proCode"), btn = $("#proApply"), msg = $("#proMsg");
-  if (btn && inp) {
-    btn.onclick = function () {
-      if (proUnlock(inp.value)) {
-        msg.className = "result ok"; msg.textContent = "✓ ひらきました！ ぜんぶの級が つかえます。";
-        renderGrid(); updateInfo(); renderPro();
-        try { fxCelebrate(2, "プレミアム かいつう！", "ありがとうございます"); } catch (e) { }
-      } else {
-        msg.className = "result ng"; msg.textContent = "このコードは つかえません。（SK- からの 12文字を そのまま 入れてください）";
-      }
-    };
-    inp.onkeydown = function (e) { if (e.key === "Enter") btn.click(); };
-  }
-}
-// つかっている素材の 出どころ（有料にするときは 出すのが きまり／礼儀）
+/* ============================================================ つかっている素材の 出どころ（魔王魂は 表記が きまり） */
 function creditHTML() {
   return "<p><b>BGM</b>：魔王魂（https://maou.audio/）<br>" +
     "魔王魂の素材は 商用利用できますが、<b>クレジット表記が 必要</b>です。この表示を 消さないでください。</p>" +
@@ -4081,7 +3899,6 @@ function lessonFor(g, subj) {
 // はじめる前に：その級の説明 → はじめての そろばんの説明 → 開始
 function startWithTips(subj) {
   const g = currentGrade();
-  if (!gradeOpen(g)) { showView("pro"); setActiveNav(document.querySelector('.nav[data-view="pro"]')); return; }
   const cf = SUBJECT[subj] || {};
   const go = () => startSession(subj);
   const step2 = () => { if (cf.answer === "soroban") tipOnce("first-play", TIP_PLAY.t, TIP_PLAY.b, go); else go(); };
