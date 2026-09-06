@@ -56,7 +56,7 @@
             <span id="goldPill" class="pill gold"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>0</b></span>
             <span class="vol-pill" title="効果音の音量"><b>🔊</b><span class="seg sm vol-seg" data-kind="sfx"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></span></span>
             <span class="vol-pill" title="BGMの音量"><b>🎵</b><span class="seg sm vol-seg" data-kind="bgm"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></span></span>
-            <button id="examInfoBtn" class="pill">🎓 検定内容について</button>
+            <button id="examInfoBtn" class="pill">📖 そろばんの きほん</button>
             <div class="avatar-mini"><span id="avatarMini">🧒</span><div><b id="nameMini">そろ太くん</b><br><small id="rankMini">未取得</small></div></div>
           </div>
         </div>
@@ -103,9 +103,9 @@
               </div>
               <div id="gradeGrid" class="grade-grid"></div>
               <div class="options">
-                <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> 制限時間タイマーを使う</label>
-                <label class="toggle"><input type="checkbox" id="examMode" /> 全問回答してから採点（検定方式）</label>
-                <label class="toggle"><input type="checkbox" id="mySoroban" /> 🧮 じぶんの そろばんを つかう（画面のそろばんを出さず、答えを数字で入力）</label>
+                <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> タイマーを つかう</label>
+                <label class="toggle"><input type="checkbox" id="examMode" /> ぜんぶ こたえてから ◎× を 見る（けんてい方式）</label>
+                <label class="toggle"><input type="checkbox" id="mySoroban" /> 🧮 じぶんの そろばんを つかう（画面の そろばんは 出さず、こたえを 数字で 入れる）</label>
                 <div id="gradeInfo" class="sub"></div>
                 <button id="startBtn">▶ はじめる（Enter）</button>
               </div>
@@ -158,7 +158,7 @@
               <div id="restResult" class="rest-result"></div>
             </div>
             <div id="playSorobanWrap">
-              <div class="sub">そろばんで答えを作ろう（マウス／数字キー：五玉と一玉が同時に動く。中央の赤い点＝一の位）</div>
+              <div class="sub">そろばんで こたえを 作ろう（🔴 あかい点の れつが 一のくらい）</div>
               <div id="soroban2" class="soroban"></div>
               <div class="value-row">
                 <span class="small">そろばん：</span><b id="soroban2Value" class="soroban-value">0</b>
@@ -175,7 +175,7 @@
             <div id="playFlashWrap" class="hidden">
               <div id="flashInfo" class="sub"></div>
               <button id="flashStart">▶ スタート</button>
-              <label class="toggle"><input type="checkbox" id="flashExamMode" /> 検定モード（20問・140/200点で合格）</label>
+              <label class="toggle"><input type="checkbox" id="flashExamMode" /> けんていモード（20もん・140点で ごうかく）</label>
               <div id="flashProgress" class="sub"></div>
               <div id="flashSignal" class="signal hidden">
                 <span class="lamp" data-c="red"></span>
@@ -217,26 +217,26 @@
         <div id="view-today" class="view hidden">
           <div class="card">
             <h3>🔥 本日の練習メニュー</h3>
-            <p class="sub">自分の級・段を選んで「スタート」。次の流れで進みます（休憩は自動カウントダウン、スキップ可）。</p>
+            <p class="sub">じぶんの 級を えらんで「はじめる」。この じゅんばんで すすむよ（きゅうけいは とばしても いい）。</p>
             <ol class="menu-list">
-              <li>暗算 15問（3分）→ 休憩1分　×3セット</li>
-              <li>休憩2分</li>
-              <li>かけ算 15問 → 休憩1分</li>
-              <li>わり算 15問 → 休憩1分</li>
-              <li>みとり算 10問 → 🎉 成績発表</li>
+              <li>あんざん 15もん（3分）→ きゅうけい 1分　×3セット</li>
+              <li>きゅうけい 2分</li>
+              <li>かけ算 15もん → きゅうけい 1分</li>
+              <li>わり算 15もん → きゅうけい 1分</li>
+              <li>みとり算 10もん → 🎉 せいせき はっぴょう</li>
             </ol>
-            <p class="sub">※選んだ級にかけ算/わり算が無い場合、その種目は自動でスキップします。</p>
+            <p class="sub">※ かけ算・わり算が ない級では、そのぶんは とばすよ。</p>
             <div class="row2">
-              <label>階級<select id="todayGrade"></select></label>
+              <label>級・段<select id="todayGrade"></select></label>
             </div>
-            <button id="todayStart">▶ 本日の練習をはじめる</button>
+            <button id="todayStart">▶ 本日の練習を はじめる</button>
           </div>
         </div>
 
         <!-- 記録 -->
         <div id="view-records" class="view hidden">
           <div class="card">
-            <h3>📊 成績の推移（本日の練習）</h3>
+            <h3>📊 せいせきの うつりかわり（本日の練習）</h3>
             <div id="routineGraph"></div>
             <div id="routineList"></div>
           </div>
@@ -245,7 +245,7 @@
             <div id="recEffort" class="sub"></div>
           </div>
           <div class="card">
-            <h3>自己ベストタイム（級・段 × 種目）</h3>
+            <h3>じこベスト タイム（級・段 × しゅもく）</h3>
             <div id="recordsTable"></div>
           </div>
           <div class="card">
@@ -253,30 +253,10 @@
             <div id="recRank"></div>
           </div>
           <div class="card">
-            <h3>🧾 やった記録（ぜんぶ）</h3>
+            <h3>🧾 やった きろく（ぜんぶ）</h3>
             <div id="recSummary" class="sub"></div>
             <div class="chips" id="recFilter"></div>
             <div id="recLog"></div>
-          </div>
-        </div>
-
-        <!-- クラフト（ブロックを積んで自分の世界を作る） -->
-        <div id="view-craft" class="view hidden">
-          <div class="card kingdom-head">
-            <div class="kd-title">🏘 そろばんの町　<span class="kd-lv">🏛 <span id="craftEra">むらの はじまり</span>　部品 <span id="craftCount">0</span></span></div>
-            <div class="gold-badge"><img class="ico-coin" src="assets/coin.png" alt="" /> <span id="craftGold">0</span> GOLD</div>
-          </div>
-          <div class="card">
-            <div class="craft-tools">
-              <button id="craftMode" class="pill">📜 設計図から えらぶ</button>
-              <button id="craftUndo" class="pill">↩ ひとつ もどす</button>
-              <button id="craftIn" class="pill">🔍＋</button><button id="craftOut" class="pill">🔍－</button><button id="craftHome" class="pill">🧭 じぶんの所へ</button><button id="craftFull" class="pill">⛶ 大きくする</button><button id="craftReset" class="ghost">世界を つくりなおす</button>
-              <span id="craftMsg" class="craft-msg"></span>
-            </div>
-            <div id="craftQuest" class="craft-quest"></div>
-            <div class="craft-stage"><canvas id="craftCanvas"></canvas></div>
-            <p class="sub">設計図を えらぶ → <b>ひかっている マス</b>を クリックすると 部品が はまる。ぜんぶ はまると 建物が 完成して、住民が ひっこして くるよ。部品を買う GOLDは そろばんの れんしゅうで たまる。</p>
-            <div id="craftPalette" class="craft-palette"></div>
           </div>
         </div>
 
@@ -388,7 +368,7 @@
         <div id="view-parent" class="view hidden">
           <div class="card">
             <h3>👨‍👩‍👧 保護者の方へ</h3>
-            <p class="sub">お子さまの学習状況です。王国が育つのは「そろばんを練習した成果」です。</p>
+            <p class="sub">お子さまの学習状況です。GOLD が増えるのは「そろばんを練習した成果」だけです。</p>
             <div id="parentSummary" class="parent-summary"></div>
           </div>
           <div class="card"><h3>今週の学習量（問題数）</h3><div id="parentWeek"></div></div>
@@ -457,14 +437,7 @@
         </div>
 
         <div id="view-lesson" class="view hidden">
-          <div class="card">
-            <details open><summary>① 各部と「入れる・払う」</summary><div class="lesson-body"><p>枠・梁・桁・定位点・一玉(=1)・五玉(=5)。中央の<b>赤い点＝一の位（小数点）</b>。梁に寄せる＝入れる／離す＝払う。始めは「ご破算」で0に。</p></div></details>
-            <details><summary>② 指づかい</summary><div class="lesson-body"><ul><li>一玉を上げる＝親指／下げる＝人差し指／五玉＝人差し指</li><li>6〜9は五玉＋一玉を同時に（このアプリは数字キーで同時操作可）。</li></ul></div></details>
-            <details><summary>③ 5の友</summary><div class="lesson-body"><p>1↔4 / 2↔3。たし算：五玉を入れて5の友を払う（4＋1＝五玉入れて4払う）。ひき算は逆。</p></div></details>
-            <details><summary>④ 10の友（繰り上がり・繰り下がり）</summary><div class="lesson-body"><p>1↔9 / 2↔8 / 3↔7 / 4↔6 / 5↔5。繰り上がり：隣に1、10の友を払う（7＋6→13）。繰り下がりは逆（13−6→7）。</p></div></details>
-            <details><summary>⑤ 掛け算</summary><div class="lesson-body"><p>両置き→片落とし→両落とし。先に定位点で一の位を決めると答えをそのまま読める。九九1桁は「が」＝0に注意。</p></div></details>
-            <details><summary>⑥ 検定基準（級）</summary><div class="lesson-body"><p>珠算＝各種目15問・7分・150点満点中100点以上。暗算＝20問・3分・100点満点中70点以上。フラッシュ＝20問・200点満点中140点以上。（段位の難易度は自動目安）</p></div></details>
-          </div>
+          <div class="card" id="lessonBody"></div>
         </div>
       </div>
     </div>
