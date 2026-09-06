@@ -44,6 +44,7 @@
           <button class="nav" data-view="records">📊 記録を見る</button>
           <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
           <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
+          <button class="nav nav-pro" data-view="pro">👑 プレミアム</button>
         </nav>
       </aside>
 
@@ -417,11 +418,44 @@
             <p class="sub">画面いちばん上の GOLD のとなりでも 調整できます。れんしゅう中は 問題の上の 🔊 🎵 でも 切りかえられます。</p>
             <p class="sub" id="bgmSongs"></p>
             <p class="sub" id="sfxNote"></p>
-            <p class="sub">音の出どころ：効果音は <b>効果音ラボ</b>、BGMは <b>魔王魂</b>（どちらも 商用利用OK）</p>
+            <p class="sub" id="setCredit"></p>
           </div>
         </div>
 
         <!-- レクチャー -->
+        <!-- プレミアム（保護者向け 有料プラン） -->
+        <div id="view-pro" class="view hidden">
+          <div class="card pro-head">
+            <div class="pro-crown">👑</div>
+            <div>
+              <div class="pro-title">プレミアム（保護者プラン）</div>
+              <div class="pro-sub" id="proStatus">かくにん中…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>できること</h3>
+            <div id="proTable"></div>
+          </div>
+          <div class="card pro-buy" id="proBuy"></div>
+          <div class="card">
+            <h3>🔑 コードを 入れる</h3>
+            <p class="sub">買ったときに とどく「ひらくコード」を 入れてください。1回入れると、この端末では ずっと つかえます。</p>
+            <div class="pro-code-row">
+              <input id="proCode" type="text" inputmode="latin" autocomplete="off" placeholder="SK-XXXX-XXXX-XXXX" />
+              <button id="proApply">ひらく</button>
+            </div>
+            <div id="proMsg" class="result"></div>
+          </div>
+          <details class="card">
+            <summary>特定商取引法に基づく表記</summary>
+            <div class="lesson-body" id="proLaw"></div>
+          </details>
+          <details class="card">
+            <summary>つかっている素材について</summary>
+            <div class="lesson-body" id="proCredit"></div>
+          </details>
+        </div>
+
         <div id="view-lesson" class="view hidden">
           <div class="card">
             <details open><summary>① 各部と「入れる・払う」</summary><div class="lesson-body"><p>枠・梁・桁・定位点・一玉(=1)・五玉(=5)。中央の<b>赤い点＝一の位（小数点）</b>。梁に寄せる＝入れる／離す＝払う。始めは「ご破算」で0に。</p></div></details>

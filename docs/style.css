@@ -1215,3 +1215,38 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   .play-hud .snd-mini { margin-left: auto; }
   .snd-btn { padding: 5px 8px; font-size: 13px; }
 }
+
+/* ============================================================ プレミアム（保護者プラン） */
+.nav-pro { color: var(--royal-gold); font-weight: 700; }
+.grade-cell.locked { opacity: .55; }
+.grade-cell .lock { font-size: 12px; }
+#startBtn.locked { background: linear-gradient(180deg, #e8c860, #c9a227); color: #3a2a00; }
+.pro-note { margin-top: 8px; color: #b5651d; font-weight: 700; }
+.pro-head { display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(160deg, #1b3a6b, #16305c); color: #fff; border: none; }
+.pro-crown { font-size: 42px; line-height: 1; }
+.pro-title { font-size: 20px; font-weight: 800; }
+.pro-sub { font-size: 14px; opacity: .9; margin-top: 2px; }
+.pro-ok { color: #7ee2b8; }
+.pro-tbl td:nth-child(2), .pro-tbl td:nth-child(3) { width: 92px; font-weight: 800; }
+.pro-tbl td:nth-child(3) { color: var(--ok); }
+.pro-tbl .pro-f { text-align: left; }
+.pro-buy { text-align: center; }
+.pro-price { font-size: 34px; font-weight: 900; color: var(--navy); margin-bottom: 10px; }
+.pro-price small { font-size: 14px; font-weight: normal; color: #8a7560; }
+.pro-cta { display: inline-block; text-decoration: none; padding: 15px 40px; border-radius: 12px;
+  background: linear-gradient(180deg, #e8c860, #c9a227); color: #3a2a00; font-size: 19px; font-weight: 800;
+  box-shadow: 0 4px 0 #a8821c, 0 8px 16px rgba(0,0,0,.2); }
+.pro-soon { display: inline-block; padding: 13px 30px; border-radius: 12px; background: #efe9dd; color: #8a7560; font-weight: 700; }
+.pro-code-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.pro-code-row input { width: 260px; max-width: 100%; text-align: center; letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .pro-price { font-size: 28px; }
+  .pro-tbl td:nth-child(2), .pro-tbl td:nth-child(3) { width: 60px; }
+}
+.pro-tease { margin-top: 10px; background: linear-gradient(180deg,#fffaf0,#f6edd6); border: 2px solid var(--royal-gold);
+  border-radius: 12px; padding: 10px 14px; font-size: 14px; color: #6b5416; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pro-tease b { color: var(--navy); }
+.pro-tease-go { margin-left: auto; background: var(--navy); font-size: 13px; padding: 7px 14px; }
+.toggle.locked { opacity: .55; }
+.toggle.locked .lock { color: var(--royal-gold); }
