@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-06-120"; // 最新反映の確認用
+const BUILD = "2026-09-06-130"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -924,8 +924,9 @@ $$(".chip").forEach((c) => c.addEventListener("click", () => { if (c.disabled) r
 /* ---------- プロフィール／記録の描画 ---------- */
 function renderProfile() {
   const p = profile();
-  $("#avatarMini").textContent = p.avatar; $("#nameMini").textContent = p.name; $("#rankMini").textContent = rankText();
-  $("#avatarBig").textContent = p.avatar; $("#nameBig").textContent = p.name; $("#rankBig").textContent = rankText();
+  $("#avatarMini").innerHTML = avatarHTML(p.avatar); $("#nameMini").textContent = p.name; $("#rankMini").textContent = rankText();
+  $("#avatarBig").innerHTML = avatarHTML(p.avatar); $("#nameBig").textContent = p.name; $("#rankBig").textContent = rankText();
+  const yi = $("#youImg"); if (yi) yi.src = youImageSrc();
   const ms = monthStats();
   $("#effortDays").textContent = ms.days; $("#effortTotal").textContent = fmtMin(ms.sec);
   const w = last7(); const max = Math.max(60, ...w.map((x) => x.sec));
@@ -945,7 +946,7 @@ function routineMenuSummary(grade) {
 }
 function renderHome() {
   const p = profile(), k = loadKingdom(), s = loadStat(), ms = monthStats(), g = homeGrade();
-  $("#homeAvatar").textContent = p.avatar; $("#homeName").textContent = p.name; $("#homeRank").textContent = rankText();
+  $("#homeAvatar").innerHTML = avatarHTML(p.avatar); $("#homeName").textContent = p.name; $("#homeRank").textContent = rankText();
   $("#homeMenu").innerHTML = routineMenuSummary(g) || '<div class="sub">この級では暗算・見取りを練習します</div>';
   $("#homeGold").textContent = k.gold.toLocaleString();
   $("#homeKingdomLv").textContent = kingdomLevel(k);
@@ -1173,7 +1174,15 @@ function renderToday() {
   sel.value = rk ? rk.idx : gradeIdx;
 }
 $("#todayStart").addEventListener("click", () => { const g = GRADES[+$("#todayGrade").value]; tipOnce("first-routine", TIP_ROUTINE.t, TIP_ROUTINE.b, () => startRoutine(g)); });
-const AVATARS = ["🧒", "👦", "👧", "🧑", "👩‍🦰", "🦊", "🐼", "🐯", "🐰", "🦉"];
+// アバター。"img:名前" は assets/名前.png の絵、それ以外は 顔文字
+const AVATARS = ["img:hero_1", "img:hero_2", "img:hero_3", "img:hero_4", "img:hero_5", "img:hero_6", "🧒", "👦", "👧", "🦊", "🐼", "🦉"];
+const AVATAR_NAMES = { hero_1: "けんし", hero_2: "まほうつかい", hero_3: "ゆみつかい", hero_4: "おひめさま", hero_5: "けんじゃ", hero_6: "ぶとうか" };
+function avatarHTML(a) {
+  if (a && a.indexOf("img:") === 0) { const n = a.slice(4); return '<img class="av-img" src="assets/' + n + '.png" alt="' + (AVATAR_NAMES[n] || "") + '">'; }
+  return a || "🧒";
+}
+// たいせんの「あなた」は えらんだアバターの絵（顔文字のときは レオ王）
+function youImageSrc() { const a = profile().avatar || ""; return a.indexOf("img:") === 0 ? "assets/" + a.slice(4) + ".png" : "assets/king.png"; }
 // 音の設定（効果音・BGM・音量）
 function renderSound2() {
   renderVolSegs(); renderSndMini();
@@ -1217,13 +1226,13 @@ function renderSettings() {
   const cr = $("#setCredit"); if (cr) cr.innerHTML = creditHTML();
   const p = profile();
   $("#nameInput").value = p.name;
-  $("#avatarPicker").innerHTML = AVATARS.map((a) => `<button data-a="${a}" class="${a === p.avatar ? "sel" : ""}">${a}</button>`).join("");
+  $("#avatarPicker").innerHTML = AVATARS.map((a) => `<button data-a="${a}" class="${a === p.avatar ? "sel" : ""}" title="${a.indexOf("img:") === 0 ? (AVATAR_NAMES[a.slice(4)] || "") : ""}">${avatarHTML(a)}</button>`).join("");
   $$("#avatarPicker button").forEach((b) => b.addEventListener("click", () => { $$("#avatarPicker button").forEach((x) => x.classList.remove("sel")); b.classList.add("sel"); }));
 }
 $("#saveProfileBtn").addEventListener("click", () => {
   const name = ($("#nameInput").value || "そろ太くん").trim();
   const sel = $("#avatarPicker button.sel");
-  saveProfile({ name, avatar: sel ? sel.dataset.a : "🧒" });
+  saveProfile({ name, avatar: sel ? sel.dataset.a : "img:hero_1" });
   renderProfile();
   $("#saveMsg").textContent = "保存しました ✓";
   setTimeout(() => ($("#saveMsg").textContent = ""), 1500);
@@ -2235,13 +2244,14 @@ let battle = null, battleTimer = null;
 const ENEMY_HP = 3;
 const PLAYER_HP = 4; // まちがえると♥が1つへる。0になったらアウト
 // 1匹たおすごとに次の敵へ（6体を順番にくり返す）
+// たいせんの敵：計算まちがいの もと「ばいきん」たち（たおした数で 順に 出てくる）
 const ENEMIES = [
-  { file: "enemy_slime.png", name: "マスカット王" },
-  { file: "enemy_bat.png", name: "こうもり" },
-  { file: "enemy_rock.png", name: "りょくのうきん" },
-  { file: "enemy_tree.png", name: "モリのぬし" },
-  { file: "enemy_wizard.png", name: "まほうつかい" },
-  { file: "enemy_box.png", name: "たからばこオバケ" },
+  { file: "germ_1.png", name: "ムラサキきん" },
+  { file: "germ_2.png", name: "ミドリのうねうね" },
+  { file: "germ_3.png", name: "アオきん" },
+  { file: "germ_4.png", name: "アカとげとげ" },
+  { file: "germ_5.png", name: "コウモリきん" },
+  { file: "germ_6.png", name: "ピンクねばねば" },
 ];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
@@ -2268,6 +2278,7 @@ function startBattle() {
   $("#battleSetup").classList.add("hidden"); $("#battleResult").classList.add("hidden"); $("#battleArena").classList.remove("hidden");
   $("#battleFx").textContent = ""; $("#battleFx").className = "battle-fx";
   $("#enemyImg").className = "";
+  const yi = $("#youImg"); if (yi) yi.src = youImageSrc();
   document.body.classList.add("playing");      // たたかい中は 上のバーを しまう
   // みとり算・かけ算・わり算はそろばん、あんざんは入力欄
   const useSoro = battleUsesSoroban();

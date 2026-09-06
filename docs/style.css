@@ -1132,3 +1132,17 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .lesson-btn { font-size: 13px; padding: 6px 12px; margin-left: 6px; vertical-align: middle; }
 .pz-howto { text-align: left; margin: -2px 0 8px; line-height: 1.8; }
 @media (max-width: 640px) { .lesson-btn { display: block; margin: 8px auto 0; } }
+
+/* ============================================================ アバターの絵（hero_1〜6）と ばいきんの敵 */
+.av-img { display: block; object-fit: contain; object-position: center top; }
+.avatar-mini .av-img { width: 30px; height: 40px; border-radius: 8px; }
+.avatar-big .av-img { width: 52px; height: 74px; border-radius: 10px; }
+.hero-avatar .av-img { width: 60px; height: 64px; border-radius: 12px; }
+.avatar-picker button .av-img { width: 44px; height: 70px; border-radius: 8px; }
+.avatar-picker button { padding: 4px 6px; }
+.fighter img { width: 92px; height: 130px; object-fit: contain; object-position: center bottom; }
+@media (max-width: 900px) { .fighter img { width: 72px; height: 104px; } }
+@media (max-width: 640px) { .fighter img { width: 62px; height: 92px; } }
+
+/* 絵の背景が 四角いので、カードのように 角を丸める */
+.fighter img { border-radius: 14px; }
