@@ -271,7 +271,9 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .fighter { flex: 1; text-align: center; }
 .fighter img { width: 92px; height: auto; filter: drop-shadow(0 4px 4px rgba(0,0,0,.28)); }
 .fighter.cpu img { transform: none; } /* 敵は専用イラストなので反転しない */
-.fname { font-weight: 700; font-size: 13px; color: var(--navy); }
+/* 敵の名前は「カンピロバクター」のように 長いので、はみ出さずに 折り返す */
+.fname { font-weight: 700; font-size: 13px; color: var(--navy); line-height: 1.25; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .fname { font-size: 11px; } }
 .battle-center { display: flex; flex-direction: column; align-items: center; }
 .battle-timer { font-size: 28px; font-weight: 800; color: var(--navy); font-variant-numeric: tabular-nums; }
 .vs { font-size: 14px; font-weight: 800; color: var(--royal-gold); letter-spacing: 2px; }

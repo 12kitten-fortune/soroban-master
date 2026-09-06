@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-06-130"; // 最新反映の確認用
+const BUILD = "2026-09-06-140"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2244,14 +2244,15 @@ let battle = null, battleTimer = null;
 const ENEMY_HP = 3;
 const PLAYER_HP = 4; // まちがえると♥が1つへる。0になったらアウト
 // 1匹たおすごとに次の敵へ（6体を順番にくり返す）
-// たいせんの敵：計算まちがいの もと「ばいきん」たち（たおした数で 順に 出てくる）
+/* たいせんの敵：ほんとうに いる ばいきん・きせいちゅう（たおした数で 順に 出てくる）。
+   絵の形に できるだけ 合わせてある（コンマ形＝カンピロバクター、らせん＝ヘリコバクター など）。 */
 const ENEMIES = [
-  { file: "germ_1.png", name: "ムラサキきん" },
-  { file: "germ_2.png", name: "ミドリのうねうね" },
-  { file: "germ_3.png", name: "アオきん" },
-  { file: "germ_4.png", name: "アカとげとげ" },
-  { file: "germ_5.png", name: "コウモリきん" },
-  { file: "germ_6.png", name: "ピンクねばねば" },
+  { file: "germ_1.png", name: "ノロウイルス" },
+  { file: "germ_2.png", name: "アニサキス" },
+  { file: "germ_3.png", name: "インフルエンザウイルス" },
+  { file: "germ_4.png", name: "カンピロバクター" },
+  { file: "germ_5.png", name: "ヘリコバクター" },
+  { file: "germ_6.png", name: "ブドウきゅうきん" },
 ];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
