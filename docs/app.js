@@ -11,7 +11,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-05-80"; // 最新反映の確認用
+const BUILD = "2026-09-05-86"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -695,10 +695,11 @@ function makeSoroban(root, onChange) {
   // 珠の位置は CSS の --bh に合わせて計算する（画面の広さで そろばんが大きくなっても ずれない）
   function renderCol(c) {
     const { heaven, earth } = refs[c];
-    heaven.style.top = state[c].heaven ? "calc(var(--bh) + 2px)" : "2px";
+    // --ty ＝ 上からの ずらし量。CSS の --bh に合わせて 計算する
+    heaven.style.setProperty("--ty", state[c].heaven ? "calc(var(--bh))" : "0px");
     for (let j = 0; j < 4; j++) {
       const k = 2 + (j < state[c].earth ? j : j + 1);
-      earth[j].style.top = "calc(var(--bh) * " + k + " + 9px)";
+      earth[j].style.setProperty("--ty", "calc(var(--bh) * " + k + " + 7px)");
     }
   }
   function setDigit(c, d) { state[c].heaven = d >= 5; state[c].earth = d % 5; renderCol(c); }
@@ -3153,6 +3154,15 @@ document.addEventListener("fullscreenchange", function () {
    「音だけで しらせる」のをやめて、画面に大きく出す。
    できたときは 花火と大きな文字、できなかったときも ねぎらいの言葉を出す。 */
 const FX_COLORS = ["#ffd35b", "#ff6b6b", "#4dd4ac", "#5aa9ff", "#c77dff", "#fff"];
+/* スマホ（とくに iPhone）は 光の粒を たくさん出すと かくかくする。
+   小さい画面・指で操作する端末では 粒の数を へらす。動きを減らす設定なら 出さない。 */
+const fxLite = () => {
+  try {
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return 0;
+    const touch = window.matchMedia && window.matchMedia("(hover: none)").matches;
+    return touch || window.innerWidth <= 820 ? 0.45 : 1;
+  } catch (e) { return 1; }
+};
 function fxLayer() {
   let el = document.getElementById("fxLayer");
   if (!el) { el = document.createElement("div"); el.id = "fxLayer"; document.body.appendChild(el); }
@@ -3170,10 +3180,11 @@ function fxBanner(main, sub, kind) {
 /* 花火（下から上がって、はじけて 散る） */
 function fxFirework(x, y, n) {
   const el = fxLayer();
-  for (let i = 0; i < (n || 18); i++) {
+  n = Math.round((n || 18) * fxLite());
+  for (let i = 0; i < n; i++) {
     const p = document.createElement("i");
     p.className = "fx-p";
-    const a = (Math.PI * 2 * i) / (n || 18) + Math.random() * 0.3;
+    const a = (Math.PI * 2 * i) / Math.max(1, n) + Math.random() * 0.3;
     const v = 90 + Math.random() * 80;
     p.style.setProperty("--x", x + "px");
     p.style.setProperty("--y", y + "px");
@@ -3188,7 +3199,9 @@ function fxFirework(x, y, n) {
 // 何発か 順番に打ち上げる
 function fxFireworks(rounds) {
   const W = window.innerWidth, H = window.innerHeight;
-  for (let r = 0; r < (rounds || 5); r++) {
+  const lite = fxLite();
+  rounds = Math.max(lite ? 1 : 0, Math.round((rounds || 5) * (lite ? Math.max(0.5, lite) : 0)));
+  for (let r = 0; r < rounds; r++) {
     setTimeout(() => {
       const x = W * (0.15 + Math.random() * 0.7), y = H * (0.15 + Math.random() * 0.35);
       fxFirework(x, y, 16 + ((Math.random() * 8) | 0));
@@ -3200,7 +3213,8 @@ function fxFireworks(rounds) {
 /* 紙ふぶき */
 function fxConfetti(n) {
   const el = fxLayer(), W = window.innerWidth;
-  for (let i = 0; i < (n || 40); i++) {
+  n = Math.round((n || 40) * fxLite());
+  for (let i = 0; i < n; i++) {
     const p = document.createElement("i");
     p.className = "fx-cf";
     p.style.setProperty("--x", (Math.random() * W).toFixed(0) + "px");
@@ -3274,6 +3288,8 @@ const PZ_KINDS = [
 ];
 // アイテム（GOLDで買って、はじめから盤に置く）
 const PZ_ITEMS = [
+  // 盤に置かず、はじめの手数を ふやすもの（手数が たりないときの たすけ）
+  { id: "moves5", n: "手数 ＋5", em: "⏱", moves: 5, cost: 30, tip: "はじめから 手数が 5 多い（かさねて 買える）" },
   { id: "rocket", n: "ロケット", em: "🚀", sp: "rh", cost: 40, tip: "たて か よこ を 1れつ 消す" },
   { id: "prop", n: "プロペラ", em: "🚁", sp: "prop", cost: 50, tip: "ねらいの 玉へ とんでいく" },
   { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: "まわり 3×3 を ばくはつ" },
@@ -3288,13 +3304,16 @@ function pzLevel(n) {
   // これを守らないと 何手あっても 届かない面ができてしまう。
   const hard = Math.min(0.30, n * 0.006);                        // 面が進むほど きつくする
   const kind = n <= 2 ? "color" : ["grass", "color", "box", "color"][(n - 3) % 4];
+  // ★ここが 面がクリアできなかった 原因：
+  //   前は「盤に置く草の数 ＝ 目あての数」だった。つまり 草を1枚も のこせない＝ほぼ不可能。
+  //   盤には 目あてより ずっと多く置いて、そのうち いくつか 消せばよい ことにする。
   if (kind === "grass") {
-    const need = Math.round(moves * (0.28 + hard * 0.3));   // 草は ねらって消しにくいので ひかえめに
-    return { n, kinds, target, need, moves, goal: "grass", grass: need, box: 0 };
+    const need = Math.max(3, Math.round(moves * (0.20 + hard * 0.18)));
+    return { n, kinds, target, need, moves, goal: "grass", grass: Math.min(34, need * 3), box: 0 };
   }
   if (kind === "box") {
-    const need = Math.max(3, Math.round(moves * (0.15 + hard * 0.2)));  // 箱は となりで消す必要があるので さらに ひかえめに
-    return { n, kinds, target, need, moves, goal: "box", grass: 0, box: need };
+    const need = Math.max(3, Math.round(moves * (0.13 + hard * 0.12)));
+    return { n, kinds, target, need, moves, goal: "box", grass: 0, box: need + 4 };
   }
   return { n, kinds, target, need: Math.round(moves * (0.50 + hard)), moves, goal: "color", grass: 0, box: 0 };
 }
@@ -3614,19 +3633,27 @@ function pzHasMove(c) {
 function pzStart(lvNo, items) {
   const lv = pzLevel(lvNo);
   const stage = pzMakeStage(lv);
+  // 「手数＋5」のような 盤に置かない道具は、はじめの手数に 足す
+  let extra = 0;
+  (items || []).forEach(function (it) {
+    const d = PZ_ITEMS.find((q) => q.id === it);
+    if (d && d.moves) extra += d.moves;
+  });
   pz = {
-    cells: new Array(PZ_W * PZ_H).fill(null), lv: lv, moves: lv.moves, got: 0, sel: -1,
+    cells: new Array(PZ_W * PZ_H).fill(null), lv: lv, moves: lv.moves + extra, got: 0, sel: -1,
     busy: false, done: false, combo: 0, score: 0, floor: stage.floor, block: stage.block,
+    extraMoves: extra,
   };
   pzFillBoard(lv.kinds);                       // 箱をよけて、そろっていない盤を作る
   if (!pzHasMove(pz.cells)) pzReshuffle();     // 動かせる手が無ければ 作り直す
   // 買ったアイテムを 盤に置く
   (items || []).forEach(function (it) {
+    const d = PZ_ITEMS.find((q) => q.id === it);
+    if (!d || !d.sp) return;                       // 手数の道具は 盤に置かない
     for (let t = 0; t < 80; t++) {
       const i = Math.floor(Math.random() * PZ_W * PZ_H);
       if (pz.cells[i] && !pz.cells[i].sp) {
-        const d = PZ_ITEMS.find((q) => q.id === it);
-        pz.cells[i].sp = d ? (d.sp === "rh" ? (Math.random() < 0.5 ? "rh" : "rv") : d.sp) : "rh";
+        pz.cells[i].sp = d.sp === "rh" ? (Math.random() < 0.5 ? "rh" : "rv") : d.sp;
         break;
       }
     }

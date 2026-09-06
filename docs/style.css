@@ -144,7 +144,12 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .col .bar { position: absolute; left: -1px; right: -1px; top: calc(var(--bh) * 2 + 3px); height: 6px; background: linear-gradient(#333, #000); z-index: 3; }
 .unit-dot { position: absolute; left: 50%; top: calc(var(--bh) * 2 + 3px); width: 7px; height: 7px; border-radius: 50%; background: #fff; box-shadow: 0 0 2px rgba(0,0,0,.6); transform: translate(-50%, -1px); z-index: 4; }
 .unit-dot.ones { width: 11px; height: 11px; background: var(--accent); box-shadow: 0 0 4px rgba(0,0,0,.7), 0 0 0 2px #fff; }
-.bead { position: absolute; left: 50%; width: calc(var(--cw) * 0.82); height: calc(var(--bh) - 2px); transform: translateX(-50%); background: linear-gradient(180deg, var(--bead-hi), var(--bead)); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); cursor: pointer; transition: top .12s ease; z-index: 2; touch-action: none; }
+/* 珠は top ではなく transform で動かす。top だと 動かすたびに 画面を組み直すので
+   スマホで かくかくする。transform なら 絵をずらすだけで すむ。 */
+.bead { position: absolute; left: 50%; top: 2px; width: calc(var(--cw) * 0.82); height: calc(var(--bh) - 2px);
+  transform: translate(-50%, var(--ty, 0px)); background: linear-gradient(180deg, var(--bead-hi), var(--bead));
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); cursor: pointer;
+  transition: transform .12s ease; z-index: 2; touch-action: none; }
 .bead:hover { filter: brightness(1.2); }
 
 /* レクチャー・設定 */
@@ -1172,4 +1177,41 @@ body.craft-full .blk-chip { width: 28px; height: 28px; }
   #recLog .rec-table, #recRank .rec-table { font-size: 12px; }
   #recLog .rec-table th, #recLog .rec-table td { padding: 5px 6px; }
   .rank-now { font-size: 16px; } .rank-now b { font-size: 22px; }
+}
+
+/* ============================================================ スマホで かくかくしないように
+   iPhone は 「影をぼかす」「大きなものを 塗りなおす」のが とても苦手。
+   動かすものは 別のレイヤーに のせて、影は かるいものに 置きかえる。 */
+@media (hover: none) {
+  /* 玉の絵に かけていた drop-shadow は 64個ぶん 毎コマ 計算されるので やめる */
+  .pz-img { filter: none; }
+  .pz-t { contain: layout style paint; }
+  /* 下にすえつけた そろばんは 別レイヤーに のせる（スクロールのたびに 塗り直さない） */
+  body.playing #playSorobanWrap, body.playing #battleSorobanWrap {
+    transform: translateZ(0); will-change: transform; contain: paint;
+  }
+  /* 上のバーも 同じ（sticky は 塗り直しが おきやすい） */
+  .sidebar, body.playing .play-hud { transform: translateZ(0); }
+  /* 影の重ねがけを へらす */
+  .pz-board { box-shadow: inset 0 4px 10px rgba(0,0,0,.28), 0 4px 10px rgba(0,0,0,.18), 0 0 0 3px #8a6d14; }
+  .card { box-shadow: none; }
+  .bead { will-change: transform; }
+}
+/* 動きを へらす設定にしている人には アニメを出さない（酔い・端末の負担どちらにも効く） */
+@media (prefers-reduced-motion: reduce) {
+  .pz-t, .bead, .hpfill { transition: none !important; }
+  .pz-t.sel, .fx-banner, .fx-p, .fx-cf { animation: none !important; }
+}
+
+/* 練習中の上の帯：もどる・級・時計・一時停止・進み具合・音ボタン が 1行に入りきらないので、
+   スマホでは 字を小さくして 折り返し、たてに つぶれないようにする */
+@media (max-width: 640px) {
+  .play-hud { flex-wrap: wrap; gap: 4px 8px; font-size: 13px; justify-content: flex-start; }
+  .play-hud > * { flex: 0 0 auto; }
+  #quitBtn { padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+  #playGrade { white-space: nowrap; font-size: 13px; }
+  #pauseBtn { padding: 6px 9px; font-size: 12px; white-space: nowrap; }
+  #playTimer, #playProgress { white-space: nowrap; font-size: 13px; }
+  .play-hud .snd-mini { margin-left: auto; }
+  .snd-btn { padding: 5px 8px; font-size: 13px; }
 }
