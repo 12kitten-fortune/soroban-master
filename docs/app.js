@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-06-100"; // 最新反映の確認用
+const BUILD = "2026-09-06-110"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -381,6 +381,23 @@ function dailyBonusOnce() {
   const streak = Math.max(1, s.streak || 1);
   return { amt: 5 * Math.min(10, streak), label: `連続学習${streak}日ボーナス` };
 }
+/* ---- れんしゅう・たいせんの おわりに、ときどき パズルの道具が もらえる ----
+   さいごまで やって 正答率70%以上のとき、35% の確率。1日 3回まで（かんたんな級で 稼ぐのを ふせぐ） */
+const DROP_ITEMS = [["rocket", 40], ["prop", 25], ["tnt", 20], ["moves5", 15]];
+function maybeDropItem(acc, completed) {
+  try {
+    if (!completed || acc < 70) return "";
+    if (dailyCount("drop") >= 3) return "";
+    if (Math.random() > 0.35) return "";
+    let r = Math.random() * 100, pick = DROP_ITEMS[0][0];
+    for (const [id, w] of DROP_ITEMS) { if (r < w) { pick = id; break; } r -= w; }
+    const it = PZ_ITEMS.find((i) => i.id === pick); if (!it) return "";
+    const d = pzLoad(); pzGiveItem(d, pick, 1); pzSave(d);
+    dailyCount("drop", true);
+    setTimeout(function () { try { sfx("star", function () { coinSnd(0); }); } catch (e) { } }, 700);
+    return '<div class="drop-box">🎁 <b>' + it.em + " " + it.n + '</b> を みつけた！<small>パズルの もちものに 入ったよ</small></div>';
+  } catch (e) { console.error("道具のプレゼントに失敗", e); return ""; }
+}
 // 次に買える建物までの目標（モチベーション表示）
 function nextGoalHint() {
   const gold = getGold();
@@ -674,7 +691,7 @@ function bgmForView(v, next) {
   if (v === "puzzle") bgmPlay(next ? bgmNextStage() : (bgmName || bgmMain));
   else if (v === "battle") bgmPlay(BGM_BATTLE.f);                   // たいせんは 専用の曲
   else if (v === "play" || v === "today") bgmForStudy(next);        // れんしゅう中は 学習用の曲
-  else bgmStop();
+  else bgmPlay(bgmMain);                                             // ホームなど：メインの曲（設定で えらべる）
 }
 
 function clickSnd() { // 珠が弾く「パチ」
@@ -962,6 +979,8 @@ function updateInfo() {
       const sp = document.createElement("span"); sp.className = "lock"; sp.textContent = " 👑"; em.parentNode.appendChild(sp);
     }
   }
+  const L = lessonFor(g, subject);
+  if (L) info += ' <button id="lessonBtn" class="ghost lesson-btn">📖 この級の 解きかたを 見る</button>';
   const open = gradeOpen(g);
   if (!open) info += '<div class="pro-note">👑 この級は <b>プレミアム</b>で ひらきます（' +
     PRO.freeKyu + "級までは ずっと無料）</div>";
@@ -969,6 +988,7 @@ function updateInfo() {
   $("#timerToggleWrap").style.display = cf.answer === "flash" ? "none" : "";
   const sb = $("#startBtn");
   if (sb) { sb.textContent = open ? "▶ はじめる（Enter）" : "👑 プレミアムを 見る"; sb.classList.toggle("locked", !open); }
+  const lb = $("#lessonBtn"); if (lb && L) lb.onclick = () => tipShow(L.t, L.b);
 }
 $$(".chip").forEach((c) => c.addEventListener("click", () => { if (c.disabled) return; subject = c.dataset.subj; updateInfo(); }));
 
@@ -1278,8 +1298,8 @@ function renderSound2() {
         '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + st + "</span>" +
         (batt ? '<span class="song-badge fixed">たいせん専用</span>'
           : '<button class="song-use" data-f="' + b.f + '">' + (off ? "つかわない" : "つかう") + "</button>" +
-            (main ? '<span class="song-badge">メイン</span>'
-              : '<button class="song-main" data-f="' + b.f + '">メインに</button>')) +
+            (main ? '<span class="song-badge">ホームの曲</span>'
+              : '<button class="song-main" data-f="' + b.f + '">ホームの曲に</button>')) +
         "</div>";
     }).join("");
   }
@@ -1552,6 +1572,7 @@ function finishSession() {
     fxCheer("とちゅうまで やったね", "つづきは いつでも できるよ");
   }
   if (completed) coinSnd(1.0); // GOLD獲得の「チャリーン」はファンファーレの後に
+  msg += maybeDropItem(acc100, completed);
   msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🧩 パズルへ</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
   const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
   const face = passed ? "king_celebrate.png" : "king_wave.png";
@@ -1714,7 +1735,7 @@ function finishRoutine() {
   fxCelebrate(3, "🏁 本日の練習 かんりょう！", acc >= 90 ? "正答率 " + acc + "%　パーフェクト！" : "毎日 つづけているのが すごい");
   const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
   const allItems = rs.sections.reduce((a, s) => a.concat(s.items || []), []);   // 本日の練習ぜんぶ分のクセ
-  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${missReportHTML(allItems)}${goldBlock}${detail}<br><button id="toKingdomBtn2">🧩 パズルへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${missReportHTML(allItems)}${goldBlock}${maybeDropItem(acc, true)}${detail}<br><button id="toKingdomBtn2">🧩 パズルへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
   $("#toKingdomBtn2").onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
@@ -2298,6 +2319,7 @@ function finishFlashSet(res) {
   addGold(earned);
   logSession("flash", N, correct, sum, 0);   // 記録に残す（保護者画面のグラフに乗る）
   msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  msg += maybeDropItem(acc, true);
   msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : FLASH_SET + "問"} が はじまるよ</div>`;
   if (flashExam.on) {
     if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + " ごうかく！", correct + " / " + N + " 正解");
@@ -2451,6 +2473,7 @@ function finishBattle(reason) {
     `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><span class="bv-badge">${badge}</span><h3>${verdict}</h3></div></div>` +
     `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問　♥のこり ${Math.max(0, battle.life)}</span></div>` + outNote +
     (battle.you > 0 ? `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${kills}ぴき × ${perKill} GOLD（${battle.grade.key} ×${gm}）</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
+    maybeDropItem(battle.atts ? Math.round((battle.you / battle.atts) * 100) : 0, !isOut && battle.atts >= 5) +
     `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🧩 パズルへ</button>`;
   renderProfile();
   $("#battleAgain").onclick = () => renderBattle();
@@ -2569,6 +2592,11 @@ function tipDone(k) { const t = tipsSeen(); t[k] = 1; try { localStorage.setItem
 // key が まだ見ていなければ 説明を出す。onClose は 閉じたあとに呼ぶ
 function tipOnce(key, title, bodyHTML, onClose) {
   if (tipsSeen()[key]) { if (onClose) onClose(); return false; }
+  tipShow(title, bodyHTML, function () { tipDone(key); if (onClose) onClose(); });
+  return true;
+}
+// いつでも 出せる説明（「この級の 解きかたを 見る」ボタンなど）
+function tipShow(title, bodyHTML, onClose) {
   const el = fxLayer();
   const d = document.createElement("div");
   d.className = "tip-back";
@@ -2576,10 +2604,8 @@ function tipOnce(key, title, bodyHTML, onClose) {
     '<div class="tip-body">' + bodyHTML + "</div>" +
     '<button class="tip-ok">わかった！</button></div>';
   el.appendChild(d);
-  d.querySelector(".tip-ok").onclick = function () {
-    tipDone(key); d.remove(); if (onClose) onClose();
-  };
-  return true;
+  d.querySelector(".tip-ok").onclick = function () { d.remove(); if (onClose) onClose(); };
+  return d;
 }
 
 /* ============================================================ そろばんパズル
@@ -2589,6 +2615,7 @@ function tipOnce(key, title, bodyHTML, onClose) {
 const PZ_KEY = "soroban_puzzle";
 const PZ_W = 8, PZ_H = 8;
 const PZ_PLAY_COST = 30;                       // 1プレイに使うGOLD
+const PZ_SP_LUCK = 0.10;                       // 3つならべで ロケットが 生まれる確率（本番の盤だけ）
 // 玉の種類：トランプの絵がら4つ＋そろばん玉
 const PZ_KINDS = [
   { k: "spade", s: "♠", c: "#3a3a46", g: "#5b5b6b" },
@@ -2601,9 +2628,9 @@ const PZ_KINDS = [
 const PZ_ITEMS = [
   // 盤に置かず、はじめの手数を ふやすもの（手数が たりないときの たすけ）
   { id: "moves5", n: "手数 ＋5", em: "⏱", moves: 5, cost: 30, tip: "はじめから 手数が 5 多い（かさねて 買える）" },
-  { id: "rocket", n: "ロケット", em: "🚀", sp: "rh", cost: 40, tip: "たて か よこ を 1れつ 消す" },
-  { id: "prop", n: "プロペラ", em: "🚁", sp: "prop", cost: 50, tip: "ねらいの 玉へ とんでいく" },
-  { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: "まわり 3×3 を ばくはつ" },
+  { id: "rocket", n: "ロケット", em: "🚀", sp: "rh", cost: 40, tip: "はじめから 盤にある。となりと 入れかえると たて か よこ 1れつ 消す" },
+  { id: "prop", n: "プロペラ", em: "🚁", sp: "prop", cost: 50, tip: "はじめから 盤にある。入れかえると 目あての玉へ とんでいって 消す" },
+  { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: "はじめから 盤にある。入れかえると まわり 3×3 を ばくはつ" },
 ];
 // レベル（目あて と 手数）。だんだん むずかしくなる
 function pzLevel(n) {
@@ -2747,6 +2774,8 @@ function pzGroups(c, swapAt) {
     } else if (line && line.len >= 5) { sp = "disco"; at = line.cells[(line.len / 2) | 0]; }
     else if (line && line.len === 4) { sp = line.dir === "h" ? "rh" : "rv"; at = line.cells[1]; }
     else if (!line && parts.some((p) => p.dir === "sq")) { sp = "prop"; at = parts[0].cells[0]; }
+    // ロイヤルマッチのように 特殊な玉が よく出るよう、3つならべでも ときどき ロケットが 生まれる（本番の盤だけ）
+    else if (line && line.len === 3 && typeof pz !== "undefined" && pz && pz.luck && Math.random() < PZ_SP_LUCK) { sp = line.dir === "h" ? "rh" : "rv"; at = line.cells[1]; }
     if (sp && swapAt != null && cells.has(swapAt)) at = swapAt;      // 動かした玉の場所に生まれる
     groups.push({ k: runs[i].k, cells: Array.from(cells), sp: sp, at: at, size: cells.size });
   }
@@ -2900,9 +2929,41 @@ function pzGotFrom(r) {
   return (r.counts && r.counts[pz.lv.target]) || 0;
 }
 // 実際に消して、アイテムを置く
+let pzPendingSp = [];                          // この手で 生まれた特殊な玉（手が終わったら 説明を出す）
 function pzApply(c, r) {
   r.gone.forEach((i) => { c[i] = null; });
-  r.made.forEach((mk) => { if (!c[mk.at]) c[mk.at] = { id: pzUid++, k: mk.k, sp: mk.sp, born: true }; });
+  r.made.forEach((mk) => { if (!c[mk.at]) { c[mk.at] = { id: pzUid++, k: mk.k, sp: mk.sp, born: true }; if (mk.sp) pzPendingSp.push(mk.sp); } });
+}
+/* はじめて生まれた特殊な玉は、その手が終わったあとに つかい方を 1回だけ 説明する */
+const PZ_SP_TIPS = {
+  rh: ["🚀 ロケットが できた！", "<p><b>4つ ならべる</b>と ロケットが できるよ。</p><p>ロケットを <b>となりの玉と 入れかえる</b>と、<b>たて か よこ 1れつ</b>を ぜんぶ 消す！</p><p>ロケットどうしを 入れかえると <b>十字</b>に 消えるよ。</p>"],
+  tnt: ["💣 TNTが できた！", "<p><b>T字 か L字</b>に ならべると TNTが できるよ。</p><p>TNTを <b>となりの玉と 入れかえる</b>と、<b>まわり 3×3</b> が ばくはつ！</p><p>TNTどうしなら もっと 大きく ばくはつするよ。</p>"],
+  prop: ["🚁 プロペラが できた！", "<p><b>2×2 の四角</b>に ならべると プロペラが できるよ。</p><p>プロペラを <b>となりの玉と 入れかえる</b>と、<b>目あての玉</b>へ とんでいって 消す！</p><p>草や 箱が のこっているときにも べんり。</p>"],
+  disco: ["✨ 光の玉が できた！", "<p><b>5つ ならべる</b>と 光の玉が できるよ。</p><p>光の玉を <b>どれかの玉と 入れかえる</b>と、<b>その色の玉を ぜんぶ</b> 消す！</p><p>ロケットや TNTと 入れかえると、その色が ぜんぶ ロケット／TNTに なるよ。</p>"],
+};
+PZ_SP_TIPS.rv = PZ_SP_TIPS.rh;
+function pzFlushSpTips() {
+  const list = pzPendingSp.slice(); pzPendingSp = [];
+  if (typeof document === "undefined" || !$("#pzBoard")) return;
+  const seen = {};
+  list.forEach(function (sp) {
+    const key = "sp-" + (sp === "rv" ? "rh" : sp), t = PZ_SP_TIPS[sp];
+    if (!t || seen[key] || tipsSeen()[key]) return;
+    seen[key] = 1;
+    tipOnce(key, t[0], t[1]);
+  });
+}
+// ロイヤルマッチのように、はじめから 盤に 特殊な玉を 置いておく（本番の盤だけ）
+function pzStarterSpecials() {
+  if (!pz) return;
+  pz.luck = true;
+  const n = pz.lv.n >= 6 ? 2 : 1, kinds = ["rh", "rv", "prop", "tnt"];
+  for (let k = 0; k < n; k++) {
+    for (let t = 0; t < 80; t++) {
+      const i = Math.floor(Math.random() * PZ_W * PZ_H);
+      if (pz.cells[i] && !pz.cells[i].sp) { pz.cells[i].sp = kinds[Math.floor(Math.random() * kinds.length)]; break; }
+    }
+  }
 }
 function pzResolveOnce(c, kinds, swapAt) {
   const r = pzCollect(c, swapAt); if (!r) return null;
@@ -3377,10 +3438,10 @@ async function pzFinale() {
 /* ---------- あそび中に使える道具バー（画面の下・ロイヤルマッチと同じ位置） ---------- */
 const PZ_TOOLS = [
   { id: "moves", n: "手数+5", em: "⏱", cost: 30, tip: "のこり手数を 5 ふやす", now: true },
-  { id: "hammer", n: "ハンマー", em: "🔨", cost: 25, tip: "すきな玉を 1つ こわす" },
-  { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "その場所を ロケットにして 発射" },
-  { id: "prop", n: "プロペラ", em: "🚁", cost: 50, tip: "その場所を プロペラにして 発射" },
-  { id: "tnt", n: "TNT", em: "💣", cost: 60, tip: "その場所を TNTにして ばくはつ" },
+  { id: "hammer", n: "ハンマー", em: "🔨", cost: 25, tip: "タップした玉を 1つ こわす（手数は へらない）" },
+  { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "タップした場所を ロケットにして すぐ 発射（たて か よこ 1れつ）" },
+  { id: "prop", n: "プロペラ", em: "🚁", cost: 50, tip: "タップした場所を プロペラにして すぐ 発射（目あての玉へ）" },
+  { id: "tnt", n: "TNT", em: "💣", cost: 60, tip: "タップした場所を TNTにして すぐ ばくはつ（まわり 3×3）" },
 ];
 let pzArmed = null;                    // いま かまえている道具
 function pzToolStock(id) { const d = pzLoad(); return (d.items && d.items[id]) || 0; }
@@ -3506,6 +3567,7 @@ async function pzTry(a, b) {
   const done = pzFinishTurn();
   pzSync(); pzRenderHud();
   if (done) setTimeout(() => pzFinish(done), 260);
+  else pzFlushSpTips();                        // はじめての特殊な玉なら つかい方を 見せる
   } finally { pz.busy = false; }              // 何があっても 操作できる状態にもどす
 }
 function pzAdj(a, b) { return Math.abs(a % PZ_W - b % PZ_W) + Math.abs(((a / PZ_W) | 0) - ((b / PZ_W) | 0)) === 1; }
@@ -3670,7 +3732,8 @@ function pzRenderLobby() {
     '<div class="pz-lv-big">レベル <b>' + lv.n + "</b></div>" +
     '<div class="pz-goal-big">' + face + " <b>" + lv.need + "</b> こ　／　<b>" + lv.moves + "</b> 手 いない</div>" +
     (stars.length ? '<div class="pz-past-row">' + stars.join("") + "</div>" : "") +
-    '<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>' + items +
+    '<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>' +
+    '<div class="sub pz-howto">つかい方：特殊な玉を <b>となりの玉と 入れかえる</b>と はっしゃ！　4つならべ＝🚀　T字・L字＝💣　2×2＝🚁　5つならべ＝✨</div>' + items +
     '<div class="pz-total">つかう GOLD：<b>' + total + "</b>　（もっている " + g.toLocaleString() + "）</div>" +
     (g >= total ? '<button id="pzGo" class="big-cta">▶ はじめる</button>'
       : '<div class="pz-need">GOLDが ' + (total - g) + " たりない。そろばんの れんしゅうで かせごう！</div>") +
@@ -3701,7 +3764,7 @@ function pzRenderLobby() {
       for (let i = 0; i < used; i++) list.push(k);
     });
     rec.plays = (rec.plays || 0) + 1; pzSave(rec);
-    pzStart(pzLoad().lv, list);
+    pzStart(pzLoad().lv, list); pzStarterSpecials();
     pzBuy = {};
     renderPuzzle();
   };
@@ -3895,9 +3958,10 @@ function creditHTML() {
 /* ============================================================ 説明用の そろばんの絵（SVG）
    画像ファイルを 足さずに、コードで そろばんを描く。num は 0〜99。
    prev を渡すと「動いた珠」を 橙色にして 目立たせる。 */
-function sbSVG(num, prev, scale) {
-  const cols = 2, W = 46, BH = 16, pad = 8;
-  const digits = (n) => [Math.floor((n / 10) % 10), n % 10];
+function sbSVG(num, prev, scale, colsWanted) {
+  const need = Math.max(String(Math.max(num || 0, prev || 0)).length, 2);
+  const cols = colsWanted || need, W = 46, BH = 16, pad = 8;
+  const digits = (n) => { const a = []; for (let c = cols - 1; c >= 0; c--) a.push(Math.floor((n / Math.pow(10, c)) % 10)); return a; };
   const cur = digits(num), old = prev == null ? null : digits(prev);
   const barY = BH * 2 + 6, H = BH * 7 + 16, TW = cols * W + pad * 2;
   const bead = (cx, y, hl) => '<polygon points="' + (cx - 17) + "," + (y + BH / 2 - 1) + " " + cx + "," + y + " " + (cx + 17) + "," + (y + BH / 2 - 1) + " " + cx + "," + (y + BH - 2) +
@@ -3919,8 +3983,8 @@ function sbSVG(num, prev, scale) {
   return o + "</svg>";
 }
 // 「まえ → あと」の 2枚ならべ。cap は 下の説明
-function sbStep(a, b, cap) {
-  return '<div class="sb-step"><div class="sb-pair">' + sbSVG(a) + '<span class="sb-ar">→</span>' + sbSVG(b, a) + "</div>" +
+function sbStep(a, b, cap, cols) {
+  return '<div class="sb-step"><div class="sb-pair">' + sbSVG(a, null, 1, cols) + '<span class="sb-ar">→</span>' + sbSVG(b, a, 1, cols) + "</div>" +
     (cap ? '<div class="sb-cap">' + cap + "</div>" : "") + "</div>";
 }
 
@@ -3973,11 +4037,46 @@ const LESSON_LOW = {
     b: '<p>3つの かずで、<b>くり上がり</b>も 出てくるよ。</p>' +
        sbStep(7, 11, "7 + 4：十のくらいに 1、6を はらう → 11") + sbStep(11, 18, "つづけて + 7 ＝ 18") +
        '<p>あわてなくて いいよ。1つずつ たしかめよう。</p>' },
+  14: { t: "14級：5の友で ひく",
+    b: '<p>ひき算も 同じ。一玉が <b>たりないとき</b>は、<b>五玉を はらって</b> 友の かずを <b>入れる</b>よ。</p>' +
+       '<p class="ls-key"><b>5の友</b>：1と4 ／ 2と3</p>' +
+       sbStep(7, 4, "7 − 3：一玉が たりない → 五玉を はらって、3の友の <b>2</b>を 入れる") +
+       sbStep(6, 2, "6 − 4：五玉を はらって、4の友の <b>1</b>を 入れる") },
+  13: { t: "13級：くり下がり（10の友で ひく）",
+    b: '<p>ひけないときは、<b>十のくらいから 1 を はらって</b>、<b>10の友</b>を 入れるよ。</p>' +
+       '<p class="ls-key"><b>10の友</b>：1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>' +
+       sbStep(13, 7, "13 − 6：十のくらいの 1 を はらって、6の友の <b>4</b>を 入れる → 7") +
+       sbStep(15, 8, "15 − 7：十のくらいの 1 を はらって、7の友の <b>3</b>を 入れる → 8") },
+  12: { t: "12級：たしたり ひいたり",
+    b: '<p>3つの かずを、<b>上から じゅんばんに</b>。たし算と ひき算が まざっても、1つずつ やれば だいじょうぶ。</p>' +
+       sbStep(9, 13, "9 + 4 ＝ 13（くり上がり）") + sbStep(13, 8, "つづけて − 5 ＝ 8（五玉を はらう）") },
+  11: { t: "11級：はやく、せいかくに",
+    b: '<p>やり方は もう ぜんぶ 知っているよ。ここからは <b>手を 止めない</b>れんしゅう。</p>' +
+       '<ul><li>かずを 見たら <b>すぐ</b> 玉を 動かす</li><li>まよったら 🔴 <b>一のくらい</b>を 見る</li><li>まちがえても <b>ご破算（0にする）</b>で やり直せる</li></ul>' +
+       sbStep(6, 14, "6 + 8 ＝ 14") + sbStep(14, 5, "つづけて − 9 ＝ 5") },
+  10: { t: "10級：2けたの かず",
+    b: '<p>2けたに なっても 同じ。<b>左（十のくらい）から</b> 入れていくよ。</p>' +
+       sbStep(23, 68, "23 + 45：十のくらい 2+4、一のくらい 3+5 → 68") +
+       sbStep(47, 85, "47 + 38：十のくらい 4+3=7、一のくらい 7+8 は くり上がり → 十に 1、8の友 2を はらう → 85") +
+       '<p>かずが 5つ つづくよ。<b>1つ たすごとに</b> そろばんを 見て たしかめよう。</p>' },
 };
+// かけ算（9級から）・わり算（7級から）の はじめての説明
+const LESSON_KAKE = { t: "9級：かけ算の やりかた",
+  b: '<p>かけ算は <b>九九を 1つずつ</b> そろばんに たしていくよ。</p>' +
+     '<p class="ls-key">23 × 4 → <b>20×4</b> と <b>3×4</b> に わける</p>' +
+     sbStep(0, 80, "まず 20 × 4 ＝ 80 を 入れる", 3) + sbStep(80, 92, "つぎに 3 × 4 ＝ 12 を たす → 92", 3) +
+     '<p>コツ：九九の答えが 1けたのときは「<b>0</b>6」のように 0を つけて、<b>2けたぶんの 場所</b>に 入れる。</p>' };
+const LESSON_WARI = { t: "7級：わり算の やりかた",
+  b: '<p>わり算は <b>大きい くらいから</b>「いくつ 入るか」を 考えるよ。</p>' +
+     '<p class="ls-key">84 ÷ 4 → 十のくらいの <b>8</b> から</p>' +
+     sbStep(84, 21, "8 に 4 は 2つ → 十のくらいに <b>2</b>。のこりの 4 に 4 は 1つ → 一のくらいに <b>1</b>。こたえ 21") +
+     '<p>コツ：入る数を 大きく とりすぎたら、1つ もどして やり直す。<b>あまり</b>は 出ないように 作ってあるよ。</p>' };
 function lessonFor(g, subj) {
-  if (!g || g.band !== "kyu" || !LESSON_LOW[g.kyu]) return null;
-  if (subj !== "mitori" && subj !== "anzan") return null;
-  return LESSON_LOW[g.kyu];
+  if (!g || g.band !== "kyu") return null;
+  if (subj === "kake" && g.kyu === 9) return LESSON_KAKE;
+  if (subj === "wari" && g.kyu === 7) return LESSON_WARI;
+  if ((subj === "mitori" || subj === "anzan") && LESSON_LOW[g.kyu]) return LESSON_LOW[g.kyu];
+  return null;
 }
 // はじめる前に：その級の説明 → はじめての そろばんの説明 → 開始
 function startWithTips(subj) {
@@ -4008,10 +4107,9 @@ function renderLesson() {
     sec(false, "④ ゆびの つかいかた",
       '<ul><li>一玉を 上げる ＝ <b>おやゆび</b></li><li>一玉を 下げる・五玉 ＝ <b>ひとさしゆび</b></li><li>6〜9 は 五玉と 一玉を <b>いっしょに</b> うごかす</li></ul>' +
       '<p>このアプリでは、ゆびで <b>なぞる</b>と たまが うごくよ。</p>') +
-    sec(false, "⑤ かけ算・わり算（9級から）",
-      '<p><b>かけ算</b>：九九を 1つずつ そろばんに たしていく。「2×3＝06」のように、答えが 1けたのときは <b>0を つける</b>のが コツ。</p>' +
-      '<p><b>わり算</b>：大きい くらいから「いくつ 入るか」を さがして、その ぶんを ひいていく。</p>') +
-    sec(false, "⑥ けんていの きまり（めやす）",
+    sec(false, "⑤ かけ算（9級から）", LESSON_KAKE.b) +
+    sec(false, "⑥ わり算（7級から）", LESSON_WARI.b) +
+    sec(false, "⑦ けんていの きまり（めやす）",
       '<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>' +
       '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
       '<p class="sub">日本計算技能連盟の 公開サンプルを 参考にした、このアプリの めやすです。</p>');

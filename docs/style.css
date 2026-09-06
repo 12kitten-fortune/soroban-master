@@ -1159,3 +1159,11 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .ex-card, .ex-head, .ex-diag, .ex-fix, .tb-side { overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
 .ex-head .ex-q { white-space: normal; font-size: clamp(14px, 4.2vw, 20px); }
 .miss-report, .steps, .result { overflow-wrap: anywhere; }
+
+/* ============================================================ 道具のプレゼント・級の解きかたボタン・パズルの つかい方 */
+.drop-box { margin: 10px auto; max-width: 420px; background: linear-gradient(180deg,#fff7e0,#ffe9b3); border: 2px solid var(--royal-gold);
+  border-radius: 14px; padding: 10px 14px; font-size: 16px; color: #5a4310; animation: goldPop .45s ease; }
+.drop-box small { display: block; font-size: 12px; color: #8a7560; margin-top: 2px; }
+.lesson-btn { font-size: 13px; padding: 6px 12px; margin-left: 6px; vertical-align: middle; }
+.pz-howto { text-align: left; margin: -2px 0 8px; line-height: 1.8; }
+@media (max-width: 640px) { .lesson-btn { display: block; margin: 8px auto 0; } }
