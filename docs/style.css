@@ -1192,3 +1192,22 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 
 /* 合格証の「とじる」は 暗い背景の上なので 白くする */
 .cert-btns .ghost { color: #fff; border-color: rgba(255,255,255,.7); }
+
+/* ============================================================ 運指（ゆびの つかいかた） */
+.un-lead { font-size: 15px; line-height: 1.9; }
+.un-rule { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #faf7f0; border: 2px solid var(--line);
+  border-radius: 12px; padding: 8px 12px; margin: 8px 0; font-size: 14px; line-height: 1.7; }
+.un-tag { display: inline-block; color: #fff; font-weight: 800; font-size: 13px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.un-svg { display: inline-block; vertical-align: middle; height: auto; max-width: 100%; }
+.un-pair { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.un-ar { font-size: 28px; color: var(--bead-hi); font-weight: 800; }
+.un-step { margin: 12px 0 16px; }
+.un-tags { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 6px; }
+.un-both { display: inline-block; background: var(--royal-gold); color: #3a2a00; font-weight: 800; font-size: 13px; padding: 3px 10px; border-radius: 999px; }
+.un-cap { text-align: center; font-size: 14px; color: #4a3a26; margin-top: 4px; line-height: 1.7; }
+.un-cap b { color: var(--accent); }
+.un-h { font-weight: 800; color: var(--navy); font-size: 15px; margin: 18px 0 4px; border-top: 2px solid var(--line); padding-top: 10px; }
+.un-list { margin: 6px 0 0 20px; line-height: 1.9; font-size: 14px; }
+.un-note { background: #fff6e0; border-left: 5px solid var(--royal-gold); border-radius: 8px; padding: 8px 12px; font-size: 14px; line-height: 1.8; margin: 10px 0; }
+@media (max-width: 640px) { .un-svg { width: 68px; } .un-ar { font-size: 22px; } .un-cap { font-size: 13px; } }
+.un-rule .un-txt { flex: 1 1 180px; min-width: 0; }

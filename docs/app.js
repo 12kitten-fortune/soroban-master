@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-07-150"; // 最新反映の確認用
+const BUILD = "2026-09-07-160"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -1684,9 +1684,9 @@ function startQuizSection(step) {
   startPlayTimer();
   nextPlayProblem();
   // はじめて そろばんが出たときは 珠の動かし方を 見せる（そのあいだ タイマーは 止める）
-  if (session.answerBy === "soroban" && !tipsSeen()["first-play"]) {
+  if (session.answerBy === "soroban" && !(tipsSeen()["first-play"] && tipsSeen()["first-finger"])) {
     pausePlay(); session.pauseCount = Math.max(0, (session.pauseCount || 1) - 1);
-    tipOnce("first-play", TIP_PLAY.t, TIP_PLAY.b, resumePlay);
+    tipOnce("first-play", TIP_PLAY.t, TIP_PLAY.b, () => tipOnce("first-finger", TIP_FINGER.t, TIP_FINGER.b, resumePlay));
   }
 }
 function finishRoutineSection() {
@@ -3965,6 +3965,8 @@ const LESSON_LOW = {
   20: { t: "20級：たまの いみ",
     b: '<p><b>一玉（いちだま）</b>は 1。上に よせると 入るよ。<br><b>五玉（ごだま）</b>は 5。下に よせると 入るよ。</p>' +
        sbStep(0, 3, "1 + 2 ＝ 3　一玉を 1つ、また 2つ 入れる") + sbStep(0, 5, "5 は 五玉 1つ") +
+       '<p class="un-note">本物の そろばんを つかうときは、<b>おやゆび</b>で 一玉を 上げ、<b>ひとさしゆび</b>で 下げます。' +
+       'くわしくは 上の 📖「そろばんの きほん」を 見てね。</p>' +
        '<p>こたえが <b>5まで</b>の もんだいを やってみよう！</p>' },
   19: { t: "19級：5の友（とも）",
     b: '<p>一玉が たりないときは、<b>五玉を 入れて</b> あまりを <b>はらう</b>よ。</p>' +
@@ -4034,7 +4036,8 @@ function startWithTips(subj) {
   const g = currentGrade();
   const cf = SUBJECT[subj] || {};
   const go = () => startSession(subj);
-  const step2 = () => { if (cf.answer === "soroban") tipOnce("first-play", TIP_PLAY.t, TIP_PLAY.b, go); else go(); };
+  const step3 = () => { if (cf.answer === "soroban") tipOnce("first-finger", TIP_FINGER.t, TIP_FINGER.b, go); else go(); };
+  const step2 = () => { if (cf.answer === "soroban") tipOnce("first-play", TIP_PLAY.t, TIP_PLAY.b, step3); else go(); };
   const L = lessonFor(g, subj);
   if (L) tipOnce("lesson-" + g.kyu, L.t, L.b, step2); else step2();
 }
@@ -4048,15 +4051,13 @@ function renderLesson() {
       '<p><b>一玉（いちだま）</b>＝1。上に よせると 入る。<br><b>五玉（ごだま）</b>＝5。下に よせると 入る。<br>' +
       'まん中の 黒い ぼうが <b>はり</b>。🔴 あかい点の れつが <b>一のくらい</b>。</p>' +
       '<div class="sb-pair">' + sbSVG(0) + '<span class="sb-ar">→</span>' + sbSVG(7, 0) + '</div><div class="sb-cap">7 ＝ 五玉 1つ ＋ 一玉 2つ</div>') +
-    sec(false, "② 5の友（とも）",
+    sec(true, "② ゆびの つかいかた（運指）", unshiHTML(true)) +
+    sec(false, "③ 5の友（とも）",
       '<p>一玉が たりないときは、<b>五玉を 入れて</b> 友の かずを <b>はらう</b>。</p><p class="ls-key">1と4 ／ 2と3</p>' +
       sbStep(3, 7, "3 + 4 → 五玉を 入れて 1を はらう") + sbStep(7, 4, "7 − 3 → 五玉を はらって 2を 入れる（ひき算は ぎゃく）")) +
-    sec(false, "③ 10の友（くり上がり・くり下がり）",
+    sec(false, "④ 10の友（くり上がり・くり下がり）",
       '<p>10を こえるときは、<b>となりの くらいに 1</b>を 入れて、10の友を はらう。</p><p class="ls-key">1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>' +
       sbStep(8, 13, "8 + 5 → 十のくらいに 1、5を はらう") + sbStep(13, 7, "13 − 6 → 十のくらいの 1を はらって、4を 入れる")) +
-    sec(false, "④ ゆびの つかいかた",
-      '<ul><li>一玉を 上げる ＝ <b>おやゆび</b></li><li>一玉を 下げる・五玉 ＝ <b>ひとさしゆび</b></li><li>6〜9 は 五玉と 一玉を <b>いっしょに</b> うごかす</li></ul>' +
-      '<p>このアプリでは、ゆびで <b>なぞる</b>と たまが うごくよ。</p>') +
     sec(false, "⑤ かけ算（9級から）", LESSON_KAKE.b) +
     sec(false, "⑥ わり算（7級から）", LESSON_WARI.b) +
     sec(false, "⑦ けんていの きまり（めやす）",
@@ -4064,6 +4065,91 @@ function renderLesson() {
       '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
       '<p class="sub">日本計算技能連盟の 公開サンプルを 参考にした、このアプリの めやすです。</p>');
 }
+
+
+/* ============================================================ 運指（うんし）＝ ゆびの つかいかた
+   そろばんの 基本中の基本。1桁だけの そろばんを 描いて、動く珠に
+   「どの指で・どっち向きに」の 矢印を つける。
+     おやゆび（青）  … 一玉を 入れる（上げる）だけ
+     ひとさしゆび（赤）… そのほか ぜんぶ（一玉を払う／五玉を入れる／五玉を払う） */
+const FINGER = { thumb: { n: "おやゆび", c: "#2b6fd0", em: "👍" }, index: { n: "ひとさしゆび", c: "#c0392b", em: "☝" } };
+// before → after で 動く珠を 調べる。[{ bead:"heaven"|"earth", dir:"up"|"down", finger }]
+function unshiMoves(before, after) {
+  const hb = before >= 5, ha = after >= 5, eb = before % 5, ea = after % 5, out = [];
+  if (hb !== ha) out.push({ bead: "heaven", dir: ha ? "down" : "up", finger: "index" });
+  if (eb !== ea) out.push({ bead: "earth", dir: ea > eb ? "up" : "down", finger: ea > eb ? "thumb" : "index" });
+  return out;
+}
+/* 1桁のそろばん＋矢印。moves は unshiMoves の結果 */
+function unshiSVG(val, moves) {
+  const W = 78, BH = 20, pad = 10, barY = BH * 2 + 8, H = BH * 7 + 22, TW = W + pad * 2;
+  const cx = pad + W / 2, d = val;
+  const bead = (y, on) => '<polygon points="' + (cx - 26) + "," + (y + BH / 2 - 1) + " " + cx + "," + y + " " + (cx + 26) + "," + (y + BH / 2 - 1) + " " + cx + "," + (y + BH - 2) +
+    '" fill="' + (on ? "#ff9f2e" : "#a5552a") + '" stroke="' + (on ? "#c0392b" : "#5a2d12") + '" stroke-width="2"/>';
+  const hv = moves.find((m) => m.bead === "heaven"), er = moves.find((m) => m.bead === "earth");
+  let o = '<svg class="un-svg" viewBox="0 0 ' + TW + " " + H + '" width="' + TW + '" aria-hidden="true">' +
+    '<rect x="2" y="2" width="' + (TW - 4) + '" height="' + (H - 4) + '" rx="7" fill="#e9e4d8" stroke="#1c1c1c" stroke-width="5"/>' +
+    '<rect x="2" y="' + barY + '" width="' + (TW - 4) + '" height="5" fill="#222"/>' +
+    '<rect x="' + (cx - 2) + '" y="6" width="4" height="' + (H - 12) + '" fill="#aaa"/>';
+  const hy = d >= 5 ? barY - BH + 2 : 6;
+  o += bead(hy, !!hv);
+  const e = d % 5;
+  for (let j = 0; j < 4; j++) o += bead(barY + 9 + (j < e ? j : j + 1) * BH, !!er && j === (er.dir === "up" ? e - 1 : e));
+  /* 矢印（右よこ）。五玉は 梁より上、一玉は 梁より下 の中だけを 動く。
+     y0 から y1 へ向かう線＋先っぽの三角。枠から はみ出さない 位置に かためる。 */
+  const arrow = (y0, y1, col) => {
+    const x = cx + 32, up = y1 < y0, tip = y1, base = up ? y1 + 10 : y1 - 10;
+    return '<line x1="' + x + '" y1="' + y0 + '" x2="' + x + '" y2="' + base + '" stroke="' + col + '" stroke-width="5" stroke-linecap="round"/>' +
+      '<polygon points="' + (x - 7) + "," + base + " " + (x + 7) + "," + base + " " + x + "," + tip + '" fill="' + col + '"/>';
+  };
+  const hTop = 14, hBot = barY - 6, eTop = barY + 16, eBot = H - 14;   // 五玉／一玉が 動ける はんい
+  if (hv) o += hv.dir === "down" ? arrow(hTop, hBot, FINGER[hv.finger].c) : arrow(hBot, hTop, FINGER[hv.finger].c);
+  if (er) o += er.dir === "up" ? arrow(eBot, eTop, FINGER[er.finger].c) : arrow(eTop, eBot, FINGER[er.finger].c);
+  return o + "</svg>";
+}
+/* 「◯ → ◯」の1組と、どの指かの ふだ */
+function unshiStep(before, after, cap) {
+  const mv = unshiMoves(before, after);
+  const tags = Array.from(new Set(mv.map((m) => m.finger))).map((f) =>
+    '<span class="un-tag" style="background:' + FINGER[f].c + '">' + FINGER[f].em + " " + FINGER[f].n + "</span>").join("");
+  return '<div class="un-step"><div class="un-pair">' + unshiSVG(before, mv) + '<span class="un-ar">→</span>' + unshiSVG(after, []) + "</div>" +
+    '<div class="un-tags">' + tags + (mv.length > 1 ? '<span class="un-both">同時に！</span>' : "") + "</div>" +
+    '<div class="un-cap">' + cap + "</div></div>";
+}
+/* 運指の説明。本物の そろばんを つかうときの ゆびの動かし方 */
+function unshiHTML(full) {
+  let o = '<p class="un-lead">そろばんは <b>右手の おやゆび と ひとさしゆび</b>の 2本だけで はじきます。' +
+    'ほかの ゆびは つかいません。ここが <b>いちばん だいじ</b>です。</p>' +
+    '<div class="un-rule"><span class="un-tag" style="background:' + FINGER.thumb.c + '">👍 おやゆび</span>' +
+    '<span class="un-txt">一玉（下の玉）を <b>入れる</b>ときだけ。下から 上へ はじく</span></div>' +
+    '<div class="un-rule"><span class="un-tag" style="background:' + FINGER.index.c + '">☝ ひとさしゆび</span>' +
+    '<span class="un-txt">そのほか <b>ぜんぶ</b>。一玉を はらう／五玉を 入れる／五玉を はらう</span></div>' +
+    unshiStep(0, 3, "1・2・3・4 を 入れる … <b>おやゆび</b>で 上げる") +
+    unshiStep(3, 0, "1・2・3・4 を はらう … <b>ひとさしゆび</b>で 下げる") +
+    unshiStep(0, 5, "5 を 入れる … <b>ひとさしゆび</b>で 五玉を 下げる") +
+    unshiStep(5, 0, "5 を はらう … <b>ひとさしゆび</b>で 五玉を 上げる");
+  if (full) {
+    o += '<p class="un-h">6・7・8・9 は <b>2本の ゆびを 同時に</b></p>' +
+      unshiStep(0, 7, "7 を 入れる … 五玉を <b>ひとさしゆび</b>で 下げながら、一玉を <b>おやゆび</b>で 上げる") +
+      unshiStep(7, 0, "7 を はらう … 五玉を <b>ひとさしゆび</b>で 上げながら、一玉を <b>ひとさしゆび</b>で 下げる") +
+      '<p class="un-note">べつべつに 2回 うごかすと おそくなります。<b>いっぺんに</b> できるように なると、ぐんと 速くなります。</p>' +
+      '<p class="un-h">はじめる まえの かまえ</p>' +
+      '<ul class="un-list"><li>そろばんは <b>体の まん中</b>に、まっすぐ おく</li>' +
+      '<li><b>左手</b>は そろばんの 左はしを おさえる（ずれない ように）</li>' +
+      '<li>えんぴつは <b>くすりゆび と こゆび</b>で はさんで もつ。はじきながら 書けるよ</li>' +
+      '<li>珠は 指の <b>つめの ちかく</b>で、かるく はじく</li></ul>' +
+      '<p class="un-h">ご破算（ごわさん）＝ 0に もどす</p>' +
+      '<ul class="un-list"><li><b>ひとさしゆび</b>を 梁（はり）の 上に あてて、左から右へ すべらせる → 五玉が ぜんぶ 上がる</li>' +
+      '<li>つづけて <b>おやゆび</b>を 梁の 下に あてて、左から右へ すべらせる → 一玉が ぜんぶ 下がる</li>' +
+      '<li>なれてきたら、2本の ゆびで <b>はさむように</b> 一回で すべらせる</li></ul>' +
+      '<p class="un-note">このアプリの 画面の そろばんは、ゆびで <b>なぞる</b>だけで うごきます。' +
+      'でも <b>本物の そろばん</b>を つかうときは、上の うごかし方に してください。' +
+      '「級・段を選ぶ」で <b>「じぶんの そろばんを つかう」</b>に すると、本物で れんしゅうできます。</p>';
+  }
+  return o;
+}
+const TIP_FINGER = { t: "✋ ゆびは 2本だけ つかう", b: unshiHTML(false) +
+  '<p class="un-note">くわしくは <b>「そろばんの きほん」</b>（上の 📖 ボタン）で いつでも 見られます。</p>' };
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */
 renderGrid();
