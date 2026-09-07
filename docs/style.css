@@ -1218,3 +1218,10 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .un-why b { color: var(--accent); }
 .un-ex { font-weight: 800; color: var(--navy); font-size: 15px; margin: 14px 0 2px; }
 .un-ex b { font-size: 19px; color: var(--accent); }
+
+/* 「そろばんの きほん」から、くわしい解説ページへの ご案内 */
+.lesson-links { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px;
+  background: #fff8e4; border: 2px solid var(--royal-gold); border-radius: 12px; padding: 12px 14px; }
+.lesson-links b { color: var(--navy); width: 100%; margin-bottom: 2px; }
+.lesson-links a { color: var(--navy); font-weight: 700; text-decoration: none; background: var(--card);
+  border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 14px; }

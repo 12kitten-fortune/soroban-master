@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-07-210"; // 最新反映の確認用
+const BUILD = "2026-09-07-220"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -4089,7 +4089,12 @@ function renderLesson() {
     sec(false, "⑦ けんていの きまり（めやす）",
       '<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>' +
       '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
-      '<p class="sub">日本計算技能連盟の 公開サンプルを 参考にした、このアプリの めやすです。</p>');
+      '<p class="sub">日本計算技能連盟の 公開サンプルを 参考にした、このアプリの めやすです。</p>') +
+    // おうちの人・先生が じっくり 読める、印刷しやすい 解説ページ（検索からも 来られる）
+    '<div class="lesson-links"><b>くわしい解説（べつのページ）</b>' +
+    '<a href="soroban-yubi.html">✋ 指づかい（運指）</a>' +
+    '<a href="soroban-tomo.html">🖐 5の友・10の友</a>' +
+    '<a href="soroban-kyu.html">📘 級のレベルの めやす</a></div>';
 }
 
 

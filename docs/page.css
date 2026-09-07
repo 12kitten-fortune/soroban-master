@@ -1,0 +1,52 @@
+/* 検索から 来た人が 読む「解説ページ」の 見た目。
+   アプリ本体（style.css）の 色や 部品を そのまま つかいつつ、
+   長い文章が 読みやすいように 整える。 */
+body.doc { background: var(--bg); }
+.doc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: linear-gradient(160deg, #1b3a6b, #16305c); padding: 12px max(16px, env(safe-area-inset-left)); }
+.doc-logo img { display: block; width: 168px; max-width: 46vw; border-radius: 10px; }
+.doc-cta { display: inline-block; text-decoration: none; white-space: nowrap;
+  background: linear-gradient(180deg, #e8c860, #c9a227); color: #3a2a00; font-weight: 800;
+  padding: 11px 22px; border-radius: 999px; box-shadow: 0 3px 0 #a8821c; }
+.doc-cta.big { font-size: 19px; padding: 15px 34px; margin-top: 10px; }
+
+.doc-main { max-width: 760px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-left)) 40px; }
+.doc-main h1 { font-size: clamp(23px, 5.4vw, 32px); line-height: 1.4; color: var(--navy); margin-bottom: 12px; }
+.doc-main h2 { font-size: clamp(19px, 4.4vw, 23px); color: var(--navy); margin: 30px 0 10px;
+  border-bottom: 3px solid var(--royal-gold); padding-bottom: 6px; }
+.doc-lead { font-size: 16px; line-height: 2; background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+.doc-main p { line-height: 1.95; margin: 10px 0; }
+.doc-main b { color: var(--accent); }
+.doc-main h1 b, .doc-main h2 b { color: inherit; }
+
+/* 本文にちらばる 図（app.js の しくみを そのまま つかう） */
+.doc-main .un-step, .doc-main .sb-step { background: var(--card); border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px 8px; }
+
+.doc-table { overflow-x: auto; }
+.doc-table .rec-table { min-width: 460px; background: var(--card); }
+.doc-table .rec-table td:first-child { white-space: nowrap; }
+
+.doc-box { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold);
+  border-radius: 16px; padding: 18px 18px 22px; margin: 34px 0 20px; text-align: center; }
+.doc-box-h { font-size: 20px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
+.doc-box p { text-align: left; }
+
+.doc-nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.doc-nav b { color: var(--navy); margin-right: 4px; }
+.doc-nav a { color: var(--navy); font-weight: 700; text-decoration: none;
+  border: 2px solid var(--line); border-radius: 999px; padding: 7px 14px; }
+.doc-nav a:hover { border-color: var(--royal-gold); background: #fff8e4; }
+
+.doc-foot { text-align: center; color: #8a7560; font-size: 13px; line-height: 1.9;
+  padding: 22px 16px max(22px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.doc-foot a { color: var(--navy); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .doc-main { padding-top: 18px; }
+  .doc-lead { font-size: 15px; line-height: 1.9; }
+  .doc-cta { padding: 9px 16px; font-size: 14px; }
+  .doc-nav a { font-size: 13px; padding: 6px 12px; }
+}
