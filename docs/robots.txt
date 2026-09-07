@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://12kitten-fortune.github.io/soroban-master/sitemap.xml
+Sitemap: https://sorobankingdom.com/sitemap.xml
