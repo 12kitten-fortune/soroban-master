@@ -45,6 +45,7 @@ function page({ file, title, desc, h1, lead, body, updated }) {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>${esc(title)}</title>
+    <meta name="google-site-verification" content="nH6SLyVBrLJ_tPMrwN-hPCs-YRNWsRnxa1U6SU5Eb7k" />
     <meta name="description" content="${esc(desc)}" />
     <link rel="canonical" href="${url}" />
     <meta name="theme-color" content="#16305c" />
