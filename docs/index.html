@@ -70,6 +70,7 @@
                 <div class="hero-speech" id="homeSpeech">きょうもいっしょにがんばろう！</div>
                 <img class="hero-mascot" src="assets/king.png" alt="レオ王" />
               </div>
+              <div class="speed-box" id="speedBox"></div>
               <div class="today-box">
                 <div class="today-title">今日の練習</div>
                 <div class="today-menu" id="homeMenu"></div>
@@ -217,13 +218,7 @@
           <div class="card">
             <h3>🔥 本日の練習メニュー</h3>
             <p class="sub">じぶんの 級を えらんで「はじめる」。この じゅんばんで すすむよ（きゅうけいは とばしても いい）。</p>
-            <ol class="menu-list">
-              <li>あんざん 15もん（3分）→ きゅうけい 1分　×3セット</li>
-              <li>きゅうけい 2分</li>
-              <li>かけ算 15もん → きゅうけい 1分</li>
-              <li>わり算 15もん → きゅうけい 1分</li>
-              <li>みとり算 10もん → 🎉 せいせき はっぴょう</li>
-            </ol>
+            <div class="sub" id="todayNote"></div>
             <p class="sub">※ かけ算・わり算が ない級では、そのぶんは とばすよ。</p>
             <div class="row2">
               <label>級・段<select id="todayGrade"></select></label>
@@ -242,6 +237,10 @@
           <div class="card">
             <h3>今月のがんばり</h3>
             <div id="recEffort" class="sub"></div>
+          </div>
+          <div class="card">
+            <h3>🎓 合格証</h3>
+            <div id="recCerts"></div>
           </div>
           <div class="card">
             <h3>じこベスト タイム（級・段 × しゅもく）</h3>

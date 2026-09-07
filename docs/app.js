@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-06-140"; // 最新反映の確認用
+const BUILD = "2026-09-07-150"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -225,11 +225,53 @@ function touchStreak() {
   const s = loadStat(), t = today();
   if (s.lastDate !== t) { const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10); s.streak = s.lastDate === y ? s.streak + 1 : 1; s.lastDate = t; saveStat(s); }
 }
-function certify(gradeKey) {
+const CERTS = "soroban_certs";
+const allCerts = () => { try { return JSON.parse(localStorage.getItem(CERTS) || "[]"); } catch (e) { return []; } };
+function certify(gradeKey, subj) {
   const idx = GRADES.findIndex((g) => g.key === gradeKey);
   const cur = JSON.parse(localStorage.getItem(RANK) || "null");
   if (!cur || idx > cur.idx) localStorage.setItem(RANK, JSON.stringify({ key: gradeKey, idx }));
+  // 合格証（同じ級・同じ種目は 1枚）
+  const list = allCerts();
+  let c = list.find((x) => x.g === gradeKey && x.subj === subj);
+  if (!c) { c = { g: gradeKey, subj: subj || "mitori", d: today(), no: list.length + 1 }; list.push(c); try { localStorage.setItem(CERTS, JSON.stringify(list)); } catch (e) { console.error("合格証の保存に失敗", e); } }
   renderProfile();
+  setTimeout(() => showCert(c), 1800);          // お祝いの花火のあとに 出す
+}
+/* 合格証を 大きく出す。印刷して かべに はれる／LINE などで おくれる */
+function showCert(c) {
+  const p = profile();
+  const old = $("#certLayer"); if (old) old.remove();
+  const d = document.createElement("div");
+  d.id = "certLayer";
+  const dateJa = (() => { const [y, m, dd] = c.d.split("-"); return y + "年" + (+m) + "月" + (+dd) + "日"; })();
+  d.innerHTML = '<div class="cert">' +
+    '<div class="cert-top"><img class="cert-crown" src="assets/crown.png" alt=""><div class="cert-title">合 格 証</div></div>' +
+    '<div class="cert-name">' + p.name + '<small>殿</small></div>' +
+    '<div class="cert-body">そろばんキングダム <b>' + c.g + '</b>（' + subjName(c.subj) + '）の けんていに<br>ごうかくしたことを ここに 証します。</div>' +
+    '<div class="cert-date">' + dateJa + '　第 ' + (c.no || 1) + ' 号</div>' +
+    '<div class="cert-king"><img src="assets/king_celebrate.png" alt="レオ王"><span>そろばんキングダム 国王 レオ</span></div>' +
+    '</div>' +
+    '<div class="cert-btns"><button id="certPrint">🖨 いんさつ する</button><button id="certShare">📤 おくる</button><button id="certClose" class="ghost">とじる</button></div>';
+  document.body.appendChild(d);
+  $("#certClose").onclick = () => d.remove();
+  $("#certPrint").onclick = () => { try { window.print(); } catch (e) { } };
+  $("#certShare").onclick = async () => {
+    const text = p.name + " が そろばんキングダム " + c.g + "（" + subjName(c.subj) + "）の けんていに ごうかくしました！🎓 " + dateJa;
+    try {
+      if (navigator.share) await navigator.share({ title: "合格証", text: text, url: location.href.split("#")[0] });
+      else { await navigator.clipboard.writeText(text + " " + location.href.split("#")[0]); alert("文を コピーしたよ。LINE などに はりつけて おくってね"); }
+    } catch (e) { }
+  };
+  try { fxConfetti(40); } catch (e) { }
+}
+// 記録画面：これまでの 合格証
+function renderCerts() {
+  const box = $("#recCerts"); if (!box) return;
+  const list = allCerts().slice().reverse();
+  if (!list.length) { box.innerHTML = '<p class="sub">けんていモード（ぜんぶ こたえてから ◎×）で ごうかくすると、ここに 合格証が ならぶよ。</p>'; return; }
+  box.innerHTML = '<div class="cert-list">' + list.map((c, i) => '<button class="cert-chip" data-i="' + i + '">🎓 ' + c.g + '<small>' + subjName(c.subj) + "・" + c.d + "</small></button>").join("") + "</div>";
+  $$("#recCerts .cert-chip").forEach((b) => { b.onclick = () => showCert(list[+b.dataset.i]); });
 }
 const rankText = () => { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.key : "未取得"; };
 function saveTime(gradeKey, subj, sec) { const t = JSON.parse(localStorage.getItem(TIMES) || "{}"); const k = `${gradeKey}_${subj}`; const prev = t[k]; const improved = prev == null || sec < prev; if (improved) { t[k] = sec; localStorage.setItem(TIMES, JSON.stringify(t)); } return { improved, prev }; }
@@ -944,7 +986,56 @@ function routineMenuSummary(grade) {
   steps.forEach((s) => { if (s.subj) cnt[s.subj] = (cnt[s.subj] || 0) + s.N; });
   return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => `<div class="menu-row"><span>${SUBJECT[s].name}</span><b>${cnt[s]}問</b></div>`).join("");
 }
+/* 1問にかかる時間の うつりかわり。「きのうの じぶん」に 勝つのが いちばん 夢中になる */
+function speedStats() {
+  const ses = allSessions().filter((e) => e.avg > 0 && e.N >= 3 && (e.subj === "anzan" || e.subj === "mitori" || e.subj === "kake" || e.subj === "wari"));
+  if (!ses.length) return null;
+  const t = today(), d7 = daysAgo(6), d14 = daysAgo(13);
+  const recent = ses.filter((e) => e.d >= d7);
+  const pick = (list) => { const c = {}; list.forEach((e) => { c[e.subj] = (c[e.subj] || 0) + e.N; }); return Object.keys(c).sort((a, b) => c[b] - c[a])[0]; };
+  const subj = pick(recent.length ? recent : ses);
+  const of = (list) => list.filter((e) => e.subj === subj);
+  const avg = (list) => { const n = list.reduce((a, e) => a + e.N, 0); return n ? list.reduce((a, e) => a + e.avg * e.N, 0) / n : null; };
+  const thisWeek = avg(of(ses.filter((e) => e.d >= d7))), lastWeek = avg(of(ses.filter((e) => e.d >= d14 && e.d < d7)));
+  const todayAvg = avg(of(ses.filter((e) => e.d === t)));
+  // 日ごとの平均（14日ぶん）。ベストは 日単位で
+  const byDay = {};
+  of(ses).forEach((e) => { (byDay[e.d] = byDay[e.d] || []).push(e); });
+  const days = Object.keys(byDay).sort();
+  const daily = days.map((d) => ({ d, v: avg(byDay[d]) }));
+  const best = daily.reduce((m, x) => (m == null || x.v < m ? x.v : m), null);
+  const spark = [];
+  for (let i = 13; i >= 0; i--) { const d = daysAgo(i); spark.push(byDay[d] ? avg(byDay[d]) : null); }
+  return { subj, thisWeek, lastWeek, todayAvg, best, spark, n: of(ses).length };
+}
+function sparkSVG(vals) {
+  const pts = vals.map((v, i) => [i, v]).filter((x) => x[1] != null);
+  if (pts.length < 2) return "";
+  const W = 220, H = 44, lo = Math.min.apply(null, pts.map((x) => x[1])) * 0.9, hi = Math.max.apply(null, pts.map((x) => x[1])) * 1.05 || 1;
+  const X = (i) => 6 + (i / 13) * (W - 12), Y = (v) => H - 4 - ((v - lo) / (hi - lo || 1)) * (H - 8);
+  const line = pts.map((x, i) => (i ? "L" : "M") + X(x[0]).toFixed(1) + " " + Y(x[1]).toFixed(1)).join(" ");
+  const last = pts[pts.length - 1];
+  return '<svg class="spark" viewBox="0 0 ' + W + " " + H + '" aria-hidden="true"><path d="' + line + '" fill="none" stroke="#d4af37" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="' + X(last[0]).toFixed(1) + '" cy="' + Y(last[1]).toFixed(1) + '" r="4" fill="#c0392b"/></svg>';
+}
+function renderSpeed() {
+  const box = $("#speedBox"); if (!box) return;
+  const st = speedStats();
+  if (!st) { box.innerHTML = '<div class="sp-h">⚡ 1もんの はやさ</div><div class="sub">れんしゅうすると、ここに「1もんに かかる時間」が 出るよ。きのうの じぶんに 勝とう！</div>'; return; }
+  const name = subjName(st.subj), now = st.todayAvg != null ? st.todayAvg : st.thisWeek;
+  let cmp = "";
+  if (st.lastWeek != null && now != null) {
+    const diff = st.lastWeek - now;
+    cmp = diff > 0.05 ? '<span class="sp-up">先週 ' + st.lastWeek.toFixed(1) + '秒 → <b>' + diff.toFixed(1) + '秒 はやくなった！</b></span>'
+      : diff < -0.05 ? '<span class="sp-dn">先週 ' + st.lastWeek.toFixed(1) + '秒。きょうは ゆっくり ていねいに</span>'
+      : '<span class="sp-eq">先週と 同じくらい。あと 0.1秒！</span>';
+  } else cmp = '<span class="sp-eq">あしたも はかって、きょうの じぶんに 勝とう</span>';
+  box.innerHTML = '<div class="sp-h">⚡ ' + name + "の はやさ</div>" +
+    '<div class="sp-row"><div class="sp-big">1もん <b>' + (now != null ? now.toFixed(1) : "—") + '</b><small>秒</small></div>' + sparkSVG(st.spark) + "</div>" +
+    '<div class="sp-cmp">' + cmp + (st.best != null ? '<span class="sp-best">🏆 じこベスト ' + st.best.toFixed(1) + "秒</span>" : "") + "</div>";
+}
 function renderHome() {
+  renderSpeed();
   const p = profile(), k = loadKingdom(), s = loadStat(), ms = monthStats(), g = homeGrade();
   $("#homeAvatar").innerHTML = avatarHTML(p.avatar); $("#homeName").textContent = p.name; $("#homeRank").textContent = rankText();
   $("#homeMenu").innerHTML = routineMenuSummary(g) || '<div class="sub">この級では暗算・見取りを練習します</div>';
@@ -1050,6 +1141,7 @@ function renderRecords() {
     : `<p class="sub">まだ きろくが ないよ。れんしゅうを さいごまで やると、タイムが のこるよ。</p>`;
   renderWeekRank();
   renderRecLog();
+  renderCerts();
 }
 
 /* ============================================================ やった記録（ぜんぶ）
@@ -1168,6 +1260,13 @@ function renderWeekRank() {
 }
 function renderToday() {
   const sel = $("#todayGrade");
+  const lv = routineLevel(), d = practiceDays();
+  const steps = buildSteps(homeGrade());
+  const lines = steps.map((st) => st.rest != null ? "きゅうけい " + st.rest + "びょう" : st.label).join(" → ");
+  const note = $("#todayNote");
+  if (note) note.innerHTML = (lv === 0 ? "はじめての日は <b>3もん</b>だけ。まずは「できた！」で おわろう。"
+    : lv < 4 ? "れんしゅうした日が <b>" + d + "日</b>。少しずつ 長くなるよ（7日で 本番のメニュー）。" : "本番のメニューだよ。") +
+    '<div class="today-flow">' + lines + " → 🎉 せいせき はっぴょう</div>";
   sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join("");
   sel.dataset.filled = "1";
   const rk = JSON.parse(localStorage.getItem(RANK) || "null");
@@ -1447,7 +1546,7 @@ function finishSession() {
     const score = session.correct * cf.per, pass = score >= cf.pass;
     msg += `<br>${pass ? "🎉 合格！" : "不合格"}（${score} / ${cf.per * session.N}点・合格${cf.pass}）`;
     cls = pass ? "ok" : "ng";
-    if (pass) { certify(session.grade.key); msg += `<br>🎓 ${session.grade.key} 認定！`; }
+    if (pass) { certify(session.grade.key, session.subj); msg += `<br>🎓 ${session.grade.key} 認定！ 合格証が もらえるよ`; }
   }
   msg += report;
   if (completed) { // GOLDは学習の成果としてのみ付与
@@ -1518,8 +1617,30 @@ const ROUTINE_TEMPLATE = [
   { rest: 60, next: "みとり算" },
   { subj: "mitori", N: 10, timed: false, label: "みとり算 10問" },
 ];
+/* 練習した日数（きょうを ふくまない）。はじめの数日は 短いメニューにして「続く」ことを 最優先にする */
+function practiceDays() {
+  try { const t = today(); return new Set(allSessions().map((e) => e.d).filter((d) => d && d !== t)).size; } catch (e) { return 0; }
+}
+// 日数 → メニューの段階（0＝はじめての日 … 4＝本番のメニュー）
+function routineLevel() { const d = practiceDays(); return d <= 0 ? 0 : d <= 1 ? 1 : d <= 3 ? 2 : d <= 6 ? 3 : 4; }
+const ROUTINE_LEVELS = [
+  // 0：はじめての日は 3問だけ。「できた！」で 終わる
+  [{ subj: "anzan", N: 3, timed: false, label: "きょうの 3もん" }],
+  // 1：2日目
+  [{ subj: "anzan", N: 5, timed: false, label: "あんざん 5もん" }, { rest: 30, next: "みとり算" }, { subj: "mitori", N: 3, timed: false, label: "みとり算 3もん" }],
+  // 2：3〜4日目
+  [{ subj: "anzan", N: 10, timed: true, label: "あんざん 10もん（3分）" }, { rest: 45, next: "かけ算" },
+   { subj: "kake", N: 5, timed: false, label: "かけ算 5もん" }, { rest: 30, next: "わり算" }, { subj: "wari", N: 5, timed: false, label: "わり算 5もん" },
+   { rest: 45, next: "みとり算" }, { subj: "mitori", N: 5, timed: false, label: "みとり算 5もん" }],
+  // 3：5〜7日目
+  [{ subj: "anzan", N: 15, timed: true, label: "あんざん 15もん（3分）" }, { rest: 60, next: "かけ算" },
+   { subj: "kake", N: 10, timed: false, label: "かけ算 10もん" }, { rest: 45, next: "わり算" }, { subj: "wari", N: 10, timed: false, label: "わり算 10もん" },
+   { rest: 60, next: "みとり算" }, { subj: "mitori", N: 10, timed: false, label: "みとり算 10もん" }],
+];
 function buildSteps(grade) {
-  const kept = ROUTINE_TEMPLATE.filter((s) => s.rest != null || difficulty(grade, s.subj));
+  const lv = routineLevel();
+  const base = lv >= 4 ? ROUTINE_TEMPLATE : ROUTINE_LEVELS[lv];
+  const kept = base.filter((s) => s.rest != null || difficulty(grade, s.subj));
   const out = [];
   for (let i = 0; i < kept.length; i++) {
     const s = kept[i];
@@ -1618,7 +1739,7 @@ function finishRoutine() {
   hist.push({ date: today(), grade: rs.grade.key, totalCorrect, totalN, acc, timeSec: Math.round(totalTime), sections: rs.sections.map((s) => ({ label: s.label, correct: s.correct, N: s.N, sec: Math.round(s.sec) })) });
   localStorage.setItem(ROUTINE, JSON.stringify(hist.slice(-200)));
   logStudy(totalTime); touchStreak();
-  const sectionsGold = rs.gold || 0, completeBonus = 100;
+  const sectionsGold = rs.gold || 0, completeBonus = [20, 35, 60, 80, 100][Math.min(4, routineLevel())];   // 短いメニューの日は ひかえめ
   const routineBonus = Math.round(60 * gradeGoldMult(rs.grade));   // 本日の練習を やりきったごほうび
   const goldLines = [`練習でためた ＋${sectionsGold}`, `本日の練習 完了 ＋${completeBonus}`, `🏁 やりきった ＋${routineBonus}`];
   let earned = sectionsGold + completeBonus + routineBonus;
@@ -2198,7 +2319,7 @@ function finishFlashSet(res) {
   let msg = "";
   if (flashExam.on) {
     msg += `検定結果：${correct}/${N} 正解　<b>${correct * 10}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
-    if (pass) { certify(flashGrade.key); msg += `<br>🎓 ${flashGrade.key} 認定！`; }
+    if (pass) { certify(flashGrade.key, "flash"); msg += `<br>🎓 ${flashGrade.key} 認定！ 合格証が もらえるよ`; }
   } else {
     msg += `⚡ ${N}問 おわり！`;
   }
