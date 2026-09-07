@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-07-170"; // 最新反映の確認用
+const BUILD = "2026-09-07-180"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -628,10 +628,15 @@ const BGM_LIST = [
 ];
 const BGM_BATTLE = { f: "bgm_battle", n: "たいせん（サイバー）" };   // ⚔️たいせん 専用
 const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
-let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm_study";      // メインの曲（設定で えらべる）
+let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm1";           // ホームの曲（設定で えらべる）
 const OFF_KEY = "soroban_bgmoff";
 let bgmOff = (function () { try { return JSON.parse(localStorage.getItem(OFF_KEY) || "{}"); } catch (e) { return {}; } })();
 const bgmUsable = () => BGM_LIST.filter((b) => !bgmOff[b.f]);
+// ローテーション用：ホームの曲は のぞく（画面を移ったのに 同じ曲、を なくすため）
+function bgmRotList() {
+  const use = bgmUsable().map((b) => b.f), rest = use.filter((f) => f !== bgmMain);
+  return rest.length ? rest : use;
+}
 function toggleBgmUse(f) {
   bgmOff[f] = !bgmOff[f];
   if (bgmUsable().length === 0) bgmOff[f] = false;                 // ぜんぶ外すのは できない
@@ -641,16 +646,14 @@ const bgmLoaded = {};                                              // 読めた�
 function setBgmMain(f) {
   bgmMain = f;
   try { localStorage.setItem(MAIN_KEY, f); } catch (e) { }
-  bgmStop(); bgmPlay(f);
+  bgmArea = ""; bgmStop(); bgmPlay(f);
 }
 /* ステージが始まるたびに 曲を送る。
    メインの曲を 1回おきに挟むので、メインが いちばん多くかかりつつ 毎回ちがう曲になる。 */
 function bgmNextStage() {
   let t = parseInt(localStorage.getItem(TURN_KEY), 10); if (!isFinite(t)) t = 0;
   try { localStorage.setItem(TURN_KEY, String(t + 1)); } catch (e) { }
-  // メインの曲から はじめて、ぜんぶ 一巡してから もどる＝毎ステージ ちがう曲
-  const use = bgmUsable().map((b) => b.f);
-  const order = use.indexOf(bgmMain) >= 0 ? [bgmMain].concat(use.filter((f) => f !== bgmMain)) : use;
+  const order = bgmRotList();
   return order[t % order.length] || bgmMain;
 }
 /* ---- れんしゅう中（みとり算・かけ算など）の BGM ----
@@ -660,27 +663,50 @@ let bgmStudy = localStorage.getItem(STUDY_KEY) || "rotate";
 function setBgmStudy(v) {
   bgmStudy = v;
   try { localStorage.setItem(STUDY_KEY, v); } catch (e) { }
-  bgmStop();
+  bgmArea = ""; bgmStop();
   const pv = $("#view-play");
   if (pv && !pv.classList.contains("hidden")) bgmForStudy(true);   // れんしゅう中なら すぐ 切りかえる
 }
 function bgmNextStudy() {
   let t = parseInt(localStorage.getItem(STURN_KEY), 10); if (!isFinite(t)) t = 0;
   try { localStorage.setItem(STURN_KEY, String(t + 1)); } catch (e) { }
-  const use = bgmUsable().map((b) => b.f);
-  return use[t % use.length] || bgmMain;
+  const order = bgmRotList();
+  return order[t % order.length] || bgmMain;
 }
 function bgmForStudy(next) {
   if (bgmStudy === "off") return bgmStop();
   if (bgmStudy !== "rotate") return bgmPlay(bgmStudy);
-  bgmPlay(next || !bgmName ? bgmNextStudy() : bgmName);
+  let f = bgmNextStudy();
+  if (f === bgmName) f = bgmNextStudy();          // いま鳴っている曲と 同じなら もう1つ 送る
+  bgmPlay(f);
 }
-// 画面に合わせて BGM を切りかえる
+/* 画面ごとに 曲を かえると、メニューを タップするたびに 曲が 切れて うるさい。
+   そこで「場所（エリア）」で わけ、場所が 変わったときだけ 切りかえる。
+     たいせん … 専用の曲（固定）
+     パズル   … ステージごとに かわる
+     れんしゅう… 学習用（設定：鳴らさない／毎回かえる／曲を指定）
+     きろく   … 記録・保護者。おちついて 読む画面なので 別の曲
+     そのほか … ホームの曲（ホーム・級えらび・設定・きほん）
+   場所が ちがえば かならず 曲も ちがうよう、ローテーションからは ホームの曲を のぞいてある。 */
+function bgmAreaOf(v) {
+  if (v === "battle") return "battle";
+  if (v === "puzzle") return "puzzle";
+  if (v === "play" || v === "today") return "study";
+  if (v === "records" || v === "parent") return "record";
+  return "menu";
+}
+// きろく画面の曲：ホームの曲 いがいから、いつも 同じものを えらぶ
+function bgmRecordSong() { const r = bgmRotList(); return r[r.length - 1] || bgmMain; }
+let bgmArea = "";
 function bgmForView(v, next) {
-  if (v === "puzzle") bgmPlay(next ? bgmNextStage() : (bgmName || bgmMain));
-  else if (v === "battle") bgmPlay(BGM_BATTLE.f);                   // たいせんは 専用の曲
-  else if (v === "play" || v === "today") bgmForStudy(next);        // れんしゅう中は 学習用の曲
-  else bgmPlay(bgmMain);                                             // ホームなど：メインの曲（設定で えらべる）
+  const area = bgmAreaOf(v);
+  if (area === bgmArea && bgmEl && !next) return;   // 同じ場所の中では 曲を そのままにする
+  bgmArea = area;
+  if (area === "battle") return bgmPlay(BGM_BATTLE.f);
+  if (area === "puzzle") return bgmPlay(bgmNextStage());
+  if (area === "study") return bgmForStudy(true);
+  if (area === "record") return bgmPlay(bgmRecordSong());
+  bgmPlay(bgmMain);
 }
 
 function clickSnd() { // 珠が弾く「パチ」
