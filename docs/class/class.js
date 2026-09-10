@@ -52,6 +52,15 @@
     } catch (err) { $("#lgMsg").textContent = friendly(err); $("#lgMsg").className = "result ng"; }
   });
   $("#logoutBtn").addEventListener("click", () => S.signOut());
+  // パスワードの 目のマーク：おすたび 表示 ⇄ 非表示
+  const eye = $("#lgPwEye");
+  if (eye) eye.addEventListener("click", () => {
+    const pw = $("#lgPw"), show = pw.type === "password";
+    pw.type = show ? "text" : "password";
+    eye.textContent = show ? "🙈" : "👁";
+    eye.setAttribute("aria-label", show ? "パスワードを 隠す" : "パスワードを 表示する");
+    pw.focus();
+  });
   const rs = $("#lgReset");
   if (rs) rs.addEventListener("click", async (e) => {
     e.preventDefault();

@@ -66,3 +66,10 @@
   background: #fff8e4; border-left: 4px solid var(--royal-gold); border-radius: 6px; }
 .cls-switch { margin-top: 12px !important; }
 .cls-switch a, .cls-main .cls-form a { color: var(--navy); font-weight: 700; }
+
+/* パスワードの 目のマーク */
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 48px; }
+.pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 34px;
+  border: none; background: transparent; font-size: 20px; cursor: pointer; border-radius: 8px; padding: 0; line-height: 1; }
+.pw-eye:hover { background: #fff8e4; }

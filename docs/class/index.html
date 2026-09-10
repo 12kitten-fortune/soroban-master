@@ -43,7 +43,10 @@
           <div id="lgModeTitle" class="cls-mode-title fb-only">はじめての先生（アカウントを 作る）</div>
           <label>お名前（教室名でも可）<input id="lgName" type="text" autocomplete="name" placeholder="さくら そろばん教室" /></label>
           <label class="fb-only">メールアドレス<input id="lgEmail" type="email" autocomplete="email" placeholder="example@gmail.com" /></label>
-          <label class="fb-only">パスワード（8文字以上。自分で 決めます）<input id="lgPw" type="password" autocomplete="current-password" minlength="8" /></label>
+          <label class="fb-only">パスワード（8文字以上。自分で 決めます）
+            <span class="pw-wrap"><input id="lgPw" type="password" autocomplete="current-password" minlength="8" />
+              <button type="button" id="lgPwEye" class="pw-eye" aria-label="パスワードを 表示する" title="表示／非表示">👁</button></span>
+          </label>
           <div class="btn-row">
             <button type="submit" id="lgGo">アカウントを 作って はじめる</button>
           </div>
