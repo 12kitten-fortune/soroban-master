@@ -62,6 +62,18 @@
     } catch (e) { console.error("読み上げに 失敗", e); }
   }
   function stopSpeak() { try { window.speechSynthesis.cancel(); } catch (e) { } }
+  /* 説明文（.hint）に 🔊 を 自動で 付ける。data-say が あれば その文を 読む */
+  (function addHintSpeakers() {
+    if (!canSpeak) return;
+    document.querySelectorAll(".hint").forEach((p) => {
+      if (p.querySelector(".hint-speak")) return;
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "hint-speak"; b.textContent = "🔊"; b.title = "読み上げる";
+      b.setAttribute("aria-label", "この説明を 読み上げる");
+      b.addEventListener("click", () => speak(p.dataset.say || p.textContent));
+      p.appendChild(b);
+    });
+  })();
   $("#guideSpeak").addEventListener("click", () => speak(($("#guideStep").textContent + "。" + $("#guideTitle").textContent + "。" + $("#guideText").textContent).replace(/\s+/g, "")));
   /* ---- 使い方（ぜんぶの 手順） ---- */
   function openGuide() {

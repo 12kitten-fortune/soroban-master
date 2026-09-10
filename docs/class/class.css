@@ -108,3 +108,14 @@ body.cls { font-size: 17px; }
 .guide-list li b { display: block; font-size: 18px; color: #c62828; margin-bottom: 4px; }
 .guide-list li span { display: block; line-height: 1.8; }
 @media (max-width: 640px) { .guide-h { font-size: 18px; } .guide-h #guideStep { font-size: 22px; } }
+
+/* 入力欄の すぐ上に 置く 説明。欄と 欄の あいだで 手順が 進む */
+.hint { position: relative; background: #fffdf3; border-left: 5px solid var(--royal-gold); border-radius: 8px;
+  padding: 11px 46px 11px 14px; margin: 16px 0 6px; font-size: 16px; line-height: 1.8; color: #33302a; }
+.hint b { color: #b8860b; }
+.hint b.warn { color: #c62828; }
+.hint-speak { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; border-radius: 50%;
+  border: 2px solid var(--royal-gold); background: #fff; font-size: 15px; cursor: pointer; line-height: 1; padding: 0; }
+.hint-speak:hover { background: #fff8e4; }
+.cls-form label .lb, .cls-add label .lb { display: block; font-weight: 800; color: var(--navy); font-size: 14px; margin-bottom: 2px; }
+.cls-form label, .cls-add label { margin-bottom: 4px; }

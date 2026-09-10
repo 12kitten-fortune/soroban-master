@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-11-360"; // 最新反映の確認用
+const BUILD = "2026-09-11-370"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ

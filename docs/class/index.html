@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=360" />
+    <link rel="stylesheet" href="class.css?v=370" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=360"></script>
-    <script src="store.js?v=360"></script>
+    <script src="../firebase-config.js?v=370"></script>
+    <script src="store.js?v=370"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -46,19 +46,27 @@
       <section id="scr-login" class="card hidden">
         <h1>🏫 先生の画面</h1>
         <p class="sub">生徒の 練習が 見える・ログインカードを 印刷する。先生だけが 使う画面です。生徒や 保護者は ここを 使いません。</p>
-        <ol class="cls-steps fb-only">
-          <li><b>はじめての先生</b>は、下に お名前・メール・パスワードを 入れて「アカウントを作る」。<b>1分</b>で 終わります</li>
-          <li>教室を 作って、生徒の <b>にっくねーむ</b>を 入れる</li>
-          <li>ログインカードを 印刷して 子どもに 渡す。子どもは コードを 入れて 名前を えらぶだけ</li>
-        </ol>
         <form id="loginForm" class="cls-form">
           <div id="lgModeTitle" class="cls-mode-title fb-only">はじめての先生（アカウントを 作る）</div>
-          <label>お名前（教室名でも可）<input id="lgName" type="text" autocomplete="name" placeholder="さくら そろばん教室" /></label>
-          <label class="fb-only">メールアドレス<input id="lgEmail" type="email" autocomplete="email" placeholder="example@gmail.com" /></label>
-          <label class="fb-only">パスワード（8文字以上。自分で 決めます）
+
+          <p class="hint" data-say="お名前を 入れます。ご自分の お名前でも、教室の 名前でも かまいません。ここは あとから 変えられます。">
+            <b>①</b> ご自分の お名前か、<b>教室の 名前</b>を 入れます。あとから 変えられます。</p>
+          <label><span class="lb">お名前（教室名でも可）</span><input id="lgName" type="text" autocomplete="name" placeholder="さくら そろばん教室" /></label>
+
+          <p class="hint fb-only" data-say="いつも 使っている メールアドレスを 入れます。パスワードを 忘れたときの 連絡に 使います。生徒や 保護者には 見えません。">
+            <b>②</b> いつも 使っている <b>メールアドレス</b>を 入れます。パスワードを 忘れたときの 連絡に 使います。生徒や 保護者には 見えません。</p>
+          <label class="fb-only"><span class="lb">メールアドレス</span><input id="lgEmail" type="email" autocomplete="email" placeholder="example@gmail.com" /></label>
+
+          <p class="hint fb-only" data-say="パスワードを、ご自分で 決めて 入れます。8文字以上です。どこかから 送られてくるものでは ありません。右の 目のマークを 押すと、入れた 文字が 見えます。忘れないよう 紙に 控えてください。">
+            <b>③</b> パスワードを <b>ご自分で 決めて</b> 入れます（8文字以上）。どこかから 送られてくるものでは ありません。<br>
+            右の <b>👁</b> を 押すと 入れた文字が 見えます。<b class="warn">紙に 控えておくと 安心です。</b></p>
+          <label class="fb-only"><span class="lb">パスワード（8文字以上）</span>
             <span class="pw-wrap"><input id="lgPw" type="password" autocomplete="current-password" minlength="8" />
               <button type="button" id="lgPwEye" class="pw-eye" aria-label="パスワードを 表示する" title="表示／非表示">👁</button></span>
           </label>
+
+          <p class="hint fb-only" data-say="3つとも 入れたら、下の 黒い ボタンを 押します。これで 準備は 終わりです。">
+            <b>④</b> 3つとも 入れたら、下の <b>黒いボタン</b>を 押します。</p>
           <div class="btn-row">
             <button type="submit" id="lgGo">アカウントを 作って はじめる</button>
           </div>
@@ -74,6 +82,8 @@
         <div class="card">
           <h1>教室</h1>
           <div id="classList" class="cls-list"></div>
+          <p class="hint" data-say="教室の 名前を 入れて、教室を 作る を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。">
+            教室の 名前を 入れて <b>「＋ 教室を 作る」</b>を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。</p>
           <form id="newClassForm" class="cls-inline">
             <input id="ncName" type="text" placeholder="教室の名前（例：月曜クラス）" required />
             <button type="submit">＋ 教室を 作る</button>
@@ -91,7 +101,9 @@
           </div>
           <div class="cls-code-box">
             <div>クラスコード<b id="clsCode"></b></div>
-            <p class="sub">子どもは アプリを ひらいて「教室に 参加」→ このコードを 入れて → 自分の名前を えらぶだけ。パスワードは ありません。</p>
+            <p class="hint" data-say="これが この教室の 合いことばです。子どもは アプリを ひらいて、教室に 参加 を 押し、この 6文字を 入れて、自分の 名前を えらぶだけです。パスワードは ありません。この 6文字は 下の ログインカードにも 入ります。">
+              これが この教室の <b>合いことば</b>です。子どもは アプリの「🏫 教室に 参加」で この6文字を 入れ、<b>自分の名前を えらぶだけ</b>。パスワードは ありません。<br>
+              この6文字は 下の <b>ログインカード</b>にも 入ります。</p>
           </div>
           <div class="btn-row">
             <button id="cardsBtn">🖨 ログインカードを 印刷</button>
@@ -102,8 +114,11 @@
           <h2>生徒</h2>
           <div id="studentTable"></div>
           <form id="addForm" class="cls-add">
-            <label>生徒を 追加（1行に 1人。にっくねーむだけ）<textarea id="addNicks" rows="4" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
-            <p class="sub">名前を 書いたら、下の ボタンを 押すと 登録されます。あとから いつでも 足せます。</p>
+            <p class="hint" data-say="下の 白い 欄に、生徒の 名前を 1行に 1人ずつ 書きます。エンターキーで 改行して ください。本名で なくて かまいません。子どもが 自分で 見つけられる 呼び名に します。">
+              下の 欄に 生徒の 名前を <b>1行に 1人ずつ</b>（改行して ください）。<b>本名で なくて かまいません。</b>子どもが 自分で 見つけられる 呼び名に します。</p>
+            <label><span class="lb">生徒を 追加</span><textarea id="addNicks" rows="4" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
+            <p class="hint" data-say="書き終わったら、下の 黒い ボタンを 押すと 登録されます。あとから いつでも 足せます。">
+              書き終わったら 下の <b>黒いボタン</b>を 押すと 登録されます。あとから いつでも 足せます。</p>
             <button type="submit" class="cls-add-btn">＋ この名前を 登録する</button>
           </form>
         </div>
@@ -136,6 +151,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=360"></script>
+    <script src="class.js?v=370"></script>
   </body>
 </html>
