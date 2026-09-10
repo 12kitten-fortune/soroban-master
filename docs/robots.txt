@@ -1,4 +1,5 @@
 User-agent: *
+Disallow: /class/
 Allow: /
 
 Sitemap: https://sorobankingdom.com/sitemap.xml

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>先生の画面｜そろばんキングダム</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#16305c" />
+    <link rel="icon" href="../icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../page.css" />
+    <link rel="stylesheet" href="class.css" />
+    <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="../firebase-config.js"></script>
+    <script src="store.js"></script>
+  </head>
+  <body class="doc cls">
+    <header class="doc-head">
+      <a class="doc-logo" href="../"><img src="../assets/logo.png" alt="そろばんキングダム" /></a>
+      <div class="cls-head-r">
+        <span id="whoami" class="cls-who"></span>
+        <button id="logoutBtn" class="ghost hidden">ログアウト</button>
+      </div>
+    </header>
+    <main class="doc-main cls-main">
+      <div id="modeNote" class="cls-mode hidden"></div>
+
+      <!-- ログイン -->
+      <section id="scr-login" class="card hidden">
+        <h1>🏫 先生の画面</h1>
+        <p class="sub">生徒の 練習が 見える・宿題を 出す・ログインカードを 印刷する。先生だけが 使う画面です。</p>
+        <form id="loginForm" class="cls-form">
+          <label>お名前（教室名でも可）<input id="lgName" type="text" autocomplete="name" placeholder="さくら そろばん教室" /></label>
+          <label class="fb-only">メールアドレス<input id="lgEmail" type="email" autocomplete="email" /></label>
+          <label class="fb-only">パスワード（8文字以上）<input id="lgPw" type="password" autocomplete="current-password" minlength="8" /></label>
+          <div class="btn-row">
+            <button type="submit" id="lgGo">はじめる</button>
+            <button type="button" id="lgToggle" class="ghost fb-only">アカウントを 持っている（ログイン）</button>
+          </div>
+          <div id="lgMsg" class="result"></div>
+        </form>
+        <p class="un-note">生徒側は ログイン不要です。先生が 登録した にっくねーむを 選ぶだけで 使えます。メール・本名・生年月日は 集めません。</p>
+      </section>
+
+      <!-- 教室の一覧 -->
+      <section id="scr-classes" class="hidden">
+        <div class="card">
+          <h1>教室</h1>
+          <div id="classList" class="cls-list"></div>
+          <form id="newClassForm" class="cls-inline">
+            <input id="ncName" type="text" placeholder="教室の名前（例：月曜クラス）" required />
+            <button type="submit">＋ 教室を 作る</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 教室 -->
+      <section id="scr-class" class="hidden">
+        <p class="cls-crumb"><a href="#" id="backClasses">← 教室の一覧</a></p>
+        <div class="card">
+          <div class="cls-title-row">
+            <h1 id="clsName"></h1>
+            <button id="clsDelete" class="ghost small">教室を 消す</button>
+          </div>
+          <div class="cls-code-box">
+            <div>クラスコード<b id="clsCode"></b></div>
+            <p class="sub">子どもは アプリを ひらいて「教室に 参加」→ このコードを 入れて → 自分の名前を えらぶだけ。パスワードは ありません。</p>
+          </div>
+          <div class="btn-row">
+            <button id="cardsBtn">🖨 ログインカードを 印刷</button>
+            <button id="reloadBtn" class="ghost">↻ 最新に</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>生徒</h2>
+          <div id="studentTable"></div>
+          <form id="addForm" class="cls-add">
+            <label>生徒を 追加（1行に 1人。にっくねーむだけ）<textarea id="addNicks" rows="3" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
+            <button type="submit">＋ 追加</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 生徒 -->
+      <section id="scr-student" class="hidden">
+        <p class="cls-crumb"><a href="#" id="backClass">← 教室に もどる</a></p>
+        <div class="card">
+          <h1 id="stName"></h1>
+          <div id="stSummary" class="cls-summary"></div>
+          <div id="stMiss"></div>
+        </div>
+        <div class="card">
+          <h2>練習の 記録</h2>
+          <div id="stSessions"></div>
+        </div>
+      </section>
+
+      <div id="cardsOut" class="hidden"></div>
+    </main>
+    <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
+    <script src="class.js"></script>
+  </body>
+</html>

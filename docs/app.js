@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-10-280"; // 最新反映の確認用
+const BUILD = "2026-09-11-300"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -421,6 +421,7 @@ function logSession(subj, N, correct, sumSec, pauses, results) {
   // 1日4セットなら 4年分のこる。
   try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-6000))); }
   catch (err) { try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-2000))); } catch (e2) { console.error("記録の保存に失敗", e2); } }
+  try { if (typeof schedulePush === "function") schedulePush(); } catch (e) { }
 }
 const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
 function sessionsBetween(from, to) { return allSessions().filter((e) => e.d >= from && e.d <= to); }
@@ -858,7 +859,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
 function showView(v) {
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
@@ -873,6 +874,7 @@ function showView(v) {
   if (v === "parent") renderParent();
   if (v === "sheet") renderSheet();
   if (v === "kentei") renderKentei();
+  if (v === "join") renderJoin();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
   document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
@@ -4502,6 +4504,119 @@ function renderExamHistory() {
   t.addEventListener("change", examUpdateSpec);
   go.addEventListener("click", startExam);
 })();
+
+
+/* ============================================================ 教室に参加（生徒側）
+   先生が 作った クラスコードを 入れて、自分の にっくねーむを えらぶ。
+   パスワードは 無い。メール・本名・生年月日は 集めない。
+   Firebase は「参加するとき」だけ 読みこむ（ふつうに 遊ぶ子には 一切 読ませない）。 */
+const CLASSLINK = "soroban_classlink";
+const jesc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const classLink = () => { try { return JSON.parse(localStorage.getItem(CLASSLINK) || "null"); } catch (e) { return null; } };
+function setClassLink(v) {
+  try { v ? localStorage.setItem(CLASSLINK, JSON.stringify(v)) : localStorage.removeItem(CLASSLINK); } catch (e) { console.error("教室の 保存に 失敗", e); }
+  renderJoin();
+}
+const FB_VER = "10.14.1";
+const FB_SRC = [
+  "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-app-compat.js",
+  "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-auth-compat.js",
+  "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-firestore-compat.js",
+  "firebase-config.js", "class/store.js",
+];
+let storeLoading = null;
+function loadStore() {
+  if (window.SKStore) return Promise.resolve(window.SKStore);
+  if (storeLoading) return storeLoading;
+  const one = (src) => new Promise((ok, ng) => {
+    const s = document.createElement("script"); s.src = src; s.async = false;
+    s.onload = ok; s.onerror = () => ng(new Error("読みこめません：" + src));
+    document.head.appendChild(s);
+  });
+  storeLoading = FB_SRC.reduce((p, src) => p.then(() => one(src)), Promise.resolve())
+    .then(() => window.SKStore)
+    .catch((e) => { storeLoading = null; throw e; });
+  return storeLoading;
+}
+function renderJoin() {
+  const box = $("#joinBox"); if (!box) return;
+  const cl = classLink();
+  if (cl) {
+    box.innerHTML = '<div class="join-on"><div class="join-on-h">🏫 ' + jesc(cl.className) + " に 参加中</div>" +
+      "<p>あなたの 名前：<b>" + jesc(cl.nick) + "</b></p>" +
+      '<p class="sub">れんしゅうの きろくは、先生の 画面に とどきます。まちがえ方の クセも 先生が 見て、つぎの 宿題を 決めます。</p>' +
+      '<div id="joinSync" class="sub"></div>' +
+      '<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>';
+    $("#joinPush").onclick = () => pushToClass(true);
+    $("#joinLeave").onclick = () => { if (confirm("教室から ぬけます。この端末の れんしゅうの きろくは 消えません。よろしいですか？")) setClassLink(null); };
+    return;
+  }
+  box.innerHTML = '<p class="sub">そろばん教室で もらった <b>クラスコード</b>（6文字）を 入れてね。おうちで れんしゅうすると、先生が 見てくれます。<br>' +
+    "コードが ない人は 入らなくて だいじょうぶ。ふつうに ぜんぶ あそべます。</p>" +
+    '<div class="join-row"><input id="joinCode" type="text" inputmode="latin" autocapitalize="characters" maxlength="6" placeholder="ABC123" />' +
+    '<button id="joinGo">つぎへ</button></div><div id="joinMsg" class="result"></div><div id="joinPick"></div>';
+  const inp = $("#joinCode");
+  inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#joinGo").click(); });
+  $("#joinGo").onclick = joinStep1;
+}
+async function joinStep1() {
+  const code = ($("#joinCode").value || "").trim().toUpperCase();
+  const msg = $("#joinMsg"), pick = $("#joinPick");
+  pick.innerHTML = ""; msg.className = "result";
+  if (code.length !== 6) { msg.textContent = "コードは 6文字だよ"; msg.className = "result ng"; return; }
+  msg.textContent = "しらべています…";
+  let S;
+  try { S = await loadStore(); } catch (e) { msg.textContent = "つうしんが できません。電波を たしかめて、もう一度 おしてね。"; msg.className = "result ng"; return; }
+  try {
+    const c = await S.resolveCode(code);
+    if (!c) { msg.textContent = "その コードの 教室が 見つかりません。先生に たしかめてね。"; msg.className = "result ng"; return; }
+    const list = await S.listStudents(c.id);
+    if (!list.length) { msg.textContent = "この 教室には まだ 名前が 登録されていません。先生に たのんでね。"; msg.className = "result ng"; return; }
+    msg.textContent = "🏫 " + c.name + "　じぶんの 名前を えらんでね"; msg.className = "result ok";
+    pick.innerHTML = '<div class="join-names">' + list.map((s, i) => '<button class="join-name" data-i="' + i + '">' + jesc(s.nick) + "</button>").join("") + "</div>";
+    $$("#joinPick .join-name").forEach((b) => {
+      b.onclick = async () => {
+        const s = list[+b.dataset.i];
+        try {
+          await S.joinClass(c.id, s.id);
+          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, sent: 0 });
+          fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
+          pushToClass(false);
+        } catch (e) { msg.textContent = "参加できませんでした：" + ((e && e.message) || e); msg.className = "result ng"; }
+      };
+    });
+  } catch (e) { msg.textContent = "うまく いきませんでした。もう一度 おしてね。"; msg.className = "result ng"; console.error(e); }
+}
+/* 記録を 先生に おくる。おくったところまでを sent に 覚えて、同じものを 二度 おくらない */
+let pushTimer = null, pushing = false;
+async function pushToClass(loud) {
+  const cl = classLink(); if (!cl || pushing) return;
+  const note = $("#joinSync");
+  const all = allSessions(), fresh = all.filter((e) => (e.t || 0) > (cl.sent || 0));
+  if (!fresh.length) { if (loud && note) note.textContent = "おくるものは ありません（ぜんぶ とどいています）"; return; }
+  pushing = true;
+  if (note) note.textContent = "おくっています…";
+  try {
+    const S = await loadStore();
+    await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all);
+    cl.sent = Math.max.apply(null, fresh.map((e) => e.t || 0));
+    try { localStorage.setItem(CLASSLINK, JSON.stringify(cl)); } catch (e) { }
+    if (note) note.textContent = "✓ " + fresh.length + "件 とどきました";
+  } catch (e) {
+    console.error("先生への 送信に 失敗", e);
+    if (note) note.textContent = "いまは おくれませんでした。つぎに ひらいたとき もう一度 ためします。";
+  } finally { pushing = false; }
+}
+// 練習が おわるたび、少し待ってから まとめて おくる（連続で 通信しない）
+function schedulePush() {
+  if (!classLink()) return;
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => pushToClass(false), 4000);
+}
+
+/* ---------- 教室に 入っている子は、ひらいたときに おくり残しを おくる ---------- */
+if (classLink()) setTimeout(function () { pushToClass(false); }, 3000);
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */
 renderGrid();

@@ -1,0 +1,60 @@
+/* 先生の画面。解説ページの 見た目（page.css）の 上に 重ねる */
+.cls-main { max-width: 900px; }
+.cls-main h1 { font-size: clamp(20px, 4.6vw, 26px); margin-bottom: 8px; }
+.cls-main h2 { font-size: 18px; margin: 4px 0 10px; border-bottom: 2px solid var(--royal-gold); padding-bottom: 4px; }
+.cls-main .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+.cls-head-r { display: flex; align-items: center; gap: 10px; }
+.cls-who { color: #fff; font-weight: 700; font-size: 14px; }
+.cls-mode { background: #fff3cd; border: 1px solid #e9d38a; color: #6b5100; border-radius: 10px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; line-height: 1.7; }
+.cls-crumb { margin: 0 0 8px; } .cls-crumb a { color: var(--navy); font-weight: 700; text-decoration: none; }
+.cls-form label, .cls-add label { display: block; font-size: 13px; color: #555; margin-bottom: 10px; }
+.cls-form input, .cls-add textarea, .cls-inline input { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; font-size: 16px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.cls-inline { display: flex; gap: 8px; margin-top: 10px; } .cls-inline input { margin: 0; flex: 1; }
+.cls-list { display: flex; flex-direction: column; gap: 8px; }
+.cls-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px;
+  background: #fff; text-align: left; font: inherit; cursor: pointer; width: 100%; }
+.cls-item:hover { border-color: var(--royal-gold); background: #fff8e4; }
+.cls-item b { font-size: 17px; color: var(--navy); }
+.cls-item small { color: #777; margin-left: auto; white-space: nowrap; }
+.cls-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.cls-code-box { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 2px solid var(--royal-gold); border-radius: 12px; padding: 12px 14px; margin: 8px 0 12px; }
+.cls-code-box b { display: inline-block; margin-left: 12px; font-size: 30px; letter-spacing: .18em; color: var(--navy); font-variant-numeric: tabular-nums; }
+.cls-main .rec-table { width: 100%; }
+.cls-main .rec-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cls-main .rec-table .st-link { background: none; border: none; padding: 0; font: inherit; font-weight: 800; color: var(--navy); cursor: pointer; text-decoration: underline; }
+.cls-main .rec-table .x { background: none; border: none; color: #b33; cursor: pointer; font: inherit; }
+.cls-main button.small { font-size: 13px; padding: 6px 12px; }
+.st-warn { color: #b33; font-weight: 700; } .st-ok { color: #1f8a4c; font-weight: 700; } .st-none { color: #999; }
+.cls-summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
+.cls-summary div { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 120px; }
+.cls-summary div b { display: block; font-size: 22px; color: var(--navy); }
+.cls-summary div span { font-size: 12px; color: #666; }
+.miss-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 14px; }
+.miss-bar i { display: block; height: 12px; background: linear-gradient(90deg, #e8a04c, #c9642a); border-radius: 6px; }
+.cls-empty { color: #777; font-size: 14px; padding: 8px 0; }
+
+/* ---- ログインカード（A4 に 8枚） ---- */
+#cardsOut { margin-top: 10px; }
+.lc-sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #fff; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }
+.lc { border: 2px dashed #c9a227; border-radius: 12px; padding: 12px 14px; color: #000; background: #fff; break-inside: avoid; }
+.lc-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #555; }
+.lc-head img { width: 44px; height: auto; border-radius: 6px; }
+.lc-nick { font-size: 22px; font-weight: 900; margin: 6px 0 2px; color: #16305c; }
+.lc-cls { font-size: 12px; color: #666; }
+.lc-code { margin: 8px 0 4px; font-size: 12px; color: #555; }
+.lc-code b { display: block; font-size: 26px; letter-spacing: .2em; color: #000; font-variant-numeric: tabular-nums; }
+.lc-steps { font-size: 11.5px; line-height: 1.6; color: #333; margin-top: 6px; }
+.lc-url { font-size: 12px; font-weight: 800; color: #16305c; }
+@media print {
+  body.print-cards * { visibility: hidden !important; }
+  body.print-cards #cardsOut, body.print-cards #cardsOut * { visibility: visible !important; }
+  body.print-cards #cardsOut { position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
+  body.print-cards .lc-sheet { border: none; padding: 0; gap: 6mm; break-after: page; page-break-after: always; }
+  body.print-cards .lc-sheet:last-child { break-after: auto; page-break-after: auto; }
+}
+@media (max-width: 640px) {
+  .cls-code-box b { display: block; margin: 4px 0 0; font-size: 26px; }
+  .cls-inline { flex-direction: column; }
+  .lc-sheet { grid-template-columns: 1fr; }
+}

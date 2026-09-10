@@ -1288,3 +1288,16 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .ex-result-h { font-size: 20px; margin: 6px 0 10px; }
 .ex-sec { margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--line); }
 #exGo:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ============================================================ 教室に参加 */
+.join-row { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+#joinCode { flex: 1; min-width: 160px; font-size: 28px; font-weight: 800; letter-spacing: .22em; text-align: center;
+  padding: 10px 12px; border: 2px solid var(--line); border-radius: 12px; font-family: inherit; text-transform: uppercase; }
+#joinCode:focus { border-color: var(--royal-gold); outline: none; }
+.join-names { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.join-name { font-size: 17px; font-weight: 800; padding: 12px 20px; border-radius: 999px;
+  border: 2px solid var(--line); background: #fff; color: var(--navy); cursor: pointer; font-family: inherit; }
+.join-name:hover { border-color: var(--royal-gold); background: #fff8e4; }
+.join-on { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold);
+  border-radius: 14px; padding: 14px 16px; }
+.join-on-h { font-size: 19px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
