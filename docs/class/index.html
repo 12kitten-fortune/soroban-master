@@ -12,20 +12,20 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=340" />
+    <link rel="stylesheet" href="class.css?v=350" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=340"></script>
-    <script src="store.js?v=340"></script>
+    <script src="../firebase-config.js?v=350"></script>
+    <script src="store.js?v=350"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
       <a class="doc-logo" href="../"><img src="../assets/logo.png" alt="そろばんキングダム" /></a>
       <div class="cls-head-r">
         <span id="whoami" class="cls-who"></span>
-        <button id="logoutBtn" class="ghost hidden">ログアウト</button>
+        <button id="logoutBtn" class="cls-logout hidden">ログアウト</button>
       </div>
     </header>
     <main class="doc-main cls-main">
@@ -91,8 +91,9 @@
           <h2>生徒</h2>
           <div id="studentTable"></div>
           <form id="addForm" class="cls-add">
-            <label>生徒を 追加（1行に 1人。にっくねーむだけ）<textarea id="addNicks" rows="3" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
-            <button type="submit">＋ 追加</button>
+            <label>生徒を 追加（1行に 1人。にっくねーむだけ）<textarea id="addNicks" rows="4" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
+            <p class="sub">名前を 書いたら、下の ボタンを 押すと 登録されます。あとから いつでも 足せます。</p>
+            <button type="submit" class="cls-add-btn">＋ この名前を 登録する</button>
           </form>
         </div>
       </section>
@@ -114,6 +115,6 @@
       <div id="cardsOut" class="hidden"></div>
     </main>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=340"></script>
+    <script src="class.js?v=350"></script>
   </body>
 </html>
