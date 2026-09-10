@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-11-350"; // 最新反映の確認用
+const BUILD = "2026-09-11-360"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -4553,9 +4553,15 @@ function renderJoin() {
   }
   box.innerHTML = '<p class="sub">そろばん教室で もらった <b>クラスコード</b>（6文字）を 入れてね。おうちで れんしゅうすると、先生が 見てくれます。<br>' +
     "コードが ない人は 入らなくて だいじょうぶ。ふつうに ぜんぶ あそべます。</p>" +
+    '<p><button type="button" id="joinSpeak" class="ghost">🔊 よみあげる</button></p>' +
     '<div class="join-row"><input id="joinCode" type="text" inputmode="latin" autocapitalize="characters" maxlength="6" placeholder="ABC123" />' +
     '<button id="joinGo">つぎへ</button></div><div id="joinMsg" class="result"></div><div id="joinPick"></div>';
   const inp = $("#joinCode");
+  const js = $("#joinSpeak");
+  if (js) js.onclick = () => {
+    if (!("speechSynthesis" in window)) return;
+    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("そろばん教室で もらった クラスコード 6文字を 入れて、つぎへ を おしてね。そのあと、じぶんの 名前を えらぶと、先生に れんしゅうが とどくよ。コードが ない人は 入らなくて だいじょうぶ。"); u.lang = "ja-JP"; u.rate = 0.92; window.speechSynthesis.speak(u); } catch (e) { }
+  };
   inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#joinGo").click(); });
   $("#joinGo").onclick = joinStep1;

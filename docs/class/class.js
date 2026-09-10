@@ -13,7 +13,70 @@
 
   let me = null, cur = null, curStudents = [], curStudent = null, signup = true;
   const screens = ["login", "classes", "class", "student"];
-  function show(name) { screens.forEach((n) => $("#scr-" + n).classList.toggle("hidden", n !== name)); window.scrollTo(0, 0); }
+  function show(name) { screens.forEach((n) => $("#scr-" + n).classList.toggle("hidden", n !== name)); window.scrollTo(0, 0); updateGuide(name); }
+  let lastClassCount = 0;
+
+  /* ============================================================ 案内（つぎに やること）と 読み上げ
+     どの画面でも、いま 何を すればいいかを 赤い見出しで 出す。
+     押すべき ボタンを 赤く 光らせる。🔊 で ブラウザの 読み上げ（外部サービスは 使わない） */
+  const STEPS = [
+    { n: "①", t: "アカウントを 作る", s: "お名前、メールアドレス、自分で決めた 8文字以上の パスワードを 入れて、黒いボタン「アカウントを 作って はじめる」を 押します。2回目からは「ログインする」を 押します。" },
+    { n: "②", t: "教室を 作る", s: "教室の 名前（例：月曜クラス）を 入れて、「教室を 作る」を 押します。クラスコードという 6文字が 出ます。" },
+    { n: "③", t: "生徒の 名前を 入れる", s: "白い欄に、生徒の にっくねーむを 1行に 1人ずつ 書いて、「この名前を 登録する」を 押します。本名で なくて かまいません。" },
+    { n: "④", t: "ログインカードを 印刷して 子どもに 渡す", s: "「ログインカードを 印刷」を 押すと、1人 1枚の カードが 出ます。子どもは カードのとおりに、アプリの「教室に 参加」で コードを 入れて、自分の 名前を えらびます。パスワードは ありません。" },
+    { n: "⑤", t: "練習が 集まるのを 見る", s: "子どもが 家で 練習すると、この表に 自動で 入ります。名前を 押すと、まちがえ方の クセが 見えます。開きなおすときは「最新に」を 押します。" },
+  ];
+  function guideFor(name) {
+    if (name === "login") return { i: 0, target: "#lgGo" };
+    if (name === "classes") return lastClassCount ? { i: 1, t: "教室を ひらく", s: "一覧の 教室の 名前を 押すと、その教室の 画面に なります。新しい 教室は 下の欄から 作れます。", target: ".cls-item" } : { i: 1, target: "#ncName" };
+    if (name === "class") {
+      if (!curStudents.length) return { i: 2, target: "#addNicks" };
+      const joined = curStudents.some((s) => (s.uids && s.uids.length) || s.lastSeen || (s.stat && s.stat.last));
+      return joined ? { i: 4, target: null } : { i: 3, target: "#cardsBtn" };
+    }
+    if (name === "student") return { i: 4, t: "この子の 記録", s: "上は 今週と 通算の まとめ、下は 1回ごとの 記録です。「教室に もどる」で 一覧に 戻ります。", target: null };
+    return null;
+  }
+  function updateGuide(name) {
+    document.querySelectorAll(".spot").forEach((el) => el.classList.remove("spot"));
+    const g = guideFor(name), bar = $("#guideBar");
+    if (!g) { bar.classList.add("hidden"); return; }
+    const st = STEPS[g.i];
+    $("#guideStep").textContent = st.n;
+    $("#guideTitle").textContent = g.t || st.t;
+    $("#guideText").textContent = g.s || st.s;
+    bar.classList.remove("hidden");
+    if (g.target) { const el = document.querySelector(g.target); if (el) el.classList.add("spot"); }
+  }
+  /* ---- 読み上げ（ブラウザ内蔵） ---- */
+  const canSpeak = "speechSynthesis" in window;
+  function speak(text) {
+    if (!canSpeak) { alert("この ブラウザは 読み上げに 対応していません"); return; }
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "ja-JP"; u.rate = 0.92; u.pitch = 1;
+      const v = window.speechSynthesis.getVoices().find((x) => /^ja/i.test(x.lang));
+      if (v) u.voice = v;
+      window.speechSynthesis.speak(u);
+    } catch (e) { console.error("読み上げに 失敗", e); }
+  }
+  function stopSpeak() { try { window.speechSynthesis.cancel(); } catch (e) { } }
+  $("#guideSpeak").addEventListener("click", () => speak(($("#guideStep").textContent + "。" + $("#guideTitle").textContent + "。" + $("#guideText").textContent).replace(/\s+/g, "")));
+  /* ---- 使い方（ぜんぶの 手順） ---- */
+  function openGuide() {
+    $("#guideList").innerHTML = STEPS.map((s, i) => "<li><b>" + s.n + " " + esc(s.t) + "</b><span>" + esc(s.s) + '</span><button type="button" class="guide-speak small" data-i="' + i + '">🔊 読み上げる</button></li>').join("");
+    document.querySelectorAll("#guideList .guide-speak").forEach((b) => b.addEventListener("click", () => { const s = STEPS[+b.dataset.i]; speak((s.n + "。" + s.t + "。" + s.s).replace(/\s+/g, "")); }));
+    $("#guideLayer").classList.remove("hidden");
+  }
+  function closeGuide() { $("#guideLayer").classList.add("hidden"); stopSpeak(); }
+  $("#helpBtn").addEventListener("click", openGuide);
+  $("#guideAll").addEventListener("click", openGuide);
+  $("#guideClose").addEventListener("click", closeGuide);
+  $("#guideLayer").addEventListener("click", (e) => { if (e.target === $("#guideLayer")) closeGuide(); });
+  $("#guideStop").addEventListener("click", stopSpeak);
+  $("#guideReadAll").addEventListener("click", () => speak(STEPS.map((s) => s.n + "。" + s.t + "。" + s.s).join("。").replace(/\s+/g, "")));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeGuide(); });
 
   /* ---------- モード表示 ---------- */
   if (S.mode === "local") {
@@ -41,6 +104,7 @@
     const mt = $("#lgModeTitle"); if (mt) mt.textContent = signup ? "はじめての先生（アカウントを 作る）" : "ログイン（2回目から）";
     $("#lgName").parentElement.classList.toggle("hidden", !signup);
     $("#lgMsg").textContent = "";
+    updateGuide("login");
   });
   $("#loginForm").addEventListener("submit", async (e) => {
     e.preventDefault(); $("#lgMsg").textContent = "";
@@ -82,6 +146,7 @@
   /* ---------- 教室の一覧 ---------- */
   async function renderClasses() {
     const list = await S.listClasses();
+    lastClassCount = list.length;
     $("#classList").innerHTML = list.length
       ? list.map((c) => '<button class="cls-item" data-id="' + c.id + '"><b>' + esc(c.name) + "</b><span>コード " + esc(c.code) + "</span><small>" + fmtDate(c.createdAt) + " 作成</small></button>").join("")
       : '<p class="cls-empty">まだ 教室が ありません。下から 作ってください。</p>';
@@ -141,6 +206,7 @@
     if (fresh.length) await S.addStudents(cur.id, fresh);
     $("#addNicks").value = "";
     await renderStudents();
+    updateGuide("class");
   });
 
   /* ---------- ログインカード ---------- */

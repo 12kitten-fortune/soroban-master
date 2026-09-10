@@ -80,3 +80,31 @@
 .cls-logout:hover { background: rgba(255,255,255,.12); border-color: #fff; }
 /* 生徒を 登録する ボタンは 大きく */
 .cls-add-btn { font-size: 17px; padding: 12px 22px; }
+
+/* ============================================================ 案内・読み上げ・使い方
+   ご高齢の 先生でも 読めるように、字は 大きく、やることは 赤で */
+body.cls { font-size: 17px; }
+.cls-form input, .cls-add textarea, .cls-inline input { font-size: 18px; }
+.guide { background: #fff; border: 3px solid #c62828; border-radius: 14px; padding: 14px 16px 12px; margin-bottom: 14px;
+  box-shadow: 0 4px 14px rgba(198,40,40,.12); }
+.guide-h { display: flex; align-items: baseline; gap: 10px; color: #c62828; font-weight: 900; font-size: 21px; line-height: 1.3; }
+.guide-h #guideStep { font-size: 26px; }
+.guide p { margin: 8px 0 10px; font-size: 16.5px; line-height: 1.85; color: #222; }
+.guide-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.guide-speak { background: #c62828; color: #fff; border: none; border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 800; cursor: pointer; }
+.guide-speak.small { font-size: 14px; padding: 6px 12px; margin-top: 6px; }
+.guide-more { background: #fff; color: #c62828; border: 2px solid #c62828; border-radius: 999px; padding: 8px 14px; font: inherit; font-weight: 800; cursor: pointer; }
+/* 押すべき 場所を 赤く 光らせる */
+.spot { outline: 4px solid #c62828 !important; outline-offset: 3px; box-shadow: 0 0 0 8px rgba(198,40,40,.18) !important; animation: spotPulse 1.4s ease-in-out infinite; }
+@keyframes spotPulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(198,40,40,.22); } 50% { box-shadow: 0 0 0 12px rgba(198,40,40,.06); } }
+/* 使い方の 画面 */
+.guide-layer { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 20px 10px; overflow: auto; }
+.guide-box { background: #fff; border-radius: 16px; max-width: 760px; width: 100%; padding: 18px 20px 20px; border: 3px solid #c62828; }
+.guide-box-h { display: flex; justify-content: space-between; align-items: center; font-size: 21px; font-weight: 900; color: #c62828; margin-bottom: 6px; }
+.guide-x { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+.guide-note { color: #555; font-size: 14px; margin: 0 0 8px; }
+.guide-list { padding-left: 0; list-style: none; margin: 0 0 12px; }
+.guide-list li { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; background: #fffdf7; }
+.guide-list li b { display: block; font-size: 18px; color: #c62828; margin-bottom: 4px; }
+.guide-list li span { display: block; line-height: 1.8; }
+@media (max-width: 640px) { .guide-h { font-size: 18px; } .guide-h #guideStep { font-size: 22px; } }

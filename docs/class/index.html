@@ -12,24 +12,35 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=350" />
+    <link rel="stylesheet" href="class.css?v=360" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=350"></script>
-    <script src="store.js?v=350"></script>
+    <script src="../firebase-config.js?v=360"></script>
+    <script src="store.js?v=360"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
       <a class="doc-logo" href="../"><img src="../assets/logo.png" alt="そろばんキングダム" /></a>
       <div class="cls-head-r">
         <span id="whoami" class="cls-who"></span>
+        <button id="helpBtn" class="cls-logout">？ 使い方</button>
         <button id="logoutBtn" class="cls-logout hidden">ログアウト</button>
       </div>
     </header>
     <main class="doc-main cls-main">
       <div id="modeNote" class="cls-mode hidden"></div>
+
+      <!-- つぎに やること（状況に あわせて 変わる） -->
+      <div id="guideBar" class="guide hidden">
+        <div class="guide-h"><span id="guideStep"></span><span id="guideTitle"></span></div>
+        <p id="guideText"></p>
+        <div class="guide-btns">
+          <button type="button" id="guideSpeak" class="guide-speak">🔊 読み上げる</button>
+          <button type="button" id="guideAll" class="guide-more">？ ぜんぶの 手順を 見る</button>
+        </div>
+      </div>
 
       <!-- ログイン -->
       <section id="scr-login" class="card hidden">
@@ -114,7 +125,17 @@
 
       <div id="cardsOut" class="hidden"></div>
     </main>
+
+    <!-- 使い方（ぜんぶの 手順） -->
+    <div id="guideLayer" class="guide-layer hidden">
+      <div class="guide-box">
+        <div class="guide-box-h">先生の画面の 使い方（5つの 手順）<button type="button" id="guideClose" class="guide-x" aria-label="とじる">✕</button></div>
+        <p class="guide-note">読み上げの 🔊 を 押すと、その手順を 声で 説明します。</p>
+        <ol id="guideList" class="guide-list"></ol>
+        <div class="btn-row"><button type="button" id="guideReadAll">🔊 ぜんぶ 読み上げる</button><button type="button" id="guideStop" class="ghost">■ 止める</button></div>
+      </div>
+    </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=350"></script>
+    <script src="class.js?v=360"></script>
   </body>
 </html>
