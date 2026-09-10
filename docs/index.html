@@ -56,6 +56,8 @@
           <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
           <button class="nav subj-nav" data-subj="flash">⚡ フラッシュ暗算</button>
           <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
+          <div class="nav-sec">けんてい</div>
+          <button class="nav" data-view="kentei">🏅 SK検定</button>
           <div class="nav-sec">きろく</div>
           <button class="nav" data-view="records">📊 記録を見る</button>
           <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
@@ -415,6 +417,30 @@
             <p class="sub" id="bgmSongs"></p>
             <p class="sub" id="sfxNote"></p>
             <p class="sub" id="setCredit"></p>
+          </div>
+        </div>
+
+        <!-- SK検定（このサイト独自の 検定） -->
+        <div id="view-kentei" class="view hidden">
+          <div class="card">
+            <h3>🏅 SK検定（そろばんキングダム検定）</h3>
+            <p class="sub">本番の検定と 同じ形で、<b>いつでも</b> 受けられる このサイト独自の 検定です。しゅもくごとに 制限時間があり、◎×は さいごに まとめて 出ます。
+              とちゅうで 一時停止は できません。合格すると <b>合格証</b>が もらえます。</p>
+            <div class="row2">
+              <label>級・段<select id="exGrade"></select></label>
+              <label>検定<select id="exTrack">
+                <option value="soroban">珠算（そろばん）</option>
+                <option value="anzan">暗算</option>
+              </select></label>
+            </div>
+            <div id="exSpec"></div>
+            <div class="btn-row"><button id="exGo">🏅 検定を はじめる</button></div>
+            <p class="sub">※ SK検定は 当サイト独自の 検定で、日本珠算連盟・全国珠算教育連盟・日本計算技能連盟 などの 検定とは 関係ありません。
+              自宅で 受けた 合格証には「自宅受験」と 入ります。<a href="kentei.html">くわしい説明</a></p>
+          </div>
+          <div class="card">
+            <h3>これまでの 検定</h3>
+            <div id="exHist"></div>
           </div>
         </div>
 

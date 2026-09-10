@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-10-240"; // 最新反映の確認用
+const BUILD = "2026-09-10-250"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -97,6 +97,13 @@ const SUBJECT = {
   anzan: { name: "あんざん", answer: "input", N: 10, per: 10, pass: 70, limit: 180 },
   flash: { name: "フラッシュ暗算", answer: "flash" },
 };
+/* SK検定（このサイト独自の 検定）。珠算＝みとり・かけ・わり を つづけて、暗算＝あんざん 1しゅもく */
+const EXAMS = "soroban_exams";
+const EXAM_TRACKS = {
+  soroban: { name: "珠算", subjs: ["mitori", "kake", "wari"] },
+  anzan: { name: "暗算", subjs: ["anzan"] },
+};
+let examState = null, examTimer = null;
 
 /* ---------- 級・段ラダー（20級〜十段） ---------- */
 const GRADES = [];
@@ -851,7 +858,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定" };
 function showView(v) {
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
@@ -865,6 +872,7 @@ function showView(v) {
   if (v === "puzzle") renderPuzzle();
   if (v === "parent") renderParent();
   if (v === "sheet") renderSheet();
+  if (v === "kentei") renderKentei();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
   document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
@@ -1180,7 +1188,7 @@ function renderRecords() {
    1回ずつ ぜんぶ 見られるようにする。 */
 let recFilter = "all";
 const SUBJ_EM = { mitori: "🧮", kake: "✏️", wari: "➗", anzan: "💭", flash: "⚡" };
-const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : k);
+const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : (String(k).startsWith("sk-") && EXAM_TRACKS[k.slice(3)] ? "SK検定・" + EXAM_TRACKS[k.slice(3)].name + "・自宅受験" : k));
 function renderRecLog() {
   const box = $("#recLog"); if (!box) return;
   const all = allSessions().slice().reverse();          // 新しいものが 上
@@ -1546,6 +1554,7 @@ function finishSession() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (!session) return;
   if (session.routine) return finishRoutineSection();
+  if (session.exam) return finishExamSection();
   hidePauseUI();
   const el = playElapsed();
   const completed = session.idx >= session.N, cf = session.cf;
@@ -1625,9 +1634,11 @@ function finishSession() {
 function quitSession() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (restTimer) { clearInterval(restTimer); restTimer = null; }
-  session = null; routineState = null;
+  if (examTimer) { clearInterval(examTimer); examTimer = null; }
+  const wasExam = !!examState;
+  session = null; routineState = null; examState = null;
   hidePauseUI();
-  const back = routineActive ? "today" : "grades";
+  const back = routineActive ? "today" : wasExam ? "kentei" : "grades";
   routineActive = false;
   showView(back); setActiveNav(document.querySelector(`.nav[data-view="${back}"]`)); updateInfo();
 }
@@ -1759,7 +1770,7 @@ function endRest() {
   routineState.stepIdx++; runStep();
 }
 // 休憩の「スキップ ▶」で、待たずに次のセットへ
-$("#restSkip").addEventListener("click", () => { if (routineState) endRest(); });
+$("#restSkip").addEventListener("click", () => { if (routineState) endRest(); else if (examState) endExamBreak(); });
 function finishRoutine() {
   const rs = routineState; routineState = null; routineActive = false;
   const totalCorrect = rs.sections.reduce((a, s) => a + s.correct, 0);
@@ -3933,8 +3944,8 @@ function creditHTML() {
     "<p><b>効果音</b>：効果音ラボ（https://soundeffect-lab.info/）<br>" +
     "商用利用・クレジット表記なしで つかえます（音源ファイルそのものの 再配布は できません）。</p>" +
     "<p><b>イラスト</b>：生成AIで 作ったものを つかっています。</p>" +
-    "<p><b>問題の内容</b>：日本計算技能連盟の 公開サンプル問題から 出題の形式（桁数・口数）を 参考にしています。" +
-    "検定そのものとは 関係のない、非公式の 練習アプリです。</p>";
+    "<p><b>問題の内容</b>：出題の形式（桁数・口数）は、日本計算技能連盟が 公開している 検定サンプル問題を 参考にした めやすです。問題は すべて このアプリが 乱数で 作っています。" +
+    "当アプリは 個人が 開発した 非公式の 練習アプリで、日本珠算連盟・全国珠算教育連盟・日本計算技能連盟 などの 団体とは 関係ありません。名称は 参考元を 示すために 記しています。</p>";
 }
 
 /* ============================================================ 説明用の そろばんの絵（SVG）
@@ -4094,7 +4105,7 @@ function renderLesson() {
     sec(false, "⑦ けんていの きまり（めやす）",
       '<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>' +
       '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
-      '<p class="sub">日本計算技能連盟の 公開サンプルを 参考にした、このアプリの めやすです。</p>') +
+      '<p class="sub">公開されている 検定サンプル問題（日本計算技能連盟）を 参考にした、このアプリ独自の めやすです。各団体の 検定とは 関係ありません。</p>') +
     // おうちの人・先生が じっくり 読める、印刷しやすい 解説ページ（検索からも 来られる）
     '<div class="lesson-links"><b>くわしい解説（べつのページ）</b>' +
     '<a href="soroban-yubi.html">✋ 指づかい（運指）</a>' +
@@ -4340,6 +4351,156 @@ function sheetPrint() {
   sj.addEventListener("change", sheetUpdateSubj);
   go.addEventListener("click", sheetBuild);
   if (pr) pr.addEventListener("click", sheetPrint);
+})();
+
+
+/* ============================================================ SK検定（そろばんキングダム検定）
+   このサイト独自の 検定。本番の検定と 同じ形（しゅもくごとに 制限時間・◎×は さいごに まとめて）で、
+   いつでも 受けられる。自宅で受けたものは 合格証に「自宅受験」と 明記する（先生の監督つきは 今後）。
+   ※ EXAM_TRACKS / examState は SUBJECT の すぐ下で 定義している */
+const allExams = () => { try { return JSON.parse(localStorage.getItem(EXAMS) || "[]"); } catch (e) { return []; } };
+function examSteps(grade, track) {
+  const t = EXAM_TRACKS[track]; if (!t) return [];
+  return t.subjs.filter((s) => difficulty(grade, s)).map((s) => ({ subj: s, cf: SUBJECT[s] }));
+}
+function renderKentei() {
+  const sel = $("#exGrade");
+  if (sel && !sel.dataset.filled) {
+    sel.innerHTML = GRADES.map((g, i) => '<option value="' + i + '">' + g.key + "</option>").join("");
+    sel.dataset.filled = "1";
+    const rk = JSON.parse(localStorage.getItem(RANK) || "null");
+    sel.value = String(Math.min(GRADES.length - 1, rk ? rk.idx + 1 : gradeIdx));   // つぎの級を 受ける
+  }
+  examUpdateSpec();
+  renderExamHistory();
+}
+function examUpdateSpec() {
+  const g = GRADES[+$("#exGrade").value], track = $("#exTrack").value;
+  const steps = examSteps(g, track), box = $("#exSpec");
+  if (!g || !box) return;
+  if (!steps.length) { box.innerHTML = '<p class="sub">この級には この検定が ありません。</p>'; $("#exGo").disabled = true; return; }
+  $("#exGo").disabled = false;
+  box.innerHTML = '<table class="rec-table ex-table"><tr><th>しゅもく</th><th>もんだい</th><th>時間</th><th>ごうかく点</th></tr>' +
+    steps.map((s) => "<tr><td>" + s.cf.name + "</td><td>" + s.cf.N + "問</td><td>" + Math.round(s.cf.limit / 60) + "分</td><td>" + s.cf.pass + "点／" + (s.cf.N * s.cf.per) + "点</td></tr>").join("") +
+    '</table><p class="sub">' + (steps.length > 1 ? "ぜんぶの しゅもくで ごうかく点を とると " : "") + g.key + " " + EXAM_TRACKS[track].name + " 合格。" +
+    (steps.length > 1 ? "しゅもくの あいだに 30秒の 休けいが あります。" : "") + "</p>";
+}
+function startExam() {
+  const g = GRADES[+$("#exGrade").value], track = $("#exTrack").value;
+  const steps = examSteps(g, track); if (!steps.length) return;
+  examState = { grade: g, track, steps, idx: 0, sections: [] };
+  runExamStep();
+}
+function runExamStep() {
+  if (!examState) return;
+  const step = examState.steps[examState.idx];
+  if (!step) return finishExam();
+  startExamSection(step);
+}
+function startExamSection(step) {
+  const grade = examState.grade, cf = step.cf;
+  session = { subj: step.subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: true, mode: "end", results: [], locking: false, start: performance.now(), cur: null, exam: true, label: cf.name };
+  $("#playMark").classList.add("hidden");
+  hidePauseUI();                                    // 検定は 一時停止 なし
+  showView("play");
+  bgmForStudy(true);
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#anzanTip").classList.add("hidden");
+  $("#stepsRow").classList.add("hidden");           // 検定中は「解き方」を 見せない
+  $("#playGrade").textContent = "🏅 SK検定 " + grade.key + " " + EXAM_TRACKS[examState.track].name + "　" + (examState.idx + 1) + "/" + examState.steps.length + "：" + cf.name + "（" + Math.round(cf.limit / 60) + "分）";
+  $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
+  startPlayTimer();
+  nextPlayProblem();
+}
+function finishExamSection() {
+  hidePauseUI();
+  const el = playElapsed();
+  const score = session.correct * session.cf.per;
+  examState.sections.push({ subj: session.subj, name: session.cf.name, correct: session.correct, N: session.N, score, full: session.N * session.cf.per, pass: session.cf.pass, ok: score >= session.cf.pass, sec: el, items: session.results });
+  logSession(session.subj, session.N, session.correct, el, 0, session.results);
+  neutralSnd();
+  session = null;
+  examState.idx++;
+  if (examState.idx >= examState.steps.length) return finishExam();
+  showExamBreak(examState.steps[examState.idx]);
+}
+function showExamBreak(next) {
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  $("#playProblemWrap").classList.add("hidden");
+  $("#playSorobanWrap").classList.add("hidden");
+  $("#playInputWrap").classList.add("hidden");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#playResult").textContent = ""; $("#playGrade").textContent = "🏅 SK検定：休けい"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  $("#playRest").classList.remove("hidden");
+  $("#restResult").innerHTML = '<p class="sub">けっかは さいごに まとめて 出ます。</p>';
+  $("#restNext").textContent = "つぎは：" + next.cf.name + "（" + Math.round(next.cf.limit / 60) + "分）　自動で 始まります";
+  let left = 30;
+  const render = () => ($("#restTimer").textContent = fmtClock(left));
+  render();
+  if (examTimer) clearInterval(examTimer);
+  examTimer = setInterval(() => { left--; render(); if (left <= 0) endExamBreak(); }, 1000);
+}
+function endExamBreak() {
+  if (examTimer) { clearInterval(examTimer); examTimer = null; }
+  $("#playRest").classList.add("hidden");
+  runExamStep();
+}
+function finishExam() {
+  const ex = examState; examState = null;
+  if (examTimer) { clearInterval(examTimer); examTimer = null; }
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  const pass = ex.sections.every((s) => s.ok), track = EXAM_TRACKS[ex.track];
+  const totalSec = ex.sections.reduce((a, s) => a + s.sec, 0);
+  const rec = { d: today(), g: ex.grade.key, track: ex.track, pass, sections: ex.sections.map((s) => ({ subj: s.subj, correct: s.correct, N: s.N, score: s.score, ok: s.ok, sec: Math.round(s.sec) })) };
+  try { const h = allExams(); h.push(rec); localStorage.setItem(EXAMS, JSON.stringify(h.slice(-300))); } catch (e) { console.error("検定の記録に失敗", e); }
+  logStudy(totalSec); touchStreak();
+  const rows = ex.sections.map((s) => "<tr><td>" + s.name + "</td><td>" + s.correct + " / " + s.N + "</td><td><b>" + s.score + "</b>／" + s.full + "<small>（合格 " + s.pass + "）</small></td><td>" + fmtClock(s.sec) + '</td><td class="' + (s.ok ? "ok" : "ng") + '">' + (s.ok ? "◎ 合格" : "×") + "</td></tr>").join("");
+  let msg = '<div class="ex-result-h">' + (pass ? "🎉 <b>" + ex.grade.key + " " + track.name + " ごうかく！</b>" : "<b>不合格</b>　もう少し！") + "</div>" +
+    '<table class="rec-table ex-table"><tr><th>しゅもく</th><th>せいかい</th><th>点</th><th>タイム</th><th></th></tr>' + rows + "</table>" +
+    '<p class="sub">自宅受験（' + rec.d + "）。" + (pass ? "合格証には「自宅受験」と 入ります。" : "まちがえ方は 下に 出ます。にがてを 直して もう一度！") + "</p>";
+  ex.sections.forEach((s) => { msg += '<div class="ex-sec"><b>' + s.name + "</b>" + missReportHTML(s.items) + "</div>"; });
+  let gold = 0;
+  ex.sections.forEach((s) => { gold += goldForSection({ correct: s.correct, N: s.N, bestUpdated: false, completed: true, grade: ex.grade, subj: s.subj, count: dailyCount("exam_" + ex.grade.key) }).g; });
+  dailyCount("exam_" + ex.grade.key, true);
+  if (pass) gold += Math.round(100 * gradeGoldMult(ex.grade));
+  addGold(gold);
+  msg += '<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋' + gold + " GOLD</b>" + (pass ? '<div class="gold-lines">🏅 検定 合格 ボーナス</div>' : "") + "</div>";
+  msg += '<br><button id="exAgainBtn">もう一度</button> <button id="exBackBtn" class="ghost">検定の 画面へ</button>';
+  msg = '<div class="result-hero"><img class="rh-face" src="assets/' + (pass ? "king_celebrate.png" : "king_wave.png") + '" alt="レオ王" />' +
+    (pass ? '<span class="rh-badge"><span class="badge-chip perfect">🏅 SK検定 ごうかく！</span></span>' : "") + "</div>" + msg;
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playProblem").textContent = "おつかれさま！";
+  $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden");
+  $("#playResult").innerHTML = msg; $("#playResult").className = "result " + (pass ? "ok" : "ng");
+  $("#playGrade").textContent = "🏅 SK検定 " + ex.grade.key + " " + track.name + "：けっか"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  renderProfile();
+  if (pass) { fxCelebrate(3, "🏅 " + ex.grade.key + " " + track.name + " ごうかく！", "SK検定 合格 おめでとう！"); bigFanfareSnd(); certify(ex.grade.key, "sk-" + ex.track); }
+  else fxCheer("あと すこし…", "ぜんぶの しゅもくで 合格点を とろう");
+  coinSnd(1.0);
+  $("#exAgainBtn").onclick = () => { examState = { grade: ex.grade, track: ex.track, steps: ex.steps, idx: 0, sections: [] }; runExamStep(); };
+  $("#exBackBtn").onclick = () => { showView("kentei"); setActiveNav(document.querySelector('.nav[data-view="kentei"]')); };
+}
+function renderExamHistory() {
+  const box = $("#exHist"); if (!box) return;
+  const list = allExams().slice().reverse().slice(0, 30);
+  if (!list.length) { box.innerHTML = '<p class="sub">まだ 受けていません。合格すると 合格証が もらえて、「記録を見る」にも ならびます。</p>'; return; }
+  box.innerHTML = '<table class="rec-table ex-table"><tr><th>日</th><th>級</th><th>検定</th><th>けっか</th><th>点</th></tr>' +
+    list.map((r) => "<tr><td>" + r.d + "</td><td>" + r.g + "</td><td>" + ((EXAM_TRACKS[r.track] || {}).name || r.track) + '</td><td class="' + (r.pass ? "ok" : "ng") + '">' + (r.pass ? "◎ 合格" : "×") + "</td><td>" +
+      r.sections.map((s) => subjName(s.subj) + " " + s.score).join("／") + "</td></tr>").join("") + "</table>";
+}
+
+/* ---------- SK検定 画面の ボタン ---------- */
+(function () {
+  const g = $("#exGrade"), t = $("#exTrack"), go = $("#exGo");
+  if (!g || !t || !go) return;
+  g.addEventListener("change", examUpdateSpec);
+  t.addEventListener("change", examUpdateSpec);
+  go.addEventListener("click", startExam);
 })();
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */

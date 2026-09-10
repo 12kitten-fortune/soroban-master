@@ -1279,3 +1279,11 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   body.print-sheet .sh-page:last-child { break-after: auto; page-break-after: auto; }
   body.print-sheet .sh-n { font-size: 14px; }
 }
+
+/* ============================================================ SK検定 */
+.ex-table td.ok { color: #1f8a4c; font-weight: 800; white-space: nowrap; }
+.ex-table td.ng { color: #c0392b; font-weight: 800; white-space: nowrap; }
+.ex-table small { color: #777; font-weight: 400; }
+.ex-result-h { font-size: 20px; margin: 6px 0 10px; }
+.ex-sec { margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--line); }
+#exGo:disabled { opacity: .5; cursor: not-allowed; }
