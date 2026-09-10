@@ -14,7 +14,8 @@
 /* iPhoneを横にしたとき 文字が勝手に大きくならないようにする */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
-  font-family: system-ui, "Hiragino Kaku Gothic ProN", sans-serif; background: var(--bg); color: #2b2b2b;
+  /* 書体：まるいゴシック。iPhone/iPadは ヒラギノ丸ゴ、Windowsは BIZ UDゴシックに 落ちる（どれも 読みやすい） */
+  font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "BIZ UDGothic", Meiryo, system-ui, sans-serif; background: var(--bg); color: #2b2b2b;
   -webkit-tap-highlight-color: transparent;      /* 指でおしたとき 青い四角を出さない */
   overscroll-behavior-y: contain;                /* 下に引っぱって ページが再読み込みされるのを防ぐ */
 }

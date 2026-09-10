@@ -60,6 +60,9 @@ function page({ file, title, desc, h1, lead, body, updated, box }) {
     <meta name="twitter:image" content="${SITE}assets/ogp.png" />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="assets/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="page.css" />
   </head>
