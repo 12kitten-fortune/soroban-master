@@ -9,12 +9,12 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-10-250"; // 最新反映の確認用
+const BUILD = "2026-09-10-260"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
-// 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
-// 珠算：日本計算技能連盟の公式サンプル問題から抽出した実測値（★＝全級サンプルで確認済み）。
-// 13〜10級のみとりが同じ2桁5口なのは公式サンプルどおり（級の差はかけ算・わり算で付く）。
+// 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
+// 珠算：公開されている珠算検定の出題例から抽出した実測値（★＝全級の出題例で確認済み）。
+// 13〜10級のみとりが同じ2桁5口なのは出題例どおり（級の差はかけ算・わり算で付く）。
 const SOROBAN_STD = {
   1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } }, // 全て★
   2: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 4 }, wari: { D: 7, dv: 3, qd: 4 } }, // 全て★（みとりは3級と同じ5桁10口。差は乗除算で付く）
@@ -25,8 +25,8 @@ const SOROBAN_STD = {
   7: { mitori: { digits: 2, terms: 10 }, kake: { a: 2, b: 2 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て★
   8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },                    // ★
   9: { mitori: { digits: 2, terms: 8 }, kake: { a: 2, b: 1 }, wari: null },                    // ★
-  // 10〜15級は「桁と口数の組み合わせ」がサンプルで決まっている。桁と口数を別々に振ると
-  // サンプルに無い組み合わせ（例：10級の2桁7口）が出てしまうため、必ず variants で対にする。
+  // 10〜15級は「桁と口数の組み合わせ」が出題例で決まっている。桁と口数を別々に振ると
+  // 出題例に無い組み合わせ（例：10級の2桁7口）が出てしまうため、必ず variants で対にする。
   // 1枚の中で1〜5番=5口・6〜10番=6口と変わる級は termsMax で表す。
   10: { mitori: { variants: [{ digits: 1, terms: 7 }, { digits: 2, terms: 5 }] }, kake: null, wari: null },        // ★A=1桁7口／B・C=2桁5口
   11: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも2桁
@@ -35,7 +35,7 @@ const SOROBAN_STD = {
   14: { mitori: { variants: [{ digits: 1, terms: 5, termsMax: 6 }, { digits: 2, terms: 5, termsMax: 6 }] }, kake: null, wari: null }, // ★A=1桁／B=2桁
   15: { mitori: { digits: 1, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも1桁
 };
-// 暗算（みとり暗算）：同じく公式サンプルの実測値。低い級はサンプルどおり ひき算を含めない
+// 暗算（みとり暗算）：同じく出題例の実測値。低い級は出題例どおり ひき算を含めない
 const ANZAN_STD = {
   10: { digits: 1, terms: 3, sub: false }, //★
   9: { digits: 1, terms: 4, sub: false },  //★
@@ -71,7 +71,7 @@ const FLASH_STD = {
   4: { digits: 2, terms: 5, sec: 4.0 }, 3: { digits: 2, terms: 7, sec: 5.6 }, 2: { digits: 2, terms: 10, sec: 8.0 },
   1: { digits: 3, terms: 5, sec: 4.0 },
 };
-// フラッシュ暗算 段位（全珠連基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
+// フラッシュ暗算 段位（一般的な段位の基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
 const FLASH_DAN = {
   1: { digits: 2, terms: 15, sec: 10 }, 2: { digits: 3, terms: 4, sec: 4 }, 3: { digits: 3, terms: 6, sec: 5 },
   4: { digits: 3, terms: 8, sec: 6 }, 5: { digits: 3, terms: 10, sec: 7 }, 6: { digits: 3, terms: 12, sec: 8 },
@@ -168,12 +168,12 @@ function genMitori(spec) {
     const r = genBySum(v); if (r) return r;
   }
   const { digits, terms, termsMax, sub } = v;
-  const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（連盟サンプルに準拠してやさしめに）
-  // 公式サンプルは1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
+  const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（出題例に準拠してやさしめに）
+  // 出題例は1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
   const T = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
-  // sub:false の級（暗算7〜10級など）はサンプルどおり ひき算を出さない
+  // sub:false の級（暗算7〜10級など）は出題例どおり ひき算を出さない
   const allowSub = sub !== false && T >= 3; const nums = []; let total = 0;
-  // 公式サンプルは必ずその級の桁数の数が入っているので、1つは必ずD桁にする
+  // 出題例は必ずその級の桁数の数が入っているので、1つは必ずD桁にする
   // （これが無いと「4桁10口」のはずが偶然すべて3桁以下になり、級より易しい問題が出てしまう）
   const forceIdx = Math.floor(Math.random() * T);
   for (let i = 0; i < T; i++) {
@@ -3944,8 +3944,8 @@ function creditHTML() {
     "<p><b>効果音</b>：効果音ラボ（https://soundeffect-lab.info/）<br>" +
     "商用利用・クレジット表記なしで つかえます（音源ファイルそのものの 再配布は できません）。</p>" +
     "<p><b>イラスト</b>：生成AIで 作ったものを つかっています。</p>" +
-    "<p><b>問題の内容</b>：出題の形式（桁数・口数）は、日本計算技能連盟が 公開している 検定サンプル問題を 参考にした めやすです。問題は すべて このアプリが 乱数で 作っています。" +
-    "当アプリは 個人が 開発した 非公式の 練習アプリで、日本珠算連盟・全国珠算教育連盟・日本計算技能連盟 などの 団体とは 関係ありません。名称は 参考元を 示すために 記しています。</p>";
+    "<p><b>問題の内容</b>：出題の形式（桁数・口数）は、公開されている 珠算検定の 出題例を 参考にした <b>このアプリ独自</b>の めやすです。問題は すべて このアプリが その場で 作っています（数字を どこかから 写して いません）。" +
+    "当アプリは 個人が 作った 非公式の 練習アプリで、珠算の 検定を 行う 団体とは 一切 関係ありません。</p>";
 }
 
 /* ============================================================ 説明用の そろばんの絵（SVG）
@@ -4105,7 +4105,7 @@ function renderLesson() {
     sec(false, "⑦ けんていの きまり（めやす）",
       '<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>' +
       '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
-      '<p class="sub">公開されている 検定サンプル問題（日本計算技能連盟）を 参考にした、このアプリ独自の めやすです。各団体の 検定とは 関係ありません。</p>') +
+      '<p class="sub">公開されている 珠算検定の 出題例を 参考にした、このアプリ独自の めやすです。よその 検定とは 関係ありません。</p>') +
     // おうちの人・先生が じっくり 読める、印刷しやすい 解説ページ（検索からも 来られる）
     '<div class="lesson-links"><b>くわしい解説（べつのページ）</b>' +
     '<a href="soroban-yubi.html">✋ 指づかい（運指）</a>' +
