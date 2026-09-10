@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-07-230"; // 最新反映の確認用
+const BUILD = "2026-09-10-240"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（日本計算技能連盟サンプルに準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -255,7 +255,11 @@ function showCert(c) {
     '<div class="cert-btns"><button id="certPrint">🖨 いんさつ する</button><button id="certShare">📤 おくる</button><button id="certClose" class="ghost">とじる</button></div>';
   document.body.appendChild(d);
   $("#certClose").onclick = () => d.remove();
-  $("#certPrint").onclick = () => { try { window.print(); } catch (e) { } };
+  $("#certPrint").onclick = () => {
+    document.body.classList.add("print-cert");
+    try { window.print(); } catch (e) { console.error("印刷に失敗", e); }
+    setTimeout(() => document.body.classList.remove("print-cert"), 500);
+  };
   $("#certShare").onclick = async () => {
     const text = p.name + " が そろばんキングダム " + c.g + "（" + subjName(c.subj) + "）の けんていに ごうかくしました！🎓 " + dateJa;
     try {
@@ -847,7 +851,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん" };
+const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る" };
 function showView(v) {
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
@@ -860,6 +864,7 @@ function showView(v) {
   if (v === "battle") renderBattle();
   if (v === "puzzle") renderPuzzle();
   if (v === "parent") renderParent();
+  if (v === "sheet") renderSheet();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
   document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
@@ -4217,6 +4222,125 @@ function unshiHTML(full) {
 const TIP_FINGER = { t: "✋ 指づかいが そろばんの「型」", b: unshiHTML(false) +
   '<p class="un-note">なぜ この ルールなのか、かまえ、ご破算の しかたは' +
   '<b>「そろばんの きほん」</b>（上の 📖 ボタン）で 見られます。</p>' };
+
+
+/* ============================================================ 印刷プリント（宿題用紙）
+   先生・おうちの人が いちばん 欲しがる機能。
+   アプリと 同じ出題のしくみを つかうので、級の むずかしさが ずれない。
+   紙で 解いて、答え合わせは 別紙（解答）で。 */
+const SHEET_KEY = "soroban_sheet";
+let sheetData = null;                       // いま 作ってある 用紙（印刷・作り直し用）
+function sheetPrefs() {
+  try { return JSON.parse(localStorage.getItem(SHEET_KEY) || "null") || { subj: "mitori", n: 10, pages: 1 }; }
+  catch (e) { return { subj: "mitori", n: 10, pages: 1 }; }
+}
+function sheetSave(p) { try { localStorage.setItem(SHEET_KEY, JSON.stringify(p)); } catch (e) { } }
+
+/* 1枚ぶんの 問題を 作る */
+function sheetMake(grade, subj, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = genProblemFor(grade, subj);
+    if (!p) break;
+    out.push(p);
+  }
+  return out;
+}
+/* みとり算・あんざん：検定の用紙と 同じ「たてに 数字を ならべる」形。5問ずつ 段に分ける */
+function sheetMitoriHTML(list) {
+  const rows = [];
+  for (let s = 0; s < list.length; s += 5) rows.push(list.slice(s, s + 5));
+  return rows.map((row, ri) =>
+    '<table class="sh-mt"><tr>' +
+    row.map((p, i) => '<th>' + (ri * 5 + i + 1) + "</th>").join("") + "</tr><tr>" +
+    row.map((p) => {
+      const cells = p.nums.map((v, k) => '<div class="sh-n">' + (k === 0 ? "" : v < 0 ? "−" : "+") + " " + Math.abs(v).toLocaleString() + "</div>").join("");
+      return "<td>" + cells + '<div class="sh-ans"></div></td>';
+    }).join("") + "</tr></table>"
+  ).join("");
+}
+/* かけ算・わり算：1問1行。答えは 右の わくに 書く */
+function sheetLineHTML(list) {
+  const half = Math.ceil(list.length / 2), cols = [list.slice(0, half), list.slice(half)];
+  return '<div class="sh-cols">' + cols.map((col, c) =>
+    '<div class="sh-col">' + col.map((p, i) =>
+      '<div class="sh-row"><span class="sh-no">' + (c * half + i + 1) + '</span>' +
+      '<span class="sh-q">' + p.display + "</span>" +
+      '<span class="sh-blank"></span></div>').join("") + "</div>").join("") + "</div>";
+}
+/* 解答（先生・おうちの人用） */
+function sheetAnswerHTML(pages) {
+  return pages.map((pg, pi) =>
+    '<div class="sh-akey"><b>' + (pages.length > 1 ? (pi + 1) + "枚目の " : "") + "こたえ</b>" +
+    pg.map((p, i) => '<span class="sh-akey-i">' + (i + 1) + ". <b>" + p.answer.toLocaleString() + "</b></span>").join("") + "</div>"
+  ).join("");
+}
+function renderSheet() {
+  const sel = $("#sheetGrade");
+  if (sel && !sel.dataset.filled) {
+    sel.innerHTML = GRADES.map((g, i) => '<option value="' + i + '">' + g.key + "</option>").join("");
+    sel.dataset.filled = "1";
+    const rk = JSON.parse(localStorage.getItem(RANK) || "null");
+    sel.value = rk ? rk.idx : gradeIdx;
+  }
+  const p = sheetPrefs();
+  const ss = $("#sheetSubj"); if (ss) ss.value = p.subj;
+  const sn = $("#sheetN"); if (sn) sn.value = String(p.n);
+  const sp = $("#sheetPages"); if (sp) sp.value = String(p.pages);
+  sheetUpdateSubj();
+}
+// その級に ない種目は えらべなくする
+function sheetUpdateSubj() {
+  const g = GRADES[+$("#sheetGrade").value], ss = $("#sheetSubj");
+  if (!g || !ss) return;
+  Array.from(ss.options).forEach((o) => { o.disabled = !difficulty(g, o.value); });
+  if (ss.selectedOptions[0] && ss.selectedOptions[0].disabled) {
+    const ok = Array.from(ss.options).find((o) => !o.disabled);
+    if (ok) ss.value = ok.value;
+  }
+  const note = $("#sheetNote");
+  if (note) note.textContent = difficulty(g, ss.value) ? g.key + "／" + SUBJECT[ss.value].name + "：" + String(specText(g, ss.value)).replace(/<[^>]*>/g, "") : "";
+}
+function sheetBuild() {
+  const g = GRADES[+$("#sheetGrade").value], subj = $("#sheetSubj").value;
+  const n = +$("#sheetN").value, pages = +$("#sheetPages").value;
+  if (!difficulty(g, subj)) { $("#sheetMsg").textContent = "この級には この種目が ありません"; return; }
+  sheetSave({ subj, n, pages });
+  const p = profile();
+  const list = [];
+  for (let k = 0; k < pages; k++) list.push(sheetMake(g, subj, n));
+  sheetData = { grade: g, subj, n, pages: list };
+  const line = subj === "kake" || subj === "wari";
+  $("#sheetOut").innerHTML = list.map((pg, pi) =>
+    '<section class="sh-page">' +
+    '<div class="sh-head"><div class="sh-title">' + g.key + "　" + SUBJECT[subj].name +
+    (list.length > 1 ? '<small>（' + (pi + 1) + " / " + list.length + "枚）</small>" : "") + "</div>" +
+    '<div class="sh-fields"><span>なまえ<i></i></span><span>日づけ<i></i></span><span>タイム<i></i></span><span>とくてん<i></i></span></div></div>' +
+    (line ? sheetLineHTML(pg) : sheetMitoriHTML(pg)) +
+    '<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>').join("") +
+    '<section class="sh-page sh-akey-page"><div class="sh-head"><div class="sh-title">' + g.key + "　" + SUBJECT[subj].name +
+    '　こたえ<small>（おうちの人・先生用）</small></div></div>' + sheetAnswerHTML(list) +
+    '<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>';
+  $("#sheetOut").classList.remove("hidden");
+  $("#sheetPrint").classList.remove("hidden");
+  $("#sheetMsg").textContent = "できました！ 下に 出ています。「印刷する」で 紙に 出せます。";
+  $("#sheetOut").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function sheetPrint() {
+  document.body.classList.add("print-sheet");
+  try { window.print(); } catch (e) { console.error("印刷に失敗", e); }
+  setTimeout(() => document.body.classList.remove("print-sheet"), 500);
+}
+
+/* ---------- プリントを作る画面の ボタン ---------- */
+(function () {
+  const g = $("#sheetGrade"), sj = $("#sheetSubj"), go = $("#sheetGo"), pr = $("#sheetPrint");
+  if (!g || !sj || !go) return;
+  g.addEventListener("change", sheetUpdateSubj);
+  sj.addEventListener("change", sheetUpdateSubj);
+  go.addEventListener("click", sheetBuild);
+  if (pr) pr.addEventListener("click", sheetPrint);
+})();
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */
 renderGrid();

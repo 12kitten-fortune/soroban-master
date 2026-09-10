@@ -1183,10 +1183,10 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 @media (max-width: 640px) { .cert { padding: 18px 12px; } .cert-title { font-size: 26px; letter-spacing: 8px; } .cert-name { font-size: 22px; } }
 /* 印刷は 合格証だけ */
 @media print {
-  body * { visibility: hidden !important; }
-  #certLayer, #certLayer .cert, #certLayer .cert * { visibility: visible !important; }
-  #certLayer { position: static; background: none; padding: 0; }
-  .cert { box-shadow: none; width: 100%; }
+  body.print-cert * { visibility: hidden !important; }
+  body.print-cert #certLayer, body.print-cert #certLayer .cert, body.print-cert #certLayer .cert * { visibility: visible !important; }
+  body.print-cert #certLayer { position: static; background: none; padding: 0; }
+  body.print-cert .cert { box-shadow: none; width: 100%; }
   .cert-btns { display: none !important; }
 }
 
@@ -1225,3 +1225,57 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .lesson-links b { color: var(--navy); width: 100%; margin-bottom: 2px; }
 .lesson-links a { color: var(--navy); font-weight: 700; text-decoration: none; background: var(--card);
   border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font-size: 14px; }
+
+/* ============================================================ 印刷プリント（宿題用紙）
+   画面では 紙に 見えるように、印刷では この用紙だけが 出るように する。 */
+#sheetOut { margin-top: 4px; }
+.sh-page { background: #fff; color: #000; border: 1px solid var(--line); border-radius: 8px;
+  padding: 20px 22px 14px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.sh-head { border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 14px; }
+.sh-title { font-size: 20px; font-weight: 800; }
+.sh-title small { font-size: 13px; font-weight: 400; margin-left: 8px; color: #555; }
+.sh-fields { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+.sh-fields span { display: flex; align-items: flex-end; gap: 6px; }
+.sh-fields i { display: block; width: 92px; border-bottom: 1px solid #666; height: 15px; }
+
+/* みとり算・あんざん：たてに 数字を ならべる（検定の用紙と 同じ形） */
+.sh-mt { width: 100%; border-collapse: collapse; margin-bottom: 16px; table-layout: fixed; }
+.sh-mt th { font-size: 12px; font-weight: 700; border-bottom: 1px solid #000; padding: 2px 0; }
+.sh-mt td { vertical-align: top; padding: 8px 6px 0; border-right: 1px dotted #bbb; }
+.sh-mt td:last-child { border-right: none; }
+.sh-n { text-align: right; font-size: 15px; line-height: 1.7; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sh-ans { border-top: 2px solid #000; margin-top: 6px; height: 34px; }
+
+/* かけ算・わり算：1問1行 */
+.sh-cols { display: flex; gap: 26px; }
+.sh-col { flex: 1; }
+.sh-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dotted #ccc; }
+.sh-no { width: 22px; font-size: 12px; color: #555; text-align: right; }
+.sh-q { font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sh-blank { flex: 1; min-width: 70px; border-bottom: 1px solid #666; height: 18px; margin-left: 6px; }
+
+/* こたえの紙 */
+.sh-akey { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; margin-bottom: 14px; font-size: 14px; }
+.sh-akey > b { width: 100%; font-size: 15px; }
+.sh-akey-i { font-variant-numeric: tabular-nums; }
+.sh-akey-i b { font-size: 16px; }
+.sh-foot { margin-top: 12px; padding-top: 6px; border-top: 1px solid #ccc; font-size: 10px; color: #777; text-align: right; }
+
+@media (max-width: 640px) {
+  .sh-page { padding: 14px 12px 10px; }
+  .sh-title { font-size: 17px; }
+  .sh-n { font-size: 13px; }
+  .sh-cols { flex-direction: column; gap: 0; }
+}
+
+/* 印刷するときは この用紙だけ。1枚ずつ 改ページ */
+@media print {
+  @page { margin: 12mm; }
+  body.print-sheet * { visibility: hidden !important; }
+  body.print-sheet #sheetOut, body.print-sheet #sheetOut * { visibility: visible !important; }
+  body.print-sheet #sheetOut { position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
+  body.print-sheet .sh-page { border: none; border-radius: 0; box-shadow: none; margin: 0; padding: 0;
+    break-after: page; page-break-after: always; }
+  body.print-sheet .sh-page:last-child { break-after: auto; page-break-after: auto; }
+  body.print-sheet .sh-n { font-size: 14px; }
+}

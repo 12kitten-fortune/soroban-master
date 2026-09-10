@@ -58,6 +58,7 @@
           <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
           <div class="nav-sec">きろく</div>
           <button class="nav" data-view="records">📊 記録を見る</button>
+          <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
           <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
           <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
         </nav>
@@ -415,6 +416,43 @@
             <p class="sub" id="sfxNote"></p>
             <p class="sub" id="setCredit"></p>
           </div>
+        </div>
+
+        <!-- 印刷プリント（宿題用紙） -->
+        <div id="view-sheet" class="view hidden">
+          <div class="card">
+            <h3>🖨 プリントを 作る（宿題用紙）</h3>
+            <p class="sub">級と 種目を えらぶと、その場で 問題用紙を 作ります。<b>こたえの紙</b>も いっしょに 出ます。
+              アプリと 同じ しくみで 作るので、級の むずかしさが ずれません。何回 作っても 毎回 ちがう問題です。</p>
+            <div class="row2">
+              <label>級・段<select id="sheetGrade"></select></label>
+              <label>しゅもく<select id="sheetSubj">
+                <option value="mitori">みとり算</option>
+                <option value="kake">かけ算</option>
+                <option value="wari">わり算</option>
+                <option value="anzan">あんざん</option>
+              </select></label>
+              <label>1枚の問題数<select id="sheetN">
+                <option value="5">5問</option>
+                <option value="10">10問</option>
+                <option value="15">15問</option>
+                <option value="20">20問</option>
+              </select></label>
+              <label>まい数<select id="sheetPages">
+                <option value="1">1枚</option>
+                <option value="2">2枚</option>
+                <option value="3">3枚</option>
+                <option value="5">5枚</option>
+              </select></label>
+            </div>
+            <div id="sheetNote" class="sub"></div>
+            <div class="btn-row">
+              <button id="sheetGo">📄 プリントを 作る</button>
+              <button id="sheetPrint" class="ghost hidden">🖨 印刷する</button>
+            </div>
+            <div id="sheetMsg" class="result"></div>
+          </div>
+          <div id="sheetOut" class="hidden"></div>
         </div>
 
         <div id="view-lesson" class="view hidden">
