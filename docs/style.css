@@ -1301,3 +1301,9 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .join-on { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold);
   border-radius: 14px; padding: 14px 16px; }
 .join-on-h { font-size: 19px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
+
+/* 教室に参加：先生の 入口 */
+.teacher-box { border: 2px solid var(--royal-gold); }
+.btn-link { display: inline-block; text-decoration: none; background: var(--navy); color: #fff; font-weight: 800;
+  padding: 10px 18px; border-radius: 12px; }
+.btn-link.ghost { background: #fff; color: var(--navy); border: 2px solid var(--line); }

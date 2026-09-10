@@ -33,15 +33,21 @@
       <!-- ログイン -->
       <section id="scr-login" class="card hidden">
         <h1>🏫 先生の画面</h1>
-        <p class="sub">生徒の 練習が 見える・宿題を 出す・ログインカードを 印刷する。先生だけが 使う画面です。</p>
+        <p class="sub">生徒の 練習が 見える・ログインカードを 印刷する。先生だけが 使う画面です。生徒や 保護者は ここを 使いません。</p>
+        <ol class="cls-steps fb-only">
+          <li><b>はじめての先生</b>は、下に お名前・メール・パスワードを 入れて「アカウントを作る」。<b>1分</b>で 終わります</li>
+          <li>教室を 作って、生徒の <b>にっくねーむ</b>を 入れる</li>
+          <li>ログインカードを 印刷して 子どもに 渡す。子どもは コードを 入れて 名前を えらぶだけ</li>
+        </ol>
         <form id="loginForm" class="cls-form">
+          <div id="lgModeTitle" class="cls-mode-title fb-only">はじめての先生（アカウントを 作る）</div>
           <label>お名前（教室名でも可）<input id="lgName" type="text" autocomplete="name" placeholder="さくら そろばん教室" /></label>
-          <label class="fb-only">メールアドレス<input id="lgEmail" type="email" autocomplete="email" /></label>
-          <label class="fb-only">パスワード（8文字以上）<input id="lgPw" type="password" autocomplete="current-password" minlength="8" /></label>
+          <label class="fb-only">メールアドレス<input id="lgEmail" type="email" autocomplete="email" placeholder="example@gmail.com" /></label>
+          <label class="fb-only">パスワード（8文字以上。自分で 決めます）<input id="lgPw" type="password" autocomplete="current-password" minlength="8" /></label>
           <div class="btn-row">
-            <button type="submit" id="lgGo">はじめる</button>
-            <button type="button" id="lgToggle" class="ghost fb-only">アカウントを 持っている（ログイン）</button>
+            <button type="submit" id="lgGo">アカウントを 作って はじめる</button>
           </div>
+          <p class="sub fb-only cls-switch">2回目からは：<a href="#" id="lgToggle">ログインする（アカウントを 持っている）</a></p>
           <p class="sub fb-only"><a href="#" id="lgReset">パスワードを 忘れた（メールで 作りなおす）</a></p>
           <div id="lgMsg" class="result"></div>
         </form>

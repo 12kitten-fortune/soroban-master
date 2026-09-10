@@ -58,3 +58,11 @@
   .cls-inline { flex-direction: column; }
   .lc-sheet { grid-template-columns: 1fr; }
 }
+
+/* ログイン画面の 案内 */
+.cls-steps { margin: 6px 0 14px; padding-left: 22px; line-height: 1.8; font-size: 14px; }
+.cls-steps li { margin-bottom: 4px; }
+.cls-mode-title { font-weight: 900; color: var(--navy); font-size: 16px; margin: 10px 0 8px; padding: 6px 12px;
+  background: #fff8e4; border-left: 4px solid var(--royal-gold); border-radius: 6px; }
+.cls-switch { margin-top: 12px !important; }
+.cls-switch a, .cls-main .cls-form a { color: var(--navy); font-weight: 700; }

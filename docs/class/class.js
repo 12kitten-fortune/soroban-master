@@ -32,11 +32,15 @@
     $("#logoutBtn").classList.toggle("hidden", !t);
     if (t) { await renderClasses(); show("classes"); } else show("login");
   });
-  $("#lgToggle").addEventListener("click", () => {
+  $("#lgToggle").addEventListener("click", (e) => {
+    e.preventDefault();
     signup = !signup;
-    $("#lgGo").textContent = signup ? "はじめる" : "ログイン";
-    $("#lgToggle").textContent = signup ? "アカウントを 持っている（ログイン）" : "はじめて 使う（登録）";
+    $("#lgGo").textContent = signup ? "アカウントを 作って はじめる" : "ログイン";
+    $("#lgToggle").textContent = signup ? "ログインする（アカウントを 持っている）" : "アカウントを 作る（はじめての先生）";
+    $("#lgToggle").parentElement.firstChild.textContent = signup ? "2回目からは：" : "はじめての先生は：";
+    const mt = $("#lgModeTitle"); if (mt) mt.textContent = signup ? "はじめての先生（アカウントを 作る）" : "ログイン（2回目から）";
     $("#lgName").parentElement.classList.toggle("hidden", !signup);
+    $("#lgMsg").textContent = "";
   });
   $("#loginForm").addEventListener("submit", async (e) => {
     e.preventDefault(); $("#lgMsg").textContent = "";
