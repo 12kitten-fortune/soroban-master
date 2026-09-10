@@ -1,17 +1,18 @@
 rules_version = '2';
-/* Firestore の 守り。Firebase コンソール → Firestore Database → 「ルール」に
-   まるごと 貼りつけて「公開」。apiKey は 秘密ではないので、守りは ここで 行う。
+/* Firestore の 守り。Firebase コンソール → Firestore → 「ルール」に まるごと 貼りつけて「公開」。
+   apiKey は 秘密ではないので、守りは ここで 行う。
 
    考え方
-   ・先生（メール＋パスワードで ログイン）＝ 自分の教室だけ 読み書きできる
-   ・生徒（匿名ログイン）＝ 教室の 名前の一覧は 見られるが、
-       ほかの子の 記録は 読めない。書けるのは 自分の 記録だけ
-   ・生徒は 教室や ほかの生徒を 作ったり 消したり できない          */
+   ・先生（メール＋パスワード）＝ 自分の教室だけ 読み書き。ほかの先生の 教室は 一覧にも 出ない
+   ・生徒（匿名ログイン）＝ 教室の 名前の一覧は 見られるが、ほかの子の 記録は 読めない
+   ・生徒が 書けるのは 自分の 記録だけ。しかも「足す」だけ（消せない・書きかえられない）
+   ・記録の 中身は 形と 範囲を 検査する（でたらめな 数や 未来の日付は はじく）
+   ・1人の生徒に つなげる 端末は 4台まで                                             */
 service cloud.firestore {
   match /databases/{db}/documents {
 
-    function signedIn()  { return request.auth != null; }
-    function teacher()   { return signedIn() && request.auth.token.firebase.sign_in_provider == 'password'; }
+    function signedIn() { return request.auth != null; }
+    function teacher()  { return signedIn() && request.auth.token.firebase.sign_in_provider == 'password'; }
     function classOwner(cid) {
       return teacher() &&
         get(/databases/$(db)/documents/classes/$(cid)).data.teacherUid == request.auth.uid;
@@ -21,46 +22,71 @@ service cloud.firestore {
       return signedIn() &&
         request.auth.uid in get(/databases/$(db)/documents/classes/$(cid)/students/$(sid)).data.uids;
     }
+    // 1セットの 記録の 形。app.js の logSession が 作るもの と 同じ
+    function validSession(d, tid) {
+      return d.keys().hasAll(['d', 't', 'subj', 'N', 'correct', 'sec'])
+        && d.t is int && string(d.t) == tid
+        && d.t > request.time.toMillis() - 400 * 86400000     // 400日より 前の 記録は 受けない
+        && d.t < request.time.toMillis() + 6 * 3600000        // 未来（時計ずれ 6時間まで）は 受けない
+        && d.subj in ['mitori', 'kake', 'wari', 'anzan', 'flash']
+        && d.N is int && d.N >= 1 && d.N <= 200
+        && d.correct is int && d.correct >= 0 && d.correct <= d.N
+        && d.sec is number && d.sec >= 0 && d.sec <= 36000
+        && d.d is string && d.d.size() == 10;
+    }
 
     /* 先生の 名前。本人だけ */
     match /teachers/{uid} {
       allow read, write: if teacher() && request.auth.uid == uid;
     }
 
-    /* クラスコード → 教室。生徒は コードを 引けるだけ。書きかえは 持ち主の先生だけ */
+    /* クラスコード → 教室。生徒は コードを 1つずつ 引けるだけ（総なめは できない） */
     match /codes/{code} {
       allow get:    if signedIn();
-      allow list:   if false;                                  // 総なめは させない
-      allow create: if teacher() && request.resource.data.keys().hasOnly(['classId']);
-      allow delete: if teacher() &&
-        get(/databases/$(db)/documents/classes/$(resource.data.classId)).data.teacherUid == request.auth.uid;
+      allow list:   if false;
+      // 自分の教室の コードしか 作れない（教室と 同時に 作るので getAfter で 見る）
+      allow create: if teacher()
+        && request.resource.data.keys().hasOnly(['classId'])
+        && getAfter(/databases/$(db)/documents/classes/$(request.resource.data.classId)).data.teacherUid == request.auth.uid;
+      allow delete: if teacher()
+        && get(/databases/$(db)/documents/classes/$(resource.data.classId)).data.teacherUid == request.auth.uid;
       allow update: if false;
     }
 
     /* 教室 */
     match /classes/{cid} {
-      allow get:    if signedIn();                              // 参加のとき 名前を 見せる
-      allow list:   if teacher() && request.query.limit <= 200; // 一覧は 先生だけ（where で 自分のぶんに しぼる）
-      allow create: if teacher() && request.resource.data.teacherUid == request.auth.uid;
-      allow update, delete: if classOwner(cid);
+      allow get:    if signedIn();                               // 参加のとき 名前を 見せる
+      // 一覧は「自分の教室」で しぼった 問い合わせ しか 通らない（他人の コードを 集められない）
+      allow list:   if teacher() && resource.data.teacherUid == request.auth.uid;
+      allow create: if teacher()
+        && request.resource.data.teacherUid == request.auth.uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 60;
+      allow update: if classOwner(cid)
+        && request.resource.data.teacherUid == resource.data.teacherUid;   // 持ち主は 変えられない
+      allow delete: if classOwner(cid);
 
       /* 生徒 */
       match /students/{sid} {
         // 参加のとき「名前の一覧」を 見せる必要がある。にっくねーむ以外の 個人情報は 入れていない
         allow get, list: if signedIn();
-        allow create, delete: if classOwner(cid);
+        allow create: if classOwner(cid)
+          && request.resource.data.nick is string && request.resource.data.nick.size() <= 20;
+        allow delete: if classOwner(cid);
         allow update: if classOwner(cid)
-          // 生徒本人：自分の 端末を つなぐ／最後に来た日時と まとめを 書く だけ
-          || (signedIn() && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['uids', 'lastSeen', 'stat'])
-              && (isMe(cid, sid)
-                  || request.resource.data.uids.hasAll(resource.data.uids)));   // はじめて つなぐとき
+          // 生徒本人：端末を つなぐ／最後に来た日時／まとめ を 書くだけ
+          || (signedIn()
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uids', 'lastSeen', 'stat'])
+              && request.resource.data.uids.hasAll(resource.data.uids)             // 他の端末を 外せない
+              && request.resource.data.uids.size() <= 4                            // 端末は 4台まで
+              && request.resource.data.uids.size() <= resource.data.uids.size() + 1 // 一度に 1台
+              && (request.auth.uid in request.resource.data.uids));
 
-        /* 練習の 記録。先生は 読むだけ、本人は 足すだけ（消せない・書きかえられない） */
-        match /sessions/{t} {
+        /* 練習の 記録。本人は 足すだけ。先生は 読む・消す（教室を 消すとき） */
+        match /sessions/{tid} {
           allow get, list: if classOwner(cid) || isMe(cid, sid);
-          allow create:    if isMe(cid, sid);
-          allow update, delete: if false;
+          allow create:    if isMe(cid, sid) && validSession(request.resource.data, tid);
+          allow update:    if false;
+          allow delete:    if classOwner(cid);
         }
       }
     }

@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-11-310"; // 最新反映の確認用
+const BUILD = "2026-09-11-320"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -4579,8 +4579,9 @@ async function joinStep1() {
       b.onclick = async () => {
         const s = list[+b.dataset.i];
         try {
-          await S.joinClass(c.id, s.id);
-          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, sent: 0 });
+          const j = await S.joinClass(c.id, s.id);
+          // サーバーに もう ある記録は 送らない（入り直しても 二重に ならない）
+          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, sent: (j && j.latest) || 0 });
           fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
           pushToClass(false);
         } catch (e) { msg.textContent = "参加できませんでした：" + ((e && e.message) || e); msg.className = "result ng"; }

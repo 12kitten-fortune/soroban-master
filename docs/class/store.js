@@ -53,7 +53,7 @@
       async listStudents(cid) { return Object.values(db.students[cid] || {}).sort((a, b) => a.createdAt - b.createdAt); },
       async addStudents(cid, nicks) {
         const out = []; db.students[cid] = db.students[cid] || {};
-        nicks.forEach((n) => { const s = { id: newId(), nick: n, createdAt: now(), lastSeen: 0, uids: [], stat: null }; db.students[cid][s.id] = s; out.push(s); });
+        nicks.map((n) => String(n).slice(0, 20)).forEach((n) => { const s = { id: newId(), nick: n, createdAt: now(), lastSeen: 0, uids: [], stat: null }; db.students[cid][s.id] = s; out.push(s); });
         save(); return out;
       },
       async updateStudent(cid, sid, patch) { Object.assign(db.students[cid][sid], patch); save(); },
@@ -61,7 +61,12 @@
       async listSessions(cid, sid, n) { return (db.sessions[key(cid, sid)] || []).slice(-(n || 300)); },
       /* ---- 生徒側 ---- */
       async resolveCode(code) { const c = Object.values(db.classes).find((x) => x.code === String(code || "").toUpperCase()); return c ? { id: c.id, name: c.name, preset: c.preset } : null; },
-      async joinClass(cid, sid) { const s = db.students[cid] && db.students[cid][sid]; if (!s) throw new Error("その名前は 教室に ありません"); s.lastSeen = now(); save(); return { cid, sid, nick: s.nick }; },
+      async joinClass(cid, sid) {
+        const s = db.students[cid] && db.students[cid][sid]; if (!s) throw new Error("その名前は 教室に ありません");
+        s.lastSeen = now(); save();
+        const have = db.sessions[key(cid, sid)] || [];
+        return { cid, sid, nick: s.nick, latest: have.length ? have[have.length - 1].t : 0 };
+      },
       async pushSessions(cid, sid, list) {
         const k = key(cid, sid); const have = new Set((db.sessions[k] || []).map((e) => e.t));
         db.sessions[k] = (db.sessions[k] || []).concat(list.filter((e) => !have.has(e.t))).slice(-2000);
@@ -122,15 +127,30 @@
       },
       async getClass(cid) { const d = await cRef(cid).get(); return d.exists ? obj(d) : null; },
       async updateClass(cid, patch) { await cRef(cid).update(patch); return this.getClass(cid); },
-      async deleteClass(cid) { const c = await this.getClass(cid); if (c && c.code) { try { await fs.collection("codes").doc(c.code).delete(); } catch (e) { } } await cRef(cid).delete(); },
+      async _deleteStudentDeep(cid, sid) {
+        // 記録を 300件ずつ 消してから 生徒を 消す（サブコレクションは 親を 消しても 残るため）
+        for (let guard = 0; guard < 40; guard++) {
+          const q = await sRef(cid, sid).collection("sessions").limit(300).get();
+          if (q.empty) break;
+          const b = fs.batch(); q.docs.forEach((d) => b.delete(d.ref)); await b.commit();
+        }
+        await sRef(cid, sid).delete();
+      },
+      async deleteClass(cid) {
+        const c = await this.getClass(cid);
+        const st = await this.listStudents(cid);
+        for (const s of st) await this._deleteStudentDeep(cid, s.id);
+        if (c && c.code) { try { await fs.collection("codes").doc(c.code).delete(); } catch (e) { } }
+        await cRef(cid).delete();
+      },
       async listStudents(cid) { const q = await cRef(cid).collection("students").get(); return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt); },
       async addStudents(cid, nicks) {
         const b = fs.batch(), out = [];
-        nicks.forEach((n) => { const r = cRef(cid).collection("students").doc(); const s = { nick: n, createdAt: now(), lastSeen: 0, uids: [], stat: null }; b.set(r, s); out.push(Object.assign({ id: r.id }, s)); });
+        nicks.map((n) => String(n).slice(0, 20)).forEach((n) => { const r = cRef(cid).collection("students").doc(); const s = { nick: n, createdAt: now(), lastSeen: 0, uids: [], stat: null }; b.set(r, s); out.push(Object.assign({ id: r.id }, s)); });
         await b.commit(); return out;
       },
       async updateStudent(cid, sid, patch) { await sRef(cid, sid).update(patch); },
-      async removeStudent(cid, sid) { await sRef(cid, sid).delete(); },
+      async removeStudent(cid, sid) { await this._deleteStudentDeep(cid, sid); },
       async listSessions(cid, sid, n) {
         const q = await sRef(cid, sid).collection("sessions").orderBy("t", "desc").limit(n || 300).get();
         return q.docs.map(obj).reverse();
@@ -146,19 +166,33 @@
         const u = await anon();
         await sRef(cid, sid).update({ uids: fb.firestore.FieldValue.arrayUnion(u.uid), lastSeen: now() });
         const s = await sRef(cid, sid).get();
-        return { cid, sid, nick: s.data().nick };
+        let latest = 0;
+        try { const q = await sRef(cid, sid).collection("sessions").orderBy("t", "desc").limit(1).get(); if (!q.empty) latest = q.docs[0].data().t || 0; } catch (e) { }
+        return { cid, sid, nick: s.data().nick, latest };
       },
+      async sendReset(email) { return auth.sendPasswordResetEmail(email); },
       async pushSessions(cid, sid, list, allList) {
         await anon();
-        const b = fs.batch();
-        list.forEach((e) => b.set(sRef(cid, sid).collection("sessions").doc(String(e.t)), e));
-        b.set(sRef(cid, sid), { lastSeen: now(), stat: statOf(allList || list) }, { merge: true });
-        await b.commit();
+        const col = sRef(cid, sid).collection("sessions");
+        try {
+          const b = fs.batch();
+          list.forEach((e) => b.set(col.doc(String(e.t)), e));
+          await b.commit();
+        } catch (err) {
+          // ルールは「足すだけ」なので、すでに ある記録が 1つでも まざると まとめ送りは 全部 失敗する。
+          // そのときは 1件ずつ 送り、ある物は とばす
+          let sent = 0;
+          for (const e of list) { try { await col.doc(String(e.t)).set(e); sent++; } catch (e2) { } }
+          if (!sent && list.length) throw err;
+        }
+        await sRef(cid, sid).set({ lastSeen: now(), stat: statOf(allList || list) }, { merge: true });
       },
     };
   }
 
-  const cfg = global.SK_FIREBASE_CONFIG;
+  // URL に ?local=1 を つけると、設定が あっても お試しモード（自動テストと、通信なしでの 動作確認用）
+  const forceLocal = /[?&]local=1/.test(global.location ? global.location.search : "") || global.SK_FORCE_LOCAL === true;
+  const cfg = forceLocal ? null : global.SK_FIREBASE_CONFIG;
   global.SKStore = (cfg && global.firebase) ? FireStore(cfg) : LocalStore();
   global.SKStore.statOf = statOf;
 })(window);

@@ -48,6 +48,14 @@
     } catch (err) { $("#lgMsg").textContent = friendly(err); $("#lgMsg").className = "result ng"; }
   });
   $("#logoutBtn").addEventListener("click", () => S.signOut());
+  const rs = $("#lgReset");
+  if (rs) rs.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const email = $("#lgEmail").value.trim();
+    if (!email) { $("#lgMsg").textContent = "上に メールアドレスを 入れてから おしてください"; $("#lgMsg").className = "result ng"; return; }
+    try { await S.sendReset(email); $("#lgMsg").textContent = "パスワードを 作りなおす メールを " + email + " に 送りました。届かないときは 迷惑メールも 見てください。"; $("#lgMsg").className = "result ok"; }
+    catch (err) { $("#lgMsg").textContent = friendly(err); $("#lgMsg").className = "result ng"; }
+  });
   function friendly(err) {
     const c = (err && err.code) || "";
     if (c.includes("email-already-in-use")) return "その メールアドレスは 登録ずみです。「ログイン」から 入ってください。";
@@ -113,7 +121,7 @@
   }
   $("#addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const nicks = $("#addNicks").value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean).slice(0, 60);
+    const nicks = $("#addNicks").value.split(/\r?\n/).map((x) => x.trim().slice(0, 20)).filter(Boolean).slice(0, 60);
     if (!nicks.length) return;
     const have = new Set(curStudents.map((s) => s.nick));
     const fresh = nicks.filter((n) => !have.has(n));

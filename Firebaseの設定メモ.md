@@ -51,8 +51,13 @@ window.SK_FIREBASE_CONFIG = {
 > `apiKey` は **秘密ではない**。ブラウザに 埋めこむ 前提の 識別子で、
 > 守りは `firestore.rules` の 側で 行う。GitHub に 入れて よい。
 
-最後に、コンソールの「Authentication →設定→ 承認済みドメイン」に
-**`sorobankingdom.com`** が 入っているか 確かめる（無ければ 追加）。
+最後に、コンソールの「Authentication → 設定 → 承認済みドメイン」に
+**`sorobankingdom.com`** を 追加する（パスワード再設定メールの リンク先にも 使われる）。
+
+## ルールを 変えたとき
+
+`firestore.rules` を 変えたら、コンソールの「ルール」に **貼りなおして 公開** しないと 効かない
+（サイトを push しても ルールは 変わらない）。
 
 ---
 
