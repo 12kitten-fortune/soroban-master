@@ -129,11 +129,15 @@
   });
   $("#logoutBtn").addEventListener("click", () => S.signOut());
   // パスワードの 目のマーク：おすたび 表示 ⇄ 非表示
+  // 目のマーク：絵文字は 出ない 端末が あるので、SVGの 絵＋文字に する
+  const EYE_OPEN = "<svg class=\"pw-ico\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 5C6.5 5 2.7 9.1 1.5 11.3a1.4 1.4 0 0 0 0 1.4C2.7 14.9 6.5 19 12 19s9.3-4.1 10.5-6.3a1.4 1.4 0 0 0 0-1.4C21.3 9.1 17.5 5 12 5z\"/><circle class=\"pw-pupil\" cx=\"12\" cy=\"12\" r=\"3.4\"/></svg>";
+  const EYE_OFF  = "<svg class=\"pw-ico\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 5C6.5 5 2.7 9.1 1.5 11.3a1.4 1.4 0 0 0 0 1.4C2.7 14.9 6.5 19 12 19s9.3-4.1 10.5-6.3a1.4 1.4 0 0 0 0-1.4C21.3 9.1 17.5 5 12 5z\"/><circle class=\"pw-pupil\" cx=\"12\" cy=\"12\" r=\"3.4\"/><path class=\"pw-slash\" d=\"M3.5 3.5 L20.5 20.5\"/></svg>";
   const eye = $("#lgPwEye");
   if (eye) eye.addEventListener("click", () => {
     const pw = $("#lgPw"), show = pw.type === "password";
     pw.type = show ? "text" : "password";
-    eye.textContent = show ? "🙈" : "👁";
+    eye.innerHTML = (show ? EYE_OFF : EYE_OPEN) + '<span class="pw-word">' + (show ? "かくす" : "見る") + "</span>";
+    eye.classList.toggle("on", show);
     eye.setAttribute("aria-label", show ? "パスワードを 隠す" : "パスワードを 表示する");
     pw.focus();
   });

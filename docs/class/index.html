@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=370" />
+    <link rel="stylesheet" href="class.css?v=380" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=370"></script>
-    <script src="store.js?v=370"></script>
+    <script src="../firebase-config.js?v=380"></script>
+    <script src="store.js?v=380"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -59,10 +59,10 @@
 
           <p class="hint fb-only" data-say="パスワードを、ご自分で 決めて 入れます。8文字以上です。どこかから 送られてくるものでは ありません。右の 目のマークを 押すと、入れた 文字が 見えます。忘れないよう 紙に 控えてください。">
             <b>③</b> パスワードを <b>ご自分で 決めて</b> 入れます（8文字以上）。どこかから 送られてくるものでは ありません。<br>
-            右の <b>👁</b> を 押すと 入れた文字が 見えます。<b class="warn">紙に 控えておくと 安心です。</b></p>
+右の <b>「見る」</b>を 押すと 入れた文字が 見えます。<b class="warn">紙に 控えておくと 安心です。</b></p>
           <label class="fb-only"><span class="lb">パスワード（8文字以上）</span>
             <span class="pw-wrap"><input id="lgPw" type="password" autocomplete="current-password" minlength="8" />
-              <button type="button" id="lgPwEye" class="pw-eye" aria-label="パスワードを 表示する" title="表示／非表示">👁</button></span>
+              <button type="button" id="lgPwEye" class="pw-eye" aria-label="パスワードを 表示する" title="表示／非表示"><svg class="pw-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5C6.5 5 2.7 9.1 1.5 11.3a1.4 1.4 0 0 0 0 1.4C2.7 14.9 6.5 19 12 19s9.3-4.1 10.5-6.3a1.4 1.4 0 0 0 0-1.4C21.3 9.1 17.5 5 12 5z"/><circle class="pw-pupil" cx="12" cy="12" r="3.4"/></svg><span class="pw-word">見る</span></button></span>
           </label>
 
           <p class="hint fb-only" data-say="3つとも 入れたら、下の 黒い ボタンを 押します。これで 準備は 終わりです。">
@@ -151,6 +151,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=370"></script>
+    <script src="class.js?v=380"></script>
   </body>
 </html>

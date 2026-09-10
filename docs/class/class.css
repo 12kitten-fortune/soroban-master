@@ -69,10 +69,19 @@
 
 /* パスワードの 目のマーク */
 .pw-wrap { position: relative; display: block; }
-.pw-wrap input { padding-right: 48px; }
-.pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 34px;
-  border: none; background: transparent; font-size: 20px; cursor: pointer; border-radius: 8px; padding: 0; line-height: 1; }
-.pw-eye:hover { background: #fff8e4; }
+.pw-wrap input { padding-right: 92px; }
+/* 絵文字は 出ない 端末が あるので、SVGの 絵＋「見る」の 文字。押せると 分かる 形に */
+.pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; gap: 4px; height: 34px; padding: 0 10px;
+  border: 2px solid var(--line); border-radius: 999px; background: #fff; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 800; color: var(--navy); line-height: 1; }
+.pw-eye:hover { background: #fff8e4; border-color: var(--royal-gold); }
+.pw-eye.on { background: #fff8e4; border-color: var(--royal-gold); }
+.pw-ico { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--navy); stroke-width: 1.9;
+  stroke-linecap: round; stroke-linejoin: round; }
+.pw-ico .pw-pupil { fill: var(--navy); stroke: none; }
+.pw-ico .pw-slash { stroke: #c62828; stroke-width: 2.2; }
+.pw-word { white-space: nowrap; }
 
 /* 紺の 帯の 上の ログアウト（黒字で つぶれていた） */
 .cls-logout { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.6); border-radius: 999px;
