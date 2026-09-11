@@ -7,7 +7,9 @@
      codes/{code}                   { classId }                       … クラスコード → 教室
      classes/{cid}                  { name, code, preset, teacherUid, createdAt }
      classes/{cid}/students/{sid}   { nick, createdAt, lastSeen, uids[], stat }
-     classes/{cid}/students/{sid}/sessions/{t}   … 1セットの 記録（app.js の logSession と 同じ形） */
+     classes/{cid}/students/{sid}/sessions/{t}   … 1セットの 記録（app.js の logSession と 同じ形）
+     classes/{cid}/homework/{hid}   { subj, g, sets, due, note, createdAt }   … 先生が 出した 宿題
+       できたかどうかは 生徒側が 数えて stat.hw = { hid: できたセット数 } に 入れる */
 (function (global) {
   "use strict";
   const LS_KEY = "sk_class_db";
@@ -17,19 +19,36 @@
   const now = () => Date.now();
 
   /* 生徒の 記録から「先生画面の 一覧」に 出す まとめ（7日ぶん）。生徒側で 計算して 送る */
-  function statOf(list) {
+  function statOf(list, hws) {
     const lim = now() - 7 * 86400000;
     const w = list.filter((e) => (e.t || 0) >= lim);
     const N = w.reduce((a, e) => a + (e.N || 0), 0), C = w.reduce((a, e) => a + (e.correct || 0), 0);
     const miss = {};
     w.forEach((e) => (e.miss || []).forEach((m) => { miss[m.k || "other"] = (miss[m.k || "other"] || 0) + 1; }));
     const last = list.length ? list[list.length - 1] : null;
-    return { n7: w.length, acc7: N ? Math.round((C / N) * 100) : null, last: last ? last.t : 0, lastG: last ? last.g : "", miss7: miss };
+    const hw = {};
+    (hws || []).forEach((h) => { hw[h.id] = hwDone(h, list); });
+    return { n7: w.length, acc7: N ? Math.round((C / N) * 100) : null, last: last ? last.t : 0, lastG: last ? last.g : "", miss7: miss, hw };
+  }
+  /* 宿題が いくつ できたか：宿題を 出した あとの 記録で、しゅもくと 級が 同じ セットを 数える */
+  function hwDone(h, list) {
+    return list.filter((e) => (e.t || 0) >= (h.createdAt || 0) && e.subj === h.subj && e.g === h.g).length;
+  }
+  const HW_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
+  function cleanHomework(hw) {
+    return {
+      subj: HW_SUBJ.includes(hw.subj) ? hw.subj : "mitori",
+      g: String(hw.g || "").slice(0, 4),
+      sets: Math.max(1, Math.min(20, parseInt(hw.sets, 10) || 1)),
+      due: /^\d{4}-\d{2}-\d{2}$/.test(hw.due || "") ? hw.due : "",
+      note: String(hw.note || "").slice(0, 60),
+      createdAt: now(),
+    };
   }
 
   /* ============================================================ お試し（この端末の中だけ） */
   function LocalStore() {
-    const empty = () => ({ teacher: null, classes: {}, students: {}, sessions: {} });
+    const empty = () => ({ teacher: null, classes: {}, students: {}, sessions: {}, homework: {} });
     const load = () => { try { return Object.assign(empty(), JSON.parse(localStorage.getItem(LS_KEY) || "null") || {}); } catch (e) { return empty(); } };
     const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(db)); } catch (e) { console.error("保存に 失敗", e); } };
     let db = load(); const authCbs = [];
@@ -49,7 +68,14 @@
       },
       async getClass(cid) { return db.classes[cid] || null; },
       async updateClass(cid, patch) { Object.assign(db.classes[cid], patch); save(); return db.classes[cid]; },
-      async deleteClass(cid) { delete db.classes[cid]; delete db.students[cid]; Object.keys(db.sessions).forEach((k) => { if (k.startsWith(cid + "/")) delete db.sessions[k]; }); save(); },
+      async deleteClass(cid) { delete db.classes[cid]; delete db.students[cid]; delete db.homework[cid]; Object.keys(db.sessions).forEach((k) => { if (k.startsWith(cid + "/")) delete db.sessions[k]; }); save(); },
+      /* ---- 宿題 ---- */
+      async listHomework(cid) { return Object.values(db.homework[cid] || {}).sort((a, b) => a.createdAt - b.createdAt); },
+      async addHomework(cid, hw) {
+        const h = Object.assign({ id: newId() }, cleanHomework(hw));
+        db.homework[cid] = db.homework[cid] || {}; db.homework[cid][h.id] = h; save(); return h;
+      },
+      async removeHomework(cid, hid) { if (db.homework[cid]) delete db.homework[cid][hid]; save(); },
       async listStudents(cid) { return Object.values(db.students[cid] || {}).sort((a, b) => a.createdAt - b.createdAt); },
       async addStudents(cid, nicks) {
         const out = []; db.students[cid] = db.students[cid] || {};
@@ -67,10 +93,11 @@
         const have = db.sessions[key(cid, sid)] || [];
         return { cid, sid, nick: s.nick, latest: have.length ? have[have.length - 1].t : 0 };
       },
-      async pushSessions(cid, sid, list) {
+      async pushSessions(cid, sid, list, allList, hws) {
         const k = key(cid, sid); const have = new Set((db.sessions[k] || []).map((e) => e.t));
         db.sessions[k] = (db.sessions[k] || []).concat(list.filter((e) => !have.has(e.t))).slice(-2000);
-        const s = db.students[cid] && db.students[cid][sid]; if (s) { s.lastSeen = now(); s.stat = statOf(db.sessions[k]); }
+        const s = db.students[cid] && db.students[cid][sid];
+        if (s) { s.lastSeen = now(); s.stat = statOf(allList || db.sessions[k], hws || Object.values(db.homework[cid] || {})); }
         save();
       },
     };
@@ -140,9 +167,17 @@
         const c = await this.getClass(cid);
         const st = await this.listStudents(cid);
         for (const s of st) await this._deleteStudentDeep(cid, s.id);
+        try { const hq = await cRef(cid).collection("homework").get(); if (!hq.empty) { const b = fs.batch(); hq.docs.forEach((d) => b.delete(d.ref)); await b.commit(); } } catch (e) { }
         if (c && c.code) { try { await fs.collection("codes").doc(c.code).delete(); } catch (e) { } }
         await cRef(cid).delete();
       },
+      /* ---- 宿題（先生が 出す。生徒は 読むだけ） ---- */
+      async listHomework(cid) { const q = await cRef(cid).collection("homework").get(); return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt); },
+      async addHomework(cid, hw) {
+        const r = cRef(cid).collection("homework").doc(), h = cleanHomework(hw);
+        await r.set(h); return Object.assign({ id: r.id }, h);
+      },
+      async removeHomework(cid, hid) { await cRef(cid).collection("homework").doc(hid).delete(); },
       async listStudents(cid) { const q = await cRef(cid).collection("students").get(); return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt); },
       async addStudents(cid, nicks) {
         const b = fs.batch(), out = [];
@@ -171,7 +206,7 @@
         return { cid, sid, nick: s.data().nick, latest };
       },
       async sendReset(email) { return auth.sendPasswordResetEmail(email); },
-      async pushSessions(cid, sid, list, allList) {
+      async pushSessions(cid, sid, list, allList, hws) {
         await anon();
         const col = sRef(cid, sid).collection("sessions");
         try {
@@ -185,7 +220,7 @@
           for (const e of list) { try { await col.doc(String(e.t)).set(e); sent++; } catch (e2) { } }
           if (!sent && list.length) throw err;
         }
-        await sRef(cid, sid).set({ lastSeen: now(), stat: statOf(allList || list) }, { merge: true });
+        await sRef(cid, sid).set({ lastSeen: now(), stat: statOf(allList || list, hws || []) }, { merge: true });
       },
     };
   }
@@ -195,4 +230,5 @@
   const cfg = forceLocal ? null : global.SK_FIREBASE_CONFIG;
   global.SKStore = (cfg && global.firebase) ? FireStore(cfg) : LocalStore();
   global.SKStore.statOf = statOf;
+  global.SKStore.hwDone = hwDone;
 })(window);

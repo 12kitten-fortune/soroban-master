@@ -35,6 +35,17 @@ service cloud.firestore {
         && d.d is string && d.d.size() == 10;
     }
 
+    // 宿題の 形。先生画面の「宿題を 出す」が 作るもの と 同じ
+    function validHomework(d) {
+      return d.keys().hasOnly(['subj', 'g', 'sets', 'due', 'note', 'createdAt'])
+        && d.subj in ['mitori', 'kake', 'wari', 'anzan', 'flash']
+        && d.g is string && d.g.size() >= 1 && d.g.size() <= 4
+        && d.sets is int && d.sets >= 1 && d.sets <= 20
+        && d.due is string && d.due.size() <= 10
+        && d.note is string && d.note.size() <= 60
+        && d.createdAt is int;
+    }
+
     /* 先生の 名前。本人だけ */
     match /teachers/{uid} {
       allow read, write: if teacher() && request.auth.uid == uid;
@@ -88,6 +99,14 @@ service cloud.firestore {
           allow update:    if false;
           allow delete:    if classOwner(cid);
         }
+      }
+
+      /* 宿題。先生が 出す・消す。生徒は 読むだけ（できた数は 生徒の stat.hw に 書く） */
+      match /homework/{hid} {
+        allow get, list: if signedIn();
+        allow create:    if classOwner(cid) && validHomework(request.resource.data);
+        allow update:    if false;
+        allow delete:    if classOwner(cid);
       }
     }
   }

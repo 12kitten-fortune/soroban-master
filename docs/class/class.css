@@ -128,3 +128,23 @@ body.cls { font-size: 17px; }
 .hint-speak:hover { background: #fff8e4; }
 .cls-form label .lb, .cls-add label .lb { display: block; font-weight: 800; color: var(--navy); font-size: 14px; margin-bottom: 2px; }
 .cls-form label, .cls-add label { margin-bottom: 4px; }
+
+/* ---- 宿題 ---- */
+.hw-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.hw-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border: 2px solid var(--royal-gold);
+  border-radius: 12px; background: #fffaf0; }
+.hw-item b { font-size: 17px; color: var(--navy); }
+.hw-due { font-size: 14px; font-weight: 800; color: #1f8a4c; background: #e7f5ec; border-radius: 999px; padding: 3px 10px; }
+.hw-due.late { color: #b33; background: #fdecec; }
+.hw-note { font-size: 14px; color: #555; }
+.hw-item small { color: #777; margin-left: auto; white-space: nowrap; }
+.hw-item .x { background: none; border: 1px solid #ccc; border-radius: 999px; color: #b33; cursor: pointer; font: inherit; font-size: 13px; padding: 4px 10px; }
+.hw-form label { display: block; font-size: 13px; color: #555; margin-bottom: 8px; }
+.hw-form label .lb { display: block; font-weight: 800; color: var(--navy); font-size: 14px; margin-bottom: 2px; }
+.hw-form select, .hw-form input { display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font: inherit; font-size: 18px;
+  border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.hw-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.hw-chip { display: inline-block; font-size: 13px; font-weight: 800; color: #6b5100; background: #fff3cd; border-radius: 999px; padding: 3px 9px; margin: 2px 4px 2px 0; white-space: nowrap; }
+.hw-chip.ok { color: #1f8a4c; background: #e7f5ec; }
+.hw-chip.late { color: #b33; background: #fdecec; }
+@media (max-width: 640px) { .hw-grid { grid-template-columns: 1fr 1fr; } }

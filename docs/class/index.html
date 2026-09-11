@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=380" />
+    <link rel="stylesheet" href="class.css?v=381" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=380"></script>
-    <script src="store.js?v=380"></script>
+    <script src="../firebase-config.js?v=381"></script>
+    <script src="store.js?v=381"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -111,6 +111,23 @@
           </div>
         </div>
         <div class="card">
+          <h2>📨 宿題</h2>
+          <div id="hwList"></div>
+          <form id="hwForm" class="hw-form">
+            <p class="hint" data-say="宿題を 出します。しゅもくと 級、何セット やるかを えらんで、宿題を 出す を 押します。子どもの ホーム画面に、先生からの 宿題 として 出ます。子どもが やった ぶんは、下の 生徒の 表に 自動で 数が 入ります。">
+              <b>しゅもく・級・何セット</b>を えらんで <b>「📨 宿題を 出す」</b>を 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 下の 表に 自動で 入ります。</p>
+            <div class="hw-grid">
+              <label><span class="lb">しゅもく</span><select id="hwSubj"><option value="mitori">みとり算</option><option value="kake">かけ算</option><option value="wari">わり算</option><option value="anzan">あんざん</option><option value="flash">フラッシュ暗算</option></select></label>
+              <label><span class="lb">級</span><select id="hwGrade"></select></label>
+              <label><span class="lb">何セット</span><select id="hwSets"></select></label>
+              <label><span class="lb">いつまで（なくても可）</span><input id="hwDue" type="date" /></label>
+            </div>
+            <label><span class="lb">ひとこと（なくても可）</span><input id="hwNote" type="text" maxlength="60" placeholder="例：五玉に 気をつけて" /></label>
+            <button type="submit" id="hwGo" class="cls-add-btn">📨 宿題を 出す</button>
+            <div id="hwMsg" class="result"></div>
+          </form>
+        </div>
+        <div class="card">
           <h2>生徒</h2>
           <div id="studentTable"></div>
           <form id="addForm" class="cls-add">
@@ -151,6 +168,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=380"></script>
+    <script src="class.js?v=381"></script>
   </body>
 </html>

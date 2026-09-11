@@ -69,7 +69,12 @@ codes/{コード6文字}   → { classId }          コード → 教室
 classes/{cid}                               教室（name, code, teacherUid）
   students/{sid}                            生徒（nick, uids[], stat）
     sessions/{時刻}                          1セットの 記録
+  homework/{hid}                            先生が 出した 宿題（subj, g, sets, due, note, createdAt）
+                                            できた数は 生徒側が 数えて stat.hw に 入れる
 ```
+
+> 2026-09-11：宿題を 足した。`firestore.rules` に `homework` の 守りが 増えているので、
+> コンソールの「ルール」に **貼りなおして 公開** すること（貼らないと 先生が 宿題を 出せない）。
 
 **生徒からは 集めないもの**：メール・本名・生年月日・住所。
 にっくねーむと 練習の 記録だけ。

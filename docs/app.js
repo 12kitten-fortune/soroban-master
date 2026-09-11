@@ -1134,6 +1134,7 @@ function renderHome() {
   const doneToday = JSON.parse(localStorage.getItem(ROUTINE) || "[]").some((h) => h.date === today());
   $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
   renderWeakMenu();
+  renderHomework();                  // 教室に 入っている子：先生からの 宿題
   renderGoldPill();
 }
 /* ---------- にがて克服メニュー（その子のまちがえ方から作る） ---------- */
@@ -4562,7 +4563,55 @@ const jesc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/<
 const classLink = () => { try { return JSON.parse(localStorage.getItem(CLASSLINK) || "null"); } catch (e) { return null; } };
 function setClassLink(v) {
   try { v ? localStorage.setItem(CLASSLINK, JSON.stringify(v)) : localStorage.removeItem(CLASSLINK); } catch (e) { console.error("教室の 保存に 失敗", e); }
+  if (!v) { try { localStorage.removeItem(HW_KEY); } catch (e) { } }   // 教室を ぬけたら 宿題も 消す
   renderJoin();
+  renderHomework();
+}
+/* ---------- 先生からの 宿題 ----------
+   先生画面で 出した 宿題を 読んで、この端末に とっておく（通信できない ときも 見える）。
+   できた数は この端末の 記録から 数え、記録と いっしょに 先生へ おくる。 */
+const HW_KEY = "soroban_hw";
+const hwCache = () => { try { return JSON.parse(localStorage.getItem(HW_KEY) || "[]"); } catch (e) { return []; } };
+function hwDoneLocal(h) { return allSessions().filter((e) => (e.t || 0) >= (h.createdAt || 0) && e.subj === h.subj && e.g === h.g).length; }
+async function fetchHomework() {
+  const cl = classLink(); if (!cl) return [];
+  try {
+    const S = await loadStore();
+    const list = await S.listHomework(cl.cid);
+    try { localStorage.setItem(HW_KEY, JSON.stringify(list)); } catch (e) { }
+    renderHomework();
+    return list;
+  } catch (e) { console.error("宿題を 読めませんでした", e); return hwCache(); }
+}
+// 宿題の「▶ やる」：その級・しゅもくに 合わせて、ふつうの 練習を 始める（記録も ふつうに 残る）
+function hwStart(h) {
+  const gi = GRADES.findIndex((g) => g.key === h.g);
+  if (gi >= 0) gradeIdx = gi;
+  subject = h.subj;
+  if (!difficulty(currentGrade(), subject)) { alert("この級には " + ((SUBJECT[subject] && SUBJECT[subject].name) || subject) + " が ありません。先生に つたえてね。"); return; }
+  renderGrid(); updateInfo();
+  setActiveNav(document.querySelector('.nav[data-subj="' + subject + '"]'));
+  startWithTips(subject);
+}
+function renderHomework() {
+  const boxes = [$("#homeHw"), $("#joinHw")].filter(Boolean);
+  const list = classLink() ? hwCache() : [];
+  const td = today();
+  boxes.forEach((box) => {
+    if (!list.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+    box.classList.remove("hidden");
+    box.innerHTML = '<div class="hw-h">📨 先生からの 宿題</div>' + list.map((h, i) => {
+      const done = hwDoneLocal(h), ok = done >= h.sets;
+      const name = (SUBJECT[h.subj] && SUBJECT[h.subj].name) || h.subj;
+      let due = "";
+      if (h.due && !ok) { const m = h.due.split("-"); due = "　" + (+m[1]) + "/" + (+m[2]) + " まで" + (h.due < td ? ' <span class="hw-late">きげん すぎ！</span>' : ""); }
+      return '<div class="hw-row' + (ok ? " ok" : "") + '"><span class="hw-t"><b>' + jesc(name) + " " + jesc(h.g) + "</b> を " + h.sets + " セット" +
+        (h.note ? "<br><small>先生から：" + jesc(h.note) + "</small>" : "") + "</span>" +
+        '<span class="hw-p">' + (ok ? "✅ できた！" : "あと " + (h.sets - done) + " セット" + due) + "</span>" +
+        (ok ? "" : '<button class="hw-go" data-i="' + i + '">▶ やる</button>') + "</div>";
+    }).join("") + '<div class="hw-sub">やった ぶんは 自動で 先生に とどくよ。</div>';
+    box.querySelectorAll(".hw-go").forEach((b) => { b.onclick = () => hwStart(list[+b.dataset.i]); });
+  });
 }
 const FB_VER = "10.14.1";
 const FB_SRC = [
@@ -4593,8 +4642,10 @@ function renderJoin() {
       "<p>あなたの 名前：<b>" + jesc(cl.nick) + "</b></p>" +
       '<p class="sub">れんしゅうの きろくは、先生の 画面に とどきます。まちがえ方の クセも 先生が 見て、つぎの 宿題を 決めます。</p>' +
       '<div id="joinSync" class="sub"></div>' +
-      '<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>';
-    $("#joinPush").onclick = () => pushToClass(true);
+      '<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>' +
+      '<div id="joinHw" class="hw-box hidden"></div>';
+    $("#joinPush").onclick = () => fetchHomework().then(() => pushToClass(true));
+    renderHomework();
     $("#joinLeave").onclick = () => { if (confirm("教室から ぬけます。この端末の れんしゅうの きろくは 消えません。よろしいですか？")) setClassLink(null); };
     return;
   }
@@ -4636,7 +4687,7 @@ async function joinStep1() {
           // サーバーに もう ある記録は 送らない（入り直しても 二重に ならない）
           setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, sent: (j && j.latest) || 0 });
           fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
-          pushToClass(false);
+          fetchHomework().then(() => pushToClass(false));
         } catch (e) { msg.textContent = "参加できませんでした：" + ((e && e.message) || e); msg.className = "result ng"; }
       };
     });
@@ -4648,15 +4699,18 @@ async function pushToClass(loud) {
   const cl = classLink(); if (!cl || pushing) return;
   const note = $("#joinSync");
   const all = allSessions(), fresh = all.filter((e) => (e.t || 0) > (cl.sent || 0));
-  if (!fresh.length) { if (loud && note) note.textContent = "おくるものは ありません（ぜんぶ とどいています）"; return; }
+  // 宿題が 新しく 出ていたら、記録が 無くても「できた数」だけは おくり直す
+  const hws = hwCache(), hwSig = hws.map((h) => h.id).join(",");
+  if (!fresh.length && hwSig === (cl.hwSig || "")) { if (loud && note) note.textContent = "おくるものは ありません（ぜんぶ とどいています）"; return; }
   pushing = true;
   if (note) note.textContent = "おくっています…";
   try {
     const S = await loadStore();
-    await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all);
-    cl.sent = Math.max.apply(null, fresh.map((e) => e.t || 0));
+    await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all, hws);
+    if (fresh.length) cl.sent = Math.max.apply(null, fresh.map((e) => e.t || 0));
+    cl.hwSig = hwSig;
     try { localStorage.setItem(CLASSLINK, JSON.stringify(cl)); } catch (e) { }
-    if (note) note.textContent = "✓ " + fresh.length + "件 とどきました";
+    if (note) note.textContent = fresh.length ? "✓ " + fresh.length + "件 とどきました" : "✓ とどいています";
   } catch (e) {
     console.error("先生への 送信に 失敗", e);
     if (note) note.textContent = "いまは おくれませんでした。つぎに ひらいたとき もう一度 ためします。";
@@ -4669,8 +4723,8 @@ function schedulePush() {
   pushTimer = setTimeout(() => pushToClass(false), 4000);
 }
 
-/* ---------- 教室に 入っている子は、ひらいたときに おくり残しを おくる ---------- */
-if (classLink()) setTimeout(function () { pushToClass(false); }, 3000);
+/* ---------- 教室に 入っている子は、ひらいたときに 宿題を 読んで、おくり残しを おくる ---------- */
+if (classLink()) setTimeout(function () { fetchHomework().then(() => pushToClass(false)); }, 3000);
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */
 renderGrid();

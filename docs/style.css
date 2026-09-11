@@ -1310,6 +1310,17 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   padding: 10px 18px; border-radius: 12px; }
 .btn-link.ghost { background: #fff; color: var(--navy); border: 2px solid var(--line); }
 
+/* ---- 先生からの 宿題（ホーム・教室に参加） ---- */
+.hw-box { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
+.hw-h { font-size: 18px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
+.hw-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff; border-radius: 10px; padding: 9px 12px; margin: 6px 0; }
+.hw-row.ok { background: #e7f5ec; }
+.hw-t { flex: 1; min-width: 150px; font-size: 15px; } .hw-t b { font-size: 17px; color: var(--navy); } .hw-t small { color: #666; }
+.hw-p { font-weight: 800; color: var(--navy); white-space: nowrap; } .hw-row.ok .hw-p { color: #1f8a4c; }
+.hw-late { color: var(--accent); font-weight: 800; }
+.hw-go { font-size: 16px; font-weight: 800; padding: 9px 16px; border-radius: 10px; background: var(--navy); color: #fff; border: none; }
+.hw-sub { font-size: 12px; color: #6b5a45; margin-top: 4px; }
+
 /* ---- はじめて開いたときの「音楽を 流しますか？」（画面の下に 出る） ---- */
 .bgm-ask { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%);
   width: min(520px, calc(100% - 24px)); background: #fffaf0; border: 3px solid var(--royal-gold); border-radius: 16px;

@@ -25,14 +25,17 @@
     { n: "③", t: "生徒の 名前を 入れる", s: "白い欄に、生徒の にっくねーむを 1行に 1人ずつ 書いて、「この名前を 登録する」を 押します。本名で なくて かまいません。" },
     { n: "④", t: "ログインカードを 印刷して 子どもに 渡す", s: "「ログインカードを 印刷」を 押すと、1人 1枚の カードが 出ます。子どもは カードのとおりに、アプリの「教室に 参加」で コードを 入れて、自分の 名前を えらびます。パスワードは ありません。" },
     { n: "⑤", t: "練習が 集まるのを 見る", s: "子どもが 家で 練習すると、この表に 自動で 入ります。名前を 押すと、まちがえ方の クセが 見えます。開きなおすときは「最新に」を 押します。" },
+    { n: "⑥", t: "宿題を 出す", s: "しゅもくと 級、何セット やるかを えらんで、「宿題を 出す」を 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 生徒の 表に 自動で 入ります。終わった 宿題は「消す」で 消せます。" },
   ];
+  let curHw = [];
   function guideFor(name) {
     if (name === "login") return { i: 0, target: "#lgGo" };
     if (name === "classes") return lastClassCount ? { i: 1, t: "教室を ひらく", s: "一覧の 教室の 名前を 押すと、その教室の 画面に なります。新しい 教室は 下の欄から 作れます。", target: ".cls-item" } : { i: 1, target: "#ncName" };
     if (name === "class") {
       if (!curStudents.length) return { i: 2, target: "#addNicks" };
       const joined = curStudents.some((s) => (s.uids && s.uids.length) || s.lastSeen || (s.stat && s.stat.last));
-      return joined ? { i: 4, target: null } : { i: 3, target: "#cardsBtn" };
+      if (!joined) return { i: 3, target: "#cardsBtn" };
+      return curHw.length ? { i: 4, target: null } : { i: 5, target: "#hwGo" };
     }
     if (name === "student") return { i: 4, t: "この子の 記録", s: "上は 今週と 通算の まとめ、下は 1回ごとの 記録です。「教室に もどる」で 一覧に 戻ります。", target: null };
     return null;
@@ -181,10 +184,47 @@
     cur = await S.getClass(cid); if (!cur) return renderClasses();
     $("#clsName").textContent = cur.name;
     $("#clsCode").textContent = cur.code;
+    await renderHomework();          // 生徒の 表に 宿題の 列を 出すので、先に 読む
     await renderStudents();
     $("#cardsOut").classList.add("hidden");
     show("class");
   }
+
+  /* ---------- 宿題 ---------- */
+  const GRADE_KEYS = [];
+  for (let k = 20; k >= 1; k--) GRADE_KEYS.push(k + "級");
+  ["初段", "二段", "三段", "四段", "五段", "六段", "七段", "八段", "九段", "十段"].forEach((n) => GRADE_KEYS.push(n));
+  $("#hwGrade").innerHTML = GRADE_KEYS.map((g) => '<option value="' + g + '"' + (g === "10級" ? " selected" : "") + ">" + g + "</option>").join("");
+  $("#hwSets").innerHTML = [1, 2, 3, 4, 5, 6, 8, 10].map((n) => '<option value="' + n + '"' + (n === 3 ? " selected" : "") + ">" + n + " セット</option>").join("");
+  const hwLabel = (h) => (SUBJ[h.subj] || h.subj) + " " + h.g + " を " + h.sets + " セット";
+  const fmtDue = (s) => { if (!s) return ""; const m = s.split("-"); return m.length === 3 ? (+m[1]) + "/" + (+m[2]) : s; };
+  const isLate = (h) => h.due && h.due < new Date().toISOString().slice(0, 10);
+  async function renderHomework() {
+    curHw = await S.listHomework(cur.id);
+    $("#hwList").innerHTML = curHw.length
+      ? '<div class="hw-list">' + curHw.map((h) =>
+          '<div class="hw-item"><b>' + esc(hwLabel(h)) + "</b>" +
+          (h.due ? '<span class="hw-due' + (isLate(h) ? " late" : "") + '">' + esc(fmtDue(h.due)) + " まで</span>" : "") +
+          (h.note ? '<span class="hw-note">「' + esc(h.note) + "」</span>" : "") +
+          '<small>' + fmtDate(h.createdAt) + ' に 出した</small><button type="button" class="x" data-id="' + h.id + '" title="消す">✕ 消す</button></div>').join("") + "</div>"
+      : '<p class="cls-empty">いま 出している 宿題は ありません。下から 出せます。</p>';
+    document.querySelectorAll("#hwList .x").forEach((b) => b.addEventListener("click", async () => {
+      const h = curHw.find((x) => x.id === b.dataset.id); if (!h) return;
+      if (!confirm("宿題「" + hwLabel(h) + "」を 消します。よろしいですか？")) return;
+      await S.removeHomework(cur.id, h.id); await renderHomework(); await renderStudents(); updateGuide("class");
+    }));
+  }
+  $("#hwForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#hwMsg"); msg.textContent = ""; msg.className = "result";
+    const hw = { subj: $("#hwSubj").value, g: $("#hwGrade").value, sets: +$("#hwSets").value, due: $("#hwDue").value, note: $("#hwNote").value.trim() };
+    try {
+      const h = await S.addHomework(cur.id, hw);
+      $("#hwNote").value = ""; $("#hwDue").value = "";
+      msg.textContent = "✓ 宿題「" + hwLabel(h) + "」を 出しました。子どもが アプリを ひらくと 見えます。"; msg.className = "result ok";
+      await renderHomework(); await renderStudents(); updateGuide("class");
+    } catch (err) { msg.textContent = "出せませんでした：" + ((err && err.message) || err); msg.className = "result ng"; }
+  });
   $("#backClasses").addEventListener("click", async (e) => { e.preventDefault(); await renderClasses(); show("classes"); });
   $("#reloadBtn").addEventListener("click", () => openClass(cur.id));
   $("#clsDelete").addEventListener("click", async () => {
@@ -199,13 +239,19 @@
       const last = st.last ? fmtDate(st.last) + (ago >= 3 ? ' <span class="st-warn">' + ago + "日前</span>" : "") : '<span class="st-none">まだ</span>';
       const acc = st.acc7 == null ? '<span class="st-none">—</span>' : (st.acc7 >= 80 ? '<span class="st-ok">' : st.acc7 < 60 ? '<span class="st-warn">' : "<span>") + st.acc7 + "%</span>";
       const topMiss = Object.entries(st.miss7 || {}).sort((a, b) => b[1] - a[1])[0];
+      // 宿題：できた数 / 出した数。ぜんぶ できたら ✓、きげんを すぎて まだなら 赤
+      const hwCell = curHw.length ? curHw.map((h) => {
+        const n = Math.min(h.sets, (st.hw && st.hw[h.id]) || 0), ok = n >= h.sets;
+        return '<span class="hw-chip' + (ok ? " ok" : isLate(h) ? " late" : "") + '" title="' + esc(hwLabel(h)) + '">' + (ok ? "✓ " : "") + esc((SUBJ[h.subj] || h.subj).slice(0, 4)) + " " + n + "/" + h.sets + "</span>";
+      }).join("") : '<span class="st-none">—</span>';
       return "<tr><td>" + '<button class="st-link" data-id="' + s.id + '">' + esc(s.nick) + "</button></td>" +
         '<td class="num">' + (st.n7 || 0) + "</td><td>" + acc + "</td><td>" + last + "</td><td>" + (st.lastG ? esc(st.lastG) : "") + "</td>" +
+        "<td>" + hwCell + "</td>" +
         "<td>" + (topMiss ? esc(MISS[topMiss[0]] || topMiss[0]) + " ×" + topMiss[1] : '<span class="st-none">—</span>') + "</td>" +
         '<td><button class="x" data-id="' + s.id + '" title="消す">✕</button></td></tr>';
     }).join("");
-    $("#studentTable").innerHTML = '<div class="doc-table"><table class="rec-table"><tr><th>名前</th><th>今週の セット</th><th>正答率</th><th>最後に 練習</th><th>級</th><th>いちばん多い まちがい</th><th></th></tr>' + rows + "</table></div>" +
-      '<p class="sub">「今週」は きょうから 7日間。生徒が アプリで 練習すると、ここに 自動で 入ります。</p>';
+    $("#studentTable").innerHTML = '<div class="doc-table"><table class="rec-table"><tr><th>名前</th><th>今週の セット</th><th>正答率</th><th>最後に 練習</th><th>級</th><th>宿題</th><th>いちばん多い まちがい</th><th></th></tr>' + rows + "</table></div>" +
+      '<p class="sub">「今週」は きょうから 7日間。生徒が アプリで 練習すると、ここに 自動で 入ります。「宿題」は できた数 ／ 出した数。子どもの 端末が 送ってきた ときに 変わります。</p>';
     document.querySelectorAll("#studentTable .st-link").forEach((b) => b.addEventListener("click", () => openStudent(b.dataset.id)));
     document.querySelectorAll("#studentTable .x").forEach((b) => b.addEventListener("click", async () => {
       const s = curStudents.find((x) => x.id === b.dataset.id);
