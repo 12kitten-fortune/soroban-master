@@ -4750,15 +4750,17 @@ function soloSave(s) { try { localStorage.setItem(SOLO_KEY, JSON.stringify(s)); 
 const SOLO_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
 const SOLO_SUBJ_NAME = { mitori: "みとり力", kake: "かけ算力", wari: "わり算力", anzan: "暗算力", flash: "フラッシュ力" };
 const SOLO_STAR = [20, 50, 100, 200, 400];                        // しゅもく別 ★：その しゅもくの 正解数
-const studySessions = () => allSessions().filter((e) => !e.src && SOLO_SUBJ.includes(e.subj));
+// 数えるのは「ソロモンと 出会った日」からの 記録だけ（前から 使っていた子も、みんな Lv.1 から いっしょに 始まる）
+const soloMet = () => soloState().met || "";
+const studySessions = () => { const met = soloMet(); return allSessions().filter((e) => !e.src && SOLO_SUBJ.includes(e.subj) && (!met || (e.d || "") >= met)); };
 // いまの そろばんの 記録を まとめる（毎回 計算＝ズルが できない・二重に 数えない）
 function soloStats() {
-  const ss = studySessions();
+  const ss = studySessions(), met = soloMet();
   const correct = ss.reduce((a, e) => a + (e.correct || 0), 0);
   const days = new Set(ss.map((e) => e.d).filter(Boolean)).size;              // そろばんを やった 日の 数（連続でなくて よい）
   const recent = ss.slice(-30), rN = recent.reduce((a, e) => a + (e.N || 0), 0), rC = recent.reduce((a, e) => a + (e.correct || 0), 0);
   const bySubj = {}; SOLO_SUBJ.forEach((k) => { bySubj[k] = 0; }); ss.forEach((e) => { bySubj[e.subj] += e.correct || 0; });
-  let routines = 0; try { routines = JSON.parse(localStorage.getItem(ROUTINE) || "[]").length; } catch (e) { }
+  let routines = 0; try { routines = JSON.parse(localStorage.getItem(ROUTINE) || "[]").filter((h) => !met || (h.date || "") >= met).length; } catch (e) { }
   const rk = myRankIdx();
   return { sets: ss.length, routines, correct, days, streak: loadStat().streak || 0, acc30: rN ? Math.round((rC / rN) * 100) : 0,
     rank: rk >= 0, dan: rk >= 0 && !!GRADES[rk] && GRADES[rk].band === "dan", examPass: allExams().some((x) => x.pass), bySubj, todayDone: ss.some((e) => e.d === today()) };
@@ -4927,7 +4929,7 @@ function renderSolomon() {
     '<div class="sub">出会った日：' + fmtMet + (s.dan ? "　⭐ 称号：段の ソロモン" : "") + "</div>" +
     "<h4>そろばんの 力（しゅもく別）</h4>" +
     SOLO_SUBJ.map((k) => '<div class="solo-skill"><span>' + SOLO_SUBJ_NAME[k] + "</span><b>" + starStr(soloStars(s.bySubj[k]), 5) + '</b><small>' + s.bySubj[k] + "問</small></div>").join("") +
-    '<p class="sub">★は その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>' +
+    '<p class="sub">★は ソロモンと 出会ってから、その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>' +
     '<div class="solo-cond"><b>つぎの 成長まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
   const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
   eps.innerHTML = all.map((ep, i) => {
