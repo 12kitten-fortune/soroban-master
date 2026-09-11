@@ -1339,8 +1339,18 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .solo-ep { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; background: #fff; }
 .solo-ep.locked { opacity: .55; } .solo-ep b { flex: 1; color: var(--navy); font-size: 14px; }
 .solo-ep button { font-size: 13px; padding: 6px 12px; } .solo-ep small { color: #777; white-space: nowrap; }
-.story-card { text-align: center; max-width: 440px; }
+.story-card { text-align: center; max-width: 480px; }
 .story-h { font-size: 14px; font-weight: 800; color: #b8860b; margin-bottom: 6px; }
+/* 場面：絵が あれば それを 出す。無ければ 空・草原・お城の 世界の 上に ソロモン（切り抜きだけに ならないように） */
+.story-scene { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 3px solid #c9a227;
+  background: linear-gradient(180deg, #8fd0ff 0%, #d9efff 52%, #a9dd6a 52%, #6fbf45 100%); }
+.story-scene::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: -30%; height: 60%; border-radius: 50%;
+  background: radial-gradient(ellipse at center, #8fd35a, #63b43c 70%); }
+.story-scene::after { content: "🏰"; position: absolute; right: 8%; top: 24%; font-size: 44px; opacity: .9; filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); }
+.story-scene-img { position: relative; z-index: 2; width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-scene.noscene .story-scene-img { display: none; }
+.story-scene .story-pic { display: none; }
+.story-scene.noscene .story-pic { display: inline-flex; position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 3; }
 .story-pic { width: 160px; height: 160px; margin: 0 auto; animation: soloPop .5s ease; } .story-pic i { font-size: 110px; }
 @keyframes soloPop { 0% { transform: scale(.85) translateY(6px); opacity: .4; } 60% { transform: scale(1.05); } 100% { transform: none; opacity: 1; } }
 .story-who { font-weight: 900; color: var(--navy); margin-top: 6px; min-height: 1.2em; }

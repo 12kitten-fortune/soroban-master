@@ -4818,42 +4818,44 @@ function soloPic(pose, cls) {
   return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png" alt="ソロモン" ' +
     'onerror="if(!this.dataset.f){this.dataset.f=1;this.src=\'assets/solomon/front.png\'}else{this.parentNode.classList.add(\'nopic\')}"><i>🐣</i></span>';
 }
-/* 物語（1話 30秒〜1分）。lv＝その段階に なったとき 読める（0＝はじめて ホームを 開いたとき） */
+/* 物語（1話 30秒〜1分）。lv＝その段階に なったとき 読める（0＝はじめて ホームを 開いたとき）
+   scene＝場面の絵 docs/assets/solomon/scene_N.png（「はじまりの物語」の 6コマ：1出会い 2一緒に練習 3仲間が増える 4数の乱れ 5みんなで立ち向かう 6もっと大きな世界へ）。
+   絵が 無い間は、空と 草原の 背景の 上に ソロモンを 置く */
 const SOLO_EPISODES = [
-  { id: "ep1", n: "第1話", t: "はじめまして、ソロモン", lv: 0, lines: [
+  { id: "ep1", n: "第1話", t: "はじめまして、ソロモン", lv: 0, scene: 1, lines: [
     { who: "", pose: "front", text: "そろばんキングダムに やってきた きみの 前に、小さな 生きものが あらわれた。" },
     { who: "ソロモン", pose: "front", text: "……ぼく、数字を 見ると ちょっと ドキドキ するんだ。" },
     { who: "きみ", pose: "front", text: "そろばん、いっしょに やってみる？" },
     { who: "ソロモン", pose: "happy", text: "うん！" },
     { who: "", pose: "soroban", text: "こうして、きみと ソロモンの れんしゅうが はじまった。まずは 1回、いっしょに やってみよう！" } ] },
-  { id: "ep1b", n: "第1話（つづき）", t: "できた！", lv: 1, lines: [
+  { id: "ep1b", n: "第1話（つづき）", t: "できた！", lv: 1, scene: 2, lines: [
     { who: "ソロモン", pose: "soroban", text: "パチ、パチ……" },
     { who: "ソロモン", pose: "happy", text: "できた！ 数字が、こわくなかった！" },
     { who: "きみ", pose: "happy", text: "やったね、ソロモン！" },
     { who: "", pose: "happy", text: "🐣 ソロモンが すこし 成長した！　「ちいさなソロモン」" } ] },
-  { id: "ep2", n: "第2話", t: "ソロモン、そろばんを 知る", lv: 2, lines: [
+  { id: "ep2", n: "第2話", t: "ソロモン、そろばんを 知る", lv: 2, scene: 2, lines: [
     { who: "ソロモン", pose: "front", text: "数字って、こんなに たくさん あるんだね。" },
     { who: "きみ", pose: "soroban", text: "でも、そろばんが あると わかりやすいよ。" },
     { who: "ソロモン", pose: "happy", text: "じゃあ、ぼくも れんしゅうする！ そろばんって おもしろい！" },
     { who: "", pose: "happy", text: "🧮 ソロモンは そろばんを おぼえた！　「そろばんを おぼえた ソロモン」" } ] },
-  { id: "ep3", n: "第3話", t: "ソロモンの はじめての 挑戦", lv: 3, lines: [
+  { id: "ep3", n: "第3話", t: "ソロモンの はじめての 挑戦", lv: 3, scene: 3, lines: [
     { who: "", pose: "soroban", text: "ソロモンは、すこし むずかしい 問題に ちょうせんした。" },
     { who: "ソロモン", pose: "cry", text: "……できない。" },
     { who: "きみ", pose: "front", text: "だいじょうぶ。もう一回 やろう。" },
     { who: "ソロモン", pose: "soroban", text: "パチ、パチ、パチ……" },
     { who: "ソロモン", pose: "happy", text: "できた！ まちがえても、もう一回 やれば できるんだ！" },
     { who: "", pose: "happy", text: "💪 まちがえるのは わるいことじゃない。れんしゅうすると、できるようになる。　「計算が とくいに なった ソロモン」" } ] },
-  { id: "ep4", n: "第4話", t: "こんどは ぼくが", lv: 4, lines: [
+  { id: "ep4", n: "第4話", t: "こんどは ぼくが", lv: 4, scene: 5, lines: [
     { who: "", pose: "run", text: "王国に「数の乱れ」が おきて、仲間たちが こまっている。" },
     { who: "ソロモン", pose: "angry", text: "こんどは ぼくが 仲間を たすける！ きみと いっしょなら できる！" },
     { who: "", pose: "friends", text: "🤝 ソロモンは、だれかの ために がんばれるように なった。　「仲間を たすけられる ソロモン」" } ] },
-  { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, lines: [
+  { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, scene: 6, lines: [
     { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
     { who: "きみ", pose: "friends", text: "これからも いっしょだよ。" },
     { who: "ソロモン", pose: "side", text: "うん！ つぎは どこへ 行こうかな！" },
     { who: "", pose: "friends", text: "👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！" } ] },
 ];
-const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばんを やった日が 30日！", lv: 0, lines: [
+const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばんを やった日が 30日！", lv: 0, scene: 6, lines: [
   { who: "ソロモン", pose: "happy", text: "そろばんを やった日が、30日に なったよ！" },
   { who: "ソロモン", pose: "front", text: "最初は 数字を 見ると こわかったけど……" },
   { who: "ソロモン", pose: "friends", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
@@ -4863,8 +4865,13 @@ function soloStory(ep, onClose) {
   const d = document.createElement("div"); d.className = "tip-back story-back";
   const render = () => {
     const L = ep.lines[i], last = i === ep.lines.length - 1;
+    // 場面：絵（scene_N.png）が あれば それを 大きく。無ければ 空と 草原の 上に ソロモン
+    const sc = L.scene || ep.scene;
+    const scene = '<div class="story-scene' + (sc ? "" : " noscene") + '">' +
+      (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + '.png" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
+      soloPic(L.pose, "story-pic") + "</div>";
     d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
-      soloPic(L.pose, "story-pic") + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
+      scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
       '<button class="tip-ok">' + (last ? "とじる" : "つぎへ ▶") + '</button><div class="story-skip">' + (i + 1) + " / " + ep.lines.length + "</div></div>";
     d.querySelector(".tip-ok").onclick = () => {
       try { clickSnd(); } catch (e) { }
