@@ -557,10 +557,49 @@ function chord(t0, root, kind, dur, vol) {
 const BGM_KEY = "soroban_bgm", VOL_KEY = "soroban_vol", BGML_KEY = "soroban_bgmlv";
 // BGMの音量：0=切 1=小 2=中 3=大
 const BGM_STEPS = [0, 0.10, 0.22, 0.38];
-let bgmLevel = (function () { const v = parseInt(localStorage.getItem(BGML_KEY), 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 2; })();
+// はじめて開いた人には「流しますか？」と きいてから 鳴らす（いきなり 大きな音を 出さない）。
+// まだ 決めていない あいだは 切（0）にしておく。
+const BGML_SAVED = (function () { try { return localStorage.getItem(BGML_KEY); } catch (e) { return null; } })();
+let bgmLevel = (function () { const v = parseInt(BGML_SAVED, 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 0; })();
 let bgmOn = bgmLevel > 0;
 let bgmEl = null, bgmName = "";
 const bgmCache = {};        // よみこんだ曲を とっておく入れもの
+/* iPhone / iPad は 曲の volume を 変えられない（いつも最大で 鳴る）。
+   そこで 曲を「音の道（Web Audio）」に通し、その途中の つまみ（gain）で 音量を しぼる。
+   道が作れない端末では 今までどおり volume を使う。 */
+let bgmGain = null;
+function bgmRoute(el) {
+  try {
+    const c = ensureAudio();
+    if (!bgmGain) { bgmGain = c.createGain(); bgmGain.gain.value = 0; bgmGain.connect(c.destination); }
+    if (!el._routed) { c.createMediaElementSource(el).connect(bgmGain); el._routed = true; }
+    el.volume = 1;                                 // 音量は つまみのほうで 決める
+    return true;
+  } catch (e) { return false; }
+}
+function bgmSetVol(v) {
+  v = Math.max(0, Math.min(1, v));
+  if (!bgmEl) return;
+  if (bgmGain && bgmEl._routed) { try { bgmGain.gain.value = v; } catch (e) { } }
+  else { try { bgmEl.volume = v; } catch (e) { } }
+}
+// 実際に 鳴りはじめた ときから そっと 音を上げる（鳴る前に 上げきってしまうと いきなり 大きな音になる）
+function bgmFadeIn() {
+  const el = bgmEl; if (!el) return;
+  bgmSetVol(0);
+  let v = 0;
+  const id = setInterval(function () {
+    if (bgmEl !== el) return clearInterval(id);
+    const target = BGM_STEPS[bgmLevel] || 0;
+    v = Math.min(target, v + 0.02); bgmSetVol(v);
+    if (v >= target) clearInterval(id);
+  }, 90);
+}
+function bgmArmFade(el) {
+  if (el._fadeArmed) return;
+  el._fadeArmed = true;
+  el.addEventListener("playing", function () { el._fadeArmed = false; bgmFadeIn(); }, { once: true });
+}
 // 効果音の音量：0=切 1=小 2=中 3=大
 const SFX_STEPS = [0, 0.35, 0.7, 1.0];
 let sfxLevel = (function () { const v = parseInt(localStorage.getItem(VOL_KEY), 10); return isFinite(v) && v >= 0 && v <= 3 ? v : 2; })();
@@ -587,7 +626,8 @@ function bgmPlay(name) {
   bgmStop();
   // 一度よみこんだ曲は とっておく（ステージを行き来しても 読み直さない＝通信の無駄をなくす）
   if (bgmCache[name]) {
-    bgmEl = bgmCache[name]; bgmName = name; bgmEl.loop = true; bgmEl.volume = 0;
+    bgmEl = bgmCache[name]; bgmName = name; bgmEl.loop = true;
+    bgmRoute(bgmEl); bgmSetVol(0); bgmArmFade(bgmEl);
     try { bgmEl.currentTime = 0; } catch (e) { }
     const pc = bgmEl.play(); if (pc && pc.catch) pc.catch(function () { });
   } else {
@@ -604,19 +644,11 @@ function bgmPlay(name) {
     bgmEl.loop = true; bgmEl.volume = 0; bgmName = name;
     bgmEl.addEventListener("error", tryNext, { once: true });
     bgmEl.addEventListener("canplay", function () { bgmCache[name] = bgmEl; bgmLoaded[name] = true; }, { once: true });
+    bgmRoute(bgmEl); bgmSetVol(0); bgmArmFade(bgmEl);
     const p2 = bgmEl.play(); if (p2 && p2.catch) p2.catch(function () { });
   };
   tryNext();
   }
-  try {
-    const target = BGM_STEPS[bgmLevel] || 0;
-    let v = 0;                                  // そっと 音を上げる
-    const id = setInterval(function () {
-      if (!bgmEl) return clearInterval(id);
-      v = Math.min(target, v + 0.02); bgmEl.volume = v;
-      if (v >= target) clearInterval(id);
-    }, 90);
-  } catch (e) { bgmEl = null; }
 }
 function bgmStop() { if (bgmEl) { try { bgmEl.pause(); } catch (e) { } } bgmEl = null; bgmName = ""; }
 // BGMの音量を 切・小・中・大 から えらぶ
@@ -625,10 +657,23 @@ function setBgmLevel(n) {
   bgmOn = bgmLevel > 0;
   try { localStorage.setItem(BGML_KEY, String(bgmLevel)); localStorage.setItem(BGM_KEY, bgmOn ? "on" : "off"); } catch (e) { }
   if (!bgmOn) bgmStop();
-  else if (bgmEl) bgmEl.volume = BGM_STEPS[bgmLevel];
-  else { sfxPreload(); bgmPlay(bgmName || bgmMain || "bgm_study"); }
+  else if (bgmEl) bgmSetVol(BGM_STEPS[bgmLevel]);
+  else { sfxPreload(); bgmArea = ""; bgmForView(curView); }   // いまの画面に合った曲を 鳴らす
+  bgmAskHide();                      // 一度でも 決めたら「流しますか？」は もう出さない
   renderVolSegs();
 }
+/* ---- はじめて開いたときの「音楽を 流しますか？」 ----
+   まだ 一度も 決めていない人にだけ 出す。おした指が「音を出してよい」合図にもなるので、
+   iPhone でも そのまま 鳴りはじめる。 */
+function bgmAskHide() { const a = $("#bgmAsk"); if (a) a.classList.add("hidden"); }
+(function () {
+  const a = $("#bgmAsk"); if (!a) return;
+  if (BGML_SAVED !== null) return;                // もう 決めてある
+  a.classList.remove("hidden");
+  const on = $("#bgmAskOn"), off = $("#bgmAskOff");
+  if (on) on.addEventListener("click", function () { unlockAudio(); setBgmLevel(1); });   // 小さく 流す
+  if (off) off.addEventListener("click", function () { setBgmLevel(0); });                 // 流さない
+})();
 
 /* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
 const BGM_LIST = [
@@ -640,7 +685,7 @@ const BGM_LIST = [
 ];
 const BGM_BATTLE = { f: "bgm_battle", n: "たいせん（サイバー）" };   // ⚔️たいせん 専用
 const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
-let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm1";           // ホームの曲（設定で えらべる）
+let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm2";           // ホームの曲（設定で えらべる）。はじめは ファンタジー2
 const OFF_KEY = "soroban_bgmoff";
 let bgmOff = (function () { try { return JSON.parse(localStorage.getItem(OFF_KEY) || "{}"); } catch (e) { return {}; } })();
 const bgmUsable = () => BGM_LIST.filter((b) => !bgmOff[b.f]);
@@ -710,6 +755,7 @@ function bgmAreaOf(v) {
 // きろく画面の曲：ホームの曲 いがいから、いつも 同じものを えらぶ
 function bgmRecordSong() { const r = bgmRotList(); return r[r.length - 1] || bgmMain; }
 let bgmArea = "";
+let curView = "home";                              // いま 開いている画面（音楽を あとから つけるときに 使う）
 function bgmForView(v, next) {
   const area = bgmAreaOf(v);
   if (area === bgmArea && bgmEl && !next) return;   // 同じ場所の中では 曲を そのままにする
@@ -861,6 +907,7 @@ const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battlePar
 /* ============================================================ 画面ルーティング */
 const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
 function showView(v) {
+  curView = v;
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
