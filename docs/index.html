@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260911c" />
+    <link rel="stylesheet" href="style.css?v=20260911d" />
   </head>
   <body>
     <div class="app">
@@ -49,6 +49,7 @@
         </div>
         <nav class="side-nav" id="sideNav">
           <button class="nav active" data-view="home">🏠 ホーム</button>
+          <button class="nav" data-view="solomon">🐣 ソロモン</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
           <button class="nav" data-view="battle">⚔️ たいせん</button>
           <button class="nav" data-view="puzzle">🧩 パズル</button>
@@ -106,6 +107,8 @@
               </div>
             </div>
             <aside class="home-side">
+              <!-- 🐣 ソロモン：そろばんの 記録で 成長する 相棒（GOLD とは 別） -->
+              <div class="card solo-card" id="homeSolomon"></div>
               <div class="card stat-tile"><span><img class="ico-coin" src="assets/coin.png" alt="" /> GOLD</span><b id="homeGold">0</b></div>
               <div class="card stat-tile"><span><img class="ico-crown" src="assets/crown.png" alt="" /> 王国レベル</span><b id="homeKingdomLv">1</b></div>
               <div class="card stat-tile"><span>🔥 連続学習</span><b id="homeStreak">0日</b></div>
@@ -113,6 +116,14 @@
               <button id="homeToKingdom" class="wide-btn">🧩 パズルで あそぶ</button>
               <button id="homeToRecords" class="wide-btn ghost">📊 成績を見る</button>
             </aside>
+          </div>
+        </div>
+
+        <!-- 🐣 ソロモン（図鑑＋物語） -->
+        <div id="view-solomon" class="view hidden">
+          <div class="solo-layout">
+            <div class="card solo-main" id="soloMain"></div>
+            <div class="card"><h3>📖 ソロモンの 物語</h3><div id="soloEpisodes"></div></div>
           </div>
         </div>
 
@@ -519,7 +530,7 @@
       <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
     </div>
 
-    <script src="app.js?v=20260911c"></script>
+    <script src="app.js?v=20260911d"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

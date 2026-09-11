@@ -408,11 +408,14 @@ function nextGoalHint() {
 
 /* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
 const SESSIONS = "soroban_sessions";
-function logSession(subj, N, correct, sumSec, pauses, results) {
+// src："battle"（たいせん）・"exam"（SK検定）の 記録には 印を つける。無印＝ふつうの 練習。
+// ソロモンの 成長は 無印の 記録だけで 数える（たいせん・検定を いくら やっても 成長しない）
+function logSession(subj, N, correct, sumSec, pauses, results, src) {
   const l = JSON.parse(localStorage.getItem(SESSIONS) || "[]");
   const g = (typeof currentGrade === "function" && currentGrade()) || null;
   const e = { d: today(), t: Date.now(), g: (session && session.grade && session.grade.key) || (g && g.key) || "",
     subj, N, correct, sec: Math.round(sumSec), avg: N ? +(sumSec / N).toFixed(2) : 0, pauses: pauses || 0 };
+  if (src) e.src = src;
   // まちがえた問題は「何をどう間違えたか」まで残す（あとで週ごとのクセを出すため）
   const miss = (results || []).filter((r) => !r.ok).slice(0, 8).map((r) => ({ q: r.compact, u: r.user, a: r.ans, k: missKind(r) }));
   if (miss.length) e.miss = miss;
@@ -905,13 +908,14 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
+const TITLES = { home: "ホーム", solomon: "ソロモン", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
 function showView(v) {
   curView = v;
   bgmForView(v);
   $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== "view-" + v));
   $("#pageTitle").textContent = TITLES[v] || "";
   if (v === "home") { renderHome(); tipFirstOpen(); }
+  if (v === "solomon") renderSolomon();
   if (v === "lesson") renderLesson();
   if (v === "records") renderRecords();
   if (v === "settings") renderSettings();
@@ -1135,6 +1139,7 @@ function renderHome() {
   $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
   renderWeakMenu();
   renderHomework();                  // 教室に 入っている子：先生からの 宿題
+  renderSolomonCard();               // 🐣 ソロモン
   renderGoldPill();
 }
 /* ---------- にがて克服メニュー（その子のまちがえ方から作る） ---------- */
@@ -1651,6 +1656,7 @@ function finishSession() {
     msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   }
   renderProfile();
+  if (completed) solomonAfterStudy();   // 🐣 練習を やりきった → ソロモンの 成長を たしかめる
   // 音だけでなく、画面いっぱいに ねぎらいと祝福を出す
   const acc100 = session.N ? Math.round(session.correct / session.N * 100) : 0;
   if (session.timed) {
@@ -1838,6 +1844,7 @@ function finishRoutine() {
   const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
   addGold(earned);
   renderProfile(); bigFanfareSnd(); coinSnd(1.4);
+  solomonAfterStudy();               // 🐣 本日の練習 完了 → ソロモンの 成長を たしかめる
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
@@ -2435,6 +2442,7 @@ function finishFlashSet(res) {
   const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
   addGold(earned);
   logSession("flash", N, correct, sum, 0);   // 記録に残す（保護者画面のグラフに乗る）
+  solomonAfterStudy();               // 🐣 フラッシュ暗算も 練習のうち
   msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   msg += maybeDropItem(acc, true);
   msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : FLASH_SET + "問"} が はじまるよ</div>`;
@@ -2457,15 +2465,17 @@ let battle = null, battleTimer = null;
 const ENEMY_HP = 3;
 const PLAYER_HP = 4; // まちがえると♥が1つへる。0になったらアウト
 // 1匹たおすごとに次の敵へ（6体を順番にくり返す）
-/* たいせんの敵：ほんとうに いる ばいきん・きせいちゅう（たおした数で 順に 出てくる）。
+/* たいせんの敵：ミスモンスター（たおした数で 順に 出てくる）。
    絵の形に できるだけ 合わせてある（コンマ形＝カンピロバクター、らせん＝ヘリコバクター など）。 */
+/* 敵は「ミスモンスター」＝王国に「数の乱れ」を起こす いたずらもの。
+   それぞれ 子どもの まちがえ方（MISS_KINDS）と 対応している。絵は いまのものを そのまま使う */
 const ENEMIES = [
-  { file: "germ_1.png", name: "ノロウイルス" },
-  { file: "germ_2.png", name: "アニサキス" },
-  { file: "germ_3.png", name: "インフルエンザウイルス" },
-  { file: "germ_4.png", name: "カンピロバクター" },
-  { file: "germ_5.png", name: "ヘリコバクター" },
-  { file: "germ_6.png", name: "ブドウきゅうきん" },
+  { file: "miss_1.png", name: "ケタズレ", d: "桁を まちがえさせる いたずらっ子" },
+  { file: "miss_2.png", name: "オクリマチガイ", d: "くり上がりを こんらんさせる" },
+  { file: "miss_3.png", name: "アセリーヌ", d: "いそがせて ミスを さそう" },
+  { file: "miss_4.png", name: "ボーットン", d: "しゅうちゅうを うばう のんびり屋" },
+  { file: "miss_5.png", name: "ミスラ", d: "計算の とちゅうで まちがえさせる" },
+  { file: "miss_6.png", name: "フリーズン", d: "頭を まっ白に する 冷たい 敵" },
 ];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
@@ -2571,7 +2581,7 @@ function battleAnswer(val) {
 function finishBattle(reason) {
   battle.running = false; if (battleTimer) { clearInterval(battleTimer); battleTimer = null; }
   const kills = battle.kills, isOut = reason === "out";
-  logSession(battleSubjOf(), battle.atts, battle.you, battle.dur); // 学習記録の仕組みは従来どおり
+  logSession(battleSubjOf(), battle.atts, battle.you, battle.dur, 0, null, "battle"); // 記録には残す（印つき＝ソロモンは数えない）
   const gm = gradeGoldMult(battle.grade);          // たいせんも級で報酬が増える
   const perKill = Math.round(GOLD_PER_KILL * gm);
   let earned = kills * perKill;
@@ -4048,7 +4058,7 @@ const TIP_RESULT = { t: "🔍 ここが いちばん だいじ",
 const TIP_PUZZLE = { t: "🧩 パズルの あそびかた",
   b: '<p>となりの たまと <b>入れかえて</b>、おなじ たまを <b>3つ ならべる</b>と きえるよ。</p>' +
      '<p>1回 あそぶのに <b>GOLD</b>を つかうよ。GOLDは <b>そろばんの れんしゅう</b>で たまる。<br>パズルでは ふえないよ。</p>' };
-function tipFirstOpen() { tipOnce("first-open", TIP_OPEN.t, TIP_OPEN.b); }
+function tipFirstOpen() { tipOnce("first-open", TIP_OPEN.t, TIP_OPEN.b, soloIntro); }   // 説明のあと、ソロモンが あらわれる（第1話）
 
 /* ============================================================ 入門級（20〜15級）の 絵つき説明
    ANZAN_LOW に決めた 学習の順（5の友 → くり上がりなし → 10の友 → くり上がり）に そって、
@@ -4471,7 +4481,7 @@ function finishExamSection() {
   const el = playElapsed();
   const score = session.correct * session.cf.per;
   examState.sections.push({ subj: session.subj, name: session.cf.name, correct: session.correct, N: session.N, score, full: session.N * session.cf.per, pass: session.cf.pass, ok: score >= session.cf.pass, sec: el, items: session.results });
-  logSession(session.subj, session.N, session.correct, el, 0, session.results);
+  logSession(session.subj, session.N, session.correct, el, 0, session.results, "exam");   // 検定の 印（ソロモンの ★には 数えない）
   neutralSnd();
   session = null;
   examState.idx++;
@@ -4518,6 +4528,7 @@ function finishExam() {
   dailyCount("exam_" + ex.grade.key, true);
   if (pass) gold += Math.round(100 * gradeGoldMult(ex.grade));
   addGold(gold);
+  solomonAfterStudy();               // 🐣 SK検定 合格は Lv.5 の 条件（★には 数えない）
   msg += '<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋' + gold + " GOLD</b>" + (pass ? '<div class="gold-lines">🏅 検定 合格 ボーナス</div>' : "") + "</div>";
   msg += '<br><button id="exAgainBtn">もう一度</button> <button id="exBackBtn" class="ghost">検定の 画面へ</button>';
   msg = '<div class="result-hero"><img class="rh-face" src="assets/' + (pass ? "king_celebrate.png" : "king_wave.png") + '" alt="レオ王" />' +
@@ -4725,6 +4736,207 @@ function schedulePush() {
 
 /* ---------- 教室に 入っている子は、ひらいたときに 宿題を 読んで、おくり残しを おくる ---------- */
 if (classLink()) setTimeout(function () { fetchHomework().then(() => pushToClass(false)); }, 3000);
+
+/* ============================================================ 🐣 ソロモン（そろばんの 相棒）
+   ★ 成長は GOLD ではなく「そろばんの 記録」だけから、ひらくたびに 計算する。
+     数えるもの  ：練習の 記録（練習の 完走・本日の練習・フラッシュ暗算）＝ src の 無い 記録
+     数えないもの：パズル（記録が 無い）・たいせん（src:"battle"）・SK検定（src:"exam"。Lv.5 の 条件にだけ 使う）
+   ★ 保存するのは「出会った日・読んだ話・とどいた段階・言った特別なセリフ」だけ。段階は 下がらない。
+   ★ ソロモンは「ゲームの キャラ」ではなく「そろばんを いっしょに がんばる 相棒」。
+     段階ごとに 性格と 言葉が 変わる（レベル上げ でなく 物語）。 */
+const SOLO_KEY = "soroban_solomon";
+function soloState() { try { return Object.assign({ met: "", seen: {}, lv: 0, said: {} }, JSON.parse(localStorage.getItem(SOLO_KEY) || "{}")); } catch (e) { return { met: "", seen: {}, lv: 0, said: {} }; } }
+function soloSave(s) { try { localStorage.setItem(SOLO_KEY, JSON.stringify(s)); } catch (e) { console.error("ソロモンの 保存に 失敗", e); } }
+const SOLO_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
+const SOLO_SUBJ_NAME = { mitori: "みとり力", kake: "かけ算力", wari: "わり算力", anzan: "暗算力", flash: "フラッシュ力" };
+const SOLO_STAR = [20, 50, 100, 200, 400];                        // しゅもく別 ★：その しゅもくの 正解数
+const studySessions = () => allSessions().filter((e) => !e.src && SOLO_SUBJ.includes(e.subj));
+// いまの そろばんの 記録を まとめる（毎回 計算＝ズルが できない・二重に 数えない）
+function soloStats() {
+  const ss = studySessions();
+  const correct = ss.reduce((a, e) => a + (e.correct || 0), 0);
+  const days = new Set(ss.map((e) => e.d).filter(Boolean)).size;              // そろばんを やった 日の 数（連続でなくて よい）
+  const recent = ss.slice(-30), rN = recent.reduce((a, e) => a + (e.N || 0), 0), rC = recent.reduce((a, e) => a + (e.correct || 0), 0);
+  const bySubj = {}; SOLO_SUBJ.forEach((k) => { bySubj[k] = 0; }); ss.forEach((e) => { bySubj[e.subj] += e.correct || 0; });
+  let routines = 0; try { routines = JSON.parse(localStorage.getItem(ROUTINE) || "[]").length; } catch (e) { }
+  const rk = myRankIdx();
+  return { sets: ss.length, routines, correct, days, streak: loadStat().streak || 0, acc30: rN ? Math.round((rC / rN) * 100) : 0,
+    rank: rk >= 0, dan: rk >= 0 && !!GRADES[rk] && GRADES[rk].band === "dan", examPass: allExams().some((x) => x.pass), bySubj, todayDone: ss.some((e) => e.d === today()) };
+}
+const soloStars = (n) => SOLO_STAR.filter((t) => n >= t).length;
+const starStr = (n, max) => "★".repeat(n) + "☆".repeat((max || 5) - n);
+const pickToday = (arr) => arr[new Date().getDate() % arr.length];       // その日は 同じ セリフ（開くたびに 変わらない）
+/* 5つの 段階。ok＝その段階に なる 条件、need＝あと どれだけか、talk＝その段階の 性格・言葉 */
+const SOLO_LEVELS = [
+  { lv: 1, name: "ちいさなソロモン", em: "🐣", cond: "練習を 1回 やりきる",
+    ok: (s) => s.sets >= 1 || s.routines >= 1, need: () => "練習を 1回 やりきろう",
+    talk: ["はじめまして！ ぼく、ソロモン。", "数字って、ちょっと ドキドキする…でも きみと なら やってみる！"],
+    after: ["できた！ 数字、こわくなかった！", "また あしたも いっしょに やろうね！"] },
+  { lv: 2, name: "そろばんを おぼえた ソロモン", em: "🧮", cond: "練習を 3回",
+    ok: (s) => s.sets >= 3, need: (s) => "あと " + Math.max(1, 3 - s.sets) + "回 練習",
+    talk: ["そろばんって おもしろい！", "パチパチって 音が すき！ きょうも やろう！"],
+    after: ["きょうも パチパチ できたね！", "そろばんが あると 数字が わかりやすいね！"] },
+  { lv: 3, name: "計算が とくいに なった ソロモン", em: "💪", cond: "正解 100問 と、練習した日 3日",
+    ok: (s) => s.correct >= 100 && s.days >= 3,
+    need: (s) => [s.correct < 100 ? "正解 あと " + (100 - s.correct) + "問" : "", s.days < 3 ? "練習する日 あと " + (3 - s.days) + "日" : ""].filter(Boolean).join("・"),
+    talk: ["まちがえても、もう一回 やってみる！", "むずかしい 問題も、やってみたら できるかも！"],
+    after: ["できた！ まちがえても だいじょうぶ だったね！", "きょうの ぶんも できた！ つよくなってる！"] },
+  { lv: 4, name: "仲間を たすけられる ソロモン", em: "🤝", cond: "7日 つづける（または 正解300問 で 正答率85%）",
+    ok: (s) => s.streak >= 7 || (s.correct >= 300 && s.acc30 >= 85),
+    need: (s) => "つづけて あと " + Math.max(1, 7 - s.streak) + "日" + (s.correct < 300 ? "（または 正解 あと " + (300 - s.correct) + "問 で 正答率85%）" : ""),
+    talk: ["こんどは ぼくが 仲間を たすける！", "きみが がんばるから、ぼくも がんばれる！"],
+    after: ["きょうも ありがとう！ 仲間が ふえた 気がする！", "きみと なら、数の乱れも こわくない！"] },
+  { lv: 5, name: "一人前の そろばん仲間", em: "👑", cond: "級に 合格（けんてい方式）か、SK検定に 合格",
+    ok: (s) => s.rank || s.examPass, need: () => "級に 合格しよう（けんてい方式 か SK検定）",
+    talk: ["ぼく、一人前の そろばん仲間に なれたよ！", "つぎは どこへ 行こうかな！"],
+    after: ["きょうも いっしょに できて うれしい！", "一人前でも、れんしゅうは つづけるんだ！"] },
+];
+// いまの 段階：下から 順に 条件を 見て、とぎれた ところまで。前に とどいた 段階より 下がらない
+function soloLevel(s, st) {
+  let lv = 0;
+  for (const L of SOLO_LEVELS) { if (L.ok(s)) lv = L.lv; else break; }
+  return Math.max(lv, (st || soloState()).lv || 0);
+}
+function soloTitle(lv) { const L = SOLO_LEVELS[lv - 1]; return L ? L.em + " Lv." + lv + " " + L.name : "🥚 まだ 出会っていない"; }
+// つぎの 段階までの ヒント
+function soloNext(s, lv) { const L = SOLO_LEVELS[lv]; return L ? L.need(s) : "もう 一人前！ これからも いっしょに"; }
+// ホームの 吹き出し。段階と きょうの 様子で 変わる
+function soloSpeech(s, lv) {
+  if (lv === 0) return "そろばん、いっしょに やってみる？";
+  const L = SOLO_LEVELS[lv - 1];
+  if (s.days >= 30 && s.todayDone) return "きみと なら、どんな 数字も だいじょうぶ！";
+  if (s.streak >= 7 && s.todayDone) return "今日も 来てくれた！ " + s.streak + "日 つづいてるね！";
+  if (s.streak >= 7) return "今日も 来てくれた！ いっしょに やろう！";
+  return pickToday(s.todayDone ? L.after : L.talk);
+}
+/* 絵：docs/assets/solomon/{pose}.png（front / side / soroban / happy / cry / angry / run / friends / zukan / story）。
+   無ければ 🐣 で 代わりを 出す（絵が 届いたら 置くだけで 変わる） */
+function soloPic(pose, cls) {
+  // その ポーズの 絵が 無ければ 正面（front）を 使い、それも 無ければ 🐣
+  return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png" alt="ソロモン" ' +
+    'onerror="if(!this.dataset.f){this.dataset.f=1;this.src=\'assets/solomon/front.png\'}else{this.parentNode.classList.add(\'nopic\')}"><i>🐣</i></span>';
+}
+/* 物語（1話 30秒〜1分）。lv＝その段階に なったとき 読める（0＝はじめて ホームを 開いたとき） */
+const SOLO_EPISODES = [
+  { id: "ep1", n: "第1話", t: "はじめまして、ソロモン", lv: 0, lines: [
+    { who: "", pose: "front", text: "そろばんキングダムに やってきた きみの 前に、小さな 生きものが あらわれた。" },
+    { who: "ソロモン", pose: "front", text: "……ぼく、数字を 見ると ちょっと ドキドキ するんだ。" },
+    { who: "きみ", pose: "front", text: "そろばん、いっしょに やってみる？" },
+    { who: "ソロモン", pose: "happy", text: "うん！" },
+    { who: "", pose: "soroban", text: "こうして、きみと ソロモンの れんしゅうが はじまった。まずは 1回、いっしょに やってみよう！" } ] },
+  { id: "ep1b", n: "第1話（つづき）", t: "できた！", lv: 1, lines: [
+    { who: "ソロモン", pose: "soroban", text: "パチ、パチ……" },
+    { who: "ソロモン", pose: "happy", text: "できた！ 数字が、こわくなかった！" },
+    { who: "きみ", pose: "happy", text: "やったね、ソロモン！" },
+    { who: "", pose: "happy", text: "🐣 ソロモンが すこし 成長した！　「ちいさなソロモン」" } ] },
+  { id: "ep2", n: "第2話", t: "ソロモン、そろばんを 知る", lv: 2, lines: [
+    { who: "ソロモン", pose: "front", text: "数字って、こんなに たくさん あるんだね。" },
+    { who: "きみ", pose: "soroban", text: "でも、そろばんが あると わかりやすいよ。" },
+    { who: "ソロモン", pose: "happy", text: "じゃあ、ぼくも れんしゅうする！ そろばんって おもしろい！" },
+    { who: "", pose: "happy", text: "🧮 ソロモンは そろばんを おぼえた！　「そろばんを おぼえた ソロモン」" } ] },
+  { id: "ep3", n: "第3話", t: "ソロモンの はじめての 挑戦", lv: 3, lines: [
+    { who: "", pose: "soroban", text: "ソロモンは、すこし むずかしい 問題に ちょうせんした。" },
+    { who: "ソロモン", pose: "cry", text: "……できない。" },
+    { who: "きみ", pose: "front", text: "だいじょうぶ。もう一回 やろう。" },
+    { who: "ソロモン", pose: "soroban", text: "パチ、パチ、パチ……" },
+    { who: "ソロモン", pose: "happy", text: "できた！ まちがえても、もう一回 やれば できるんだ！" },
+    { who: "", pose: "happy", text: "💪 まちがえるのは わるいことじゃない。れんしゅうすると、できるようになる。　「計算が とくいに なった ソロモン」" } ] },
+  { id: "ep4", n: "第4話", t: "こんどは ぼくが", lv: 4, lines: [
+    { who: "", pose: "run", text: "王国に「数の乱れ」が おきて、仲間たちが こまっている。" },
+    { who: "ソロモン", pose: "angry", text: "こんどは ぼくが 仲間を たすける！ きみと いっしょなら できる！" },
+    { who: "", pose: "friends", text: "🤝 ソロモンは、だれかの ために がんばれるように なった。　「仲間を たすけられる ソロモン」" } ] },
+  { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, lines: [
+    { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
+    { who: "きみ", pose: "friends", text: "これからも いっしょだよ。" },
+    { who: "ソロモン", pose: "side", text: "うん！ つぎは どこへ 行こうかな！" },
+    { who: "", pose: "friends", text: "👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！" } ] },
+];
+const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばんを やった日が 30日！", lv: 0, lines: [
+  { who: "ソロモン", pose: "happy", text: "そろばんを やった日が、30日に なったよ！" },
+  { who: "ソロモン", pose: "front", text: "最初は 数字を 見ると こわかったけど……" },
+  { who: "ソロモン", pose: "friends", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
+/* 物語を 見せる（絵＋セリフ、「つぎへ」で 進む。動画は 無くても 成り立つ。将来 pose を 短い動画に 差しかえられる） */
+function soloStory(ep, onClose) {
+  const el = fxLayer(); let i = 0;
+  const d = document.createElement("div"); d.className = "tip-back story-back";
+  const render = () => {
+    const L = ep.lines[i], last = i === ep.lines.length - 1;
+    d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
+      soloPic(L.pose, "story-pic") + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
+      '<button class="tip-ok">' + (last ? "とじる" : "つぎへ ▶") + '</button><div class="story-skip">' + (i + 1) + " / " + ep.lines.length + "</div></div>";
+    d.querySelector(".tip-ok").onclick = () => {
+      try { clickSnd(); } catch (e) { }
+      if (last) { d.remove(); const st = soloState(); st.seen[ep.id] = 1; soloSave(st); if (onClose) onClose(); }
+      else { i++; render(); }
+    };
+  };
+  render(); el.appendChild(d);
+}
+// はじめて ホームを 開いたとき：第1話（出会い）
+function soloIntro() {
+  const st = soloState();
+  if (st.seen.ep1) return;
+  if (!st.met) { st.met = today(); soloSave(st); }
+  soloStory(SOLO_EPISODES[0], renderSolomonCard);
+}
+// 小さな ひとこと（画面の 下に 数秒だけ）
+function soloToast(text) {
+  const t = document.createElement("div"); t.className = "solo-toast"; t.textContent = text;
+  document.body.appendChild(t);
+  setTimeout(() => { try { t.remove(); } catch (e) { } }, 5000);
+}
+/* 練習が 終わるたびに 呼ぶ（練習の 完走・本日の練習・フラッシュ・SK検定）。たいせん・パズルからは 呼ばない。
+   段階が 上がっていたら、その話を 見せる。上がらなければ「あと どれだけ」を ひとこと。 */
+function solomonAfterStudy() {
+  const st = soloState(); if (!st.met) st.met = today();
+  const s = soloStats(), before = st.lv || 0, lv = soloLevel(s, st);
+  st.lv = lv;
+  const queue = [];
+  for (let k = before + 1; k <= lv; k++) { const ep = SOLO_EPISODES.find((e) => e.lv === k); if (ep && !st.seen[ep.id]) queue.push(ep); }
+  if (s.days >= 30 && !st.said.d30) { st.said.d30 = 1; queue.push(SOLO_SPECIAL_30); }
+  soloSave(st);
+  const next = () => { const ep = queue.shift(); if (ep) soloStory(ep, next); else renderSolomonCard(); };
+  setTimeout(() => {
+    if (queue.length) { try { sfx("levelup", function () { fanfareSnd(); }); } catch (e) { } next(); }
+    else { soloToast("🐣 ソロモン「れんしゅう ありがとう！」　つぎの 成長まで：" + soloNext(s, lv)); renderSolomonCard(); }
+  }, 1600);
+}
+/* ホームの カード */
+function renderSolomonCard() {
+  const box = $("#homeSolomon"); if (!box) return;
+  const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
+  box.innerHTML = '<div class="solo-top">' + soloPic(lv >= 5 ? "friends" : lv >= 3 ? "happy" : "front") +
+    "<div><b>🐣 ソロモン</b><small>" + (lv ? "Lv." + lv + " " + SOLO_LEVELS[lv - 1].name : "まだ 出会ったばかり") + "</small></div></div>" +
+    '<div class="solo-speech">「' + soloSpeech(s, lv) + '」</div>' +
+    '<div class="solo-row"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
+    '<div class="solo-next">つぎの 成長まで：' + soloNext(s, lv) + "</div>" +
+    '<button id="homeToSolomon" class="wide-btn">🐣 ソロモンを 見る</button>';
+  $("#homeToSolomon").onclick = () => { showView("solomon"); setActiveNav(document.querySelector('.nav[data-view="solomon"]')); };
+}
+/* ソロモンの 画面（図鑑＋物語） */
+function renderSolomon() {
+  const main = $("#soloMain"), eps = $("#soloEpisodes"); if (!main) return;
+  const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
+  const L = SOLO_LEVELS[lv - 1];
+  const fmtMet = st.met ? st.met.slice(0, 4) + "年" + (+st.met.slice(5, 7)) + "月" + (+st.met.slice(8, 10)) + "日" : "—";
+  main.innerHTML = soloPic(lv >= 5 ? "friends" : lv >= 4 ? "run" : lv >= 3 ? "happy" : lv >= 2 ? "soroban" : "zukan") +
+    '<div class="solo-lvname">' + soloTitle(lv) + "</div>" +
+    '<div class="solo-quote">「' + (L ? pickToday(L.talk) : "そろばん、いっしょに やってみる？") + '」</div>' +
+    '<div class="solo-row big"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
+    '<div class="solo-stats"><div><b>' + s.sets + '</b><span>練習した 回数</span></div><div><b>' + s.correct + '</b><span>正解した 問題</span></div><div><b>' + s.days + '</b><span>そろばんを やった日</span></div></div>' +
+    '<div class="sub">出会った日：' + fmtMet + (s.dan ? "　⭐ 称号：段の ソロモン" : "") + "</div>" +
+    "<h4>そろばんの 力（しゅもく別）</h4>" +
+    SOLO_SUBJ.map((k) => '<div class="solo-skill"><span>' + SOLO_SUBJ_NAME[k] + "</span><b>" + starStr(soloStars(s.bySubj[k]), 5) + '</b><small>' + s.bySubj[k] + "問</small></div>").join("") +
+    '<p class="sub">★は その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>' +
+    '<div class="solo-cond"><b>つぎの 成長まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
+  const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
+  eps.innerHTML = all.map((ep, i) => {
+    const open = ep.id === "d30" || lv >= ep.lv || st.seen[ep.id];
+    return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : "？？？") + "</b>" +
+      (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? "もう一度 よむ" : "▶ よむ") + "</button>" : "<small>🔒 Lv." + ep.lv + " で ひらく</small>") + "</div>";
+  }).join("") + '<p class="sub">物語は「そろばんの 練習」で 進みます。パズルや たいせんでは 進みません。</p>';
+  eps.querySelectorAll(".ep-read").forEach((b) => { b.onclick = () => soloStory(all[+b.dataset.i], renderSolomon); });
+}
 
 /* ---------- 初期化（必ず いちばん最後。上で定義した定数を すべて使えるようにするため） ---------- */
 renderGrid();

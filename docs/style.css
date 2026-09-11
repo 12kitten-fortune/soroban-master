@@ -1310,6 +1310,46 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   padding: 10px 18px; border-radius: 12px; }
 .btn-link.ghost { background: #fff; color: var(--navy); border: 2px solid var(--line); }
 
+/* ---- 🐣 ソロモン（ホームの カード・図鑑・物語） ---- */
+.solo-card { background: linear-gradient(180deg, #fffaf0, #fff3d6); border: 2px solid var(--royal-gold); padding: 12px 14px; }
+.solo-top { display: flex; align-items: center; gap: 10px; }
+.solo-top b { font-size: 17px; color: var(--navy); display: block; }
+.solo-top small { color: #6b5a45; font-weight: 700; font-size: 12px; }
+.solo-pic { display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; flex-shrink: 0; }
+.solo-pic img { width: 100%; height: 100%; object-fit: contain; }
+.solo-pic i { display: none; font-style: normal; font-size: 44px; line-height: 1; }
+.solo-pic.nopic img { display: none; } .solo-pic.nopic i { display: block; }
+.solo-speech { background: #fff; border-radius: 12px; padding: 8px 12px; margin: 8px 0; font-weight: 700; color: #2b2b2b; font-size: 14px; }
+.solo-row { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #6b5a45; }
+.solo-row b { color: #b8860b; letter-spacing: 2px; font-size: 16px; }
+.solo-row.big { justify-content: center; gap: 12px; font-size: 16px; } .solo-row.big b { font-size: 22px; }
+.solo-next { font-size: 13px; color: var(--navy); font-weight: 700; margin: 4px 0 8px; }
+.solo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.solo-main { text-align: center; }
+.solo-main .solo-pic { width: 180px; height: 180px; } .solo-main .solo-pic i { font-size: 120px; }
+.solo-main h4 { margin: 12px 0 4px; color: var(--navy); }
+.solo-lvname { font-size: 20px; font-weight: 900; color: var(--navy); margin: 6px 0 2px; }
+.solo-quote { font-size: 15px; color: #4a3a26; margin-bottom: 10px; }
+.solo-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 6px; }
+.solo-stats div { background: #fffaf0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; }
+.solo-stats b { display: block; font-size: 20px; color: var(--navy); } .solo-stats span { font-size: 12px; color: #6b5a45; }
+.solo-skill { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px dashed var(--line); font-size: 14px; text-align: left; }
+.solo-skill b { color: #b8860b; letter-spacing: 2px; margin-left: auto; } .solo-skill small { color: #999; width: 44px; text-align: right; }
+.solo-cond { background: #fff8e4; border-left: 4px solid var(--royal-gold); padding: 8px 12px; border-radius: 6px; text-align: left; font-size: 14px; margin-top: 10px; line-height: 1.7; }
+.solo-ep { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0; background: #fff; }
+.solo-ep.locked { opacity: .55; } .solo-ep b { flex: 1; color: var(--navy); font-size: 14px; }
+.solo-ep button { font-size: 13px; padding: 6px 12px; } .solo-ep small { color: #777; white-space: nowrap; }
+.story-card { text-align: center; max-width: 440px; }
+.story-h { font-size: 14px; font-weight: 800; color: #b8860b; margin-bottom: 6px; }
+.story-pic { width: 160px; height: 160px; margin: 0 auto; animation: soloPop .5s ease; } .story-pic i { font-size: 110px; }
+@keyframes soloPop { 0% { transform: scale(.85) translateY(6px); opacity: .4; } 60% { transform: scale(1.05); } 100% { transform: none; opacity: 1; } }
+.story-who { font-weight: 900; color: var(--navy); margin-top: 6px; min-height: 1.2em; }
+.story-text { font-size: 17px; line-height: 1.8; color: #2b2b2b; min-height: 3.6em; margin: 4px 0; }
+.story-skip { font-size: 12px; color: #999; margin-top: 6px; }
+.solo-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #fffaf0; border: 3px solid var(--royal-gold);
+  border-radius: 999px; padding: 10px 18px; font-weight: 800; color: var(--navy); z-index: 9500; box-shadow: 0 6px 18px rgba(0,0,0,.2); max-width: calc(100% - 24px); text-align: center; font-size: 14px; }
+@media (max-width: 900px) { .solo-layout { grid-template-columns: 1fr; } }
+
 /* ---- 先生からの 宿題（ホーム・教室に参加） ---- */
 .hw-box { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
 .hw-h { font-size: 18px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }
