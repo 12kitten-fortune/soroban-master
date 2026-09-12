@@ -286,6 +286,37 @@
     setTimeout(() => { try { window.print(); } catch (e) { } setTimeout(() => document.body.classList.remove("print-cards"), 500); }, 50);
   });
 
+  /* ---------- 保護者への 案内（A4 1枚）。先生は これを 配るだけ＝売りこまない ---------- */
+  $("#noticeBtn").addEventListener("click", () => {
+    const tname = me && me.name ? esc(me.name) : "";
+    $("#cardsOut").innerHTML =
+      '<div class="pn-sheet">' +
+        '<div class="pn-head"><img src="../assets/logo.png" alt="">保護者の みなさまへ</div>' +
+        '<h1 class="pn-title">家での そろばん練習に「そろばんキングダム」を 使います</h1>' +
+        '<p class="pn-cls">' + esc(cur.name) + (tname ? "　／　" + tname : "") + "</p>" +
+        '<div class="pn-box"><h2>できること</h2><ul>' +
+          "<li>先生からの <b>宿題</b>が、お子さまの 画面に とどきます</li>" +
+          "<li>家で 練習した 記録が、<b>まちがえ方まで</b> 先生に とどきます（次の 指導に 使います）</li>" +
+          "<li>本物の そろばんと 同じ 動きで 練習できます。相棒の ソロモンと いっしょに、毎日 つづけやすく なっています</li>" +
+        "</ul></div>" +
+        '<div class="pn-box"><h2>はじめ方（3分）</h2><ol>' +
+          "<li>スマホ・タブレット・パソコンで <b>sorobankingdom.com</b> を ひらく</li>" +
+          "<li>メニューの「<b>🏫 教室に 参加</b>」を おし、ログインカードの <b>コード</b>を 入れて、お子さまの <b>名前</b>を えらぶ</li>" +
+          "<li>あとは ホームの「<b>本日の練習</b>」を おすだけ。1日 10分ほどです</li>" +
+        "</ol></div>" +
+        '<div class="pn-box pn-important"><h2>ご家庭の お金は かかりません</h2>' +
+          "<p>教室が 利用の 契約を しています。ご家庭での お支払い・登録・アプリの インストールは ありません。</p></div>" +
+        '<div class="pn-box"><h2>個人情報について</h2>' +
+          "<p>メールアドレス・本名・生年月日は 集めません。使うのは にっくねーむと 練習の 記録だけです。</p></div>" +
+        '<div class="pn-box"><h2>はじめて ひらいたとき</h2>' +
+          "<p>「音楽を 流しますか？」と 聞かれます。小さな 音で 始まり、あとから 上の 🎵 で 変えられます。</p></div>" +
+        '<p class="pn-foot">わからないことは 先生（' + esc(cur.name) + '）に おたずねください。　そろばんキングダム　sorobankingdom.com</p>' +
+      "</div>";
+    $("#cardsOut").classList.remove("hidden");
+    document.body.classList.add("print-cards");
+    setTimeout(() => { try { window.print(); } catch (e) { } setTimeout(() => document.body.classList.remove("print-cards"), 500); }, 50);
+  });
+
   /* ---------- 生徒 ---------- */
   async function openStudent(sid) {
     curStudent = curStudents.find((s) => s.id === sid); if (!curStudent) return;

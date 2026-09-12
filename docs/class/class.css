@@ -34,6 +34,19 @@
 .miss-bar i { display: block; height: 12px; background: linear-gradient(90deg, #e8a04c, #c9642a); border-radius: 6px; }
 .cls-empty { color: #777; font-size: 14px; padding: 8px 0; }
 
+/* ---- 保護者への 案内（A4 1枚） ---- */
+.pn-sheet { background: #fff; color: #000; border: 1px solid var(--line); border-radius: 10px; padding: 22px 26px; margin-top: 10px; max-width: 720px; font-size: 15px; line-height: 1.8; }
+.pn-head { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #555; }
+.pn-head img { width: 56px; height: auto; border-radius: 6px; }
+.pn-title { font-size: 22px; font-weight: 900; color: #16305c; margin: 8px 0 4px; line-height: 1.4; }
+.pn-cls { font-size: 16px; font-weight: 700; color: #333; margin: 0 0 10px; }
+.pn-box { border: 1.5px solid #cfc3a8; border-radius: 10px; padding: 8px 14px; margin: 8px 0; }
+.pn-box h2 { font-size: 15px; margin: 0 0 4px; border: none; padding: 0; color: #16305c; }
+.pn-box ul, .pn-box ol { margin: 0; padding-left: 1.4em; } .pn-box li { margin: 2px 0; } .pn-box p { margin: 0; }
+.pn-important { border: 2.5px solid #c62828; } .pn-important h2 { color: #c62828; }
+.pn-foot { font-size: 13px; color: #555; margin: 10px 0 0; }
+@media print { body.print-cards .pn-sheet { border: none; max-width: none; padding: 0; font-size: 14px; } }
+
 /* ---- ログインカード（A4 に 8枚） ---- */
 #cardsOut { margin-top: 10px; }
 .lc-sheet { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #fff; padding: 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; }

@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=381" />
+    <link rel="stylesheet" href="class.css?v=382" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=381"></script>
-    <script src="store.js?v=381"></script>
+    <script src="../firebase-config.js?v=382"></script>
+    <script src="store.js?v=382"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -107,8 +107,11 @@
           </div>
           <div class="btn-row">
             <button id="cardsBtn">🖨 ログインカードを 印刷</button>
+            <button id="noticeBtn" class="ghost">🖨 保護者への 案内を 印刷</button>
             <button id="reloadBtn" class="ghost">↻ 最新に</button>
           </div>
+          <p class="hint" data-say="保護者への 案内は、A4 1枚の お知らせです。ご家庭で どう使うか、お金は かからないこと、個人情報は 集めないことが 書いてあります。ログインカードと いっしょに 渡してください。先生が 売りこむ 必要は ありません。">
+            <b>「保護者への 案内」</b>は A4 1枚の お知らせ（使い方・<b>ご家庭の お金は かからない</b>・個人情報は 集めない）。ログインカードと いっしょに 渡すだけで OK です。</p>
         </div>
         <div class="card">
           <h2>📨 宿題</h2>
@@ -168,6 +171,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=381"></script>
+    <script src="class.js?v=382"></script>
   </body>
 </html>
