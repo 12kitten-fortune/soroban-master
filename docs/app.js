@@ -4864,28 +4864,38 @@ const SOLO_EPISODES = [
     { who: "ソロモン", scene: "2_15", text: "ソロモンは 大喜びした。「やったー！ よろしくね、ルート！」「……うん。いっしょに がんばろう。」" },
     { who: "", scene: "2_16", text: "3人は、夕ぐれの 森を 歩いて 帰った。「明日も やろうね！」「うん！」" },
     { who: "", scene: "2_end", text: "第2章 END　空の 向こうから、大きな 何かが やってくる——。" } ] },
-  // 第3話は 16コマ（scene_3_1〜3_16）。赤い ドラゴン＝カケル（かけ算）
-  { id: "ep3", n: "第3話", t: "仲間が ふえる", lv: 3, scene: 3, lines: [
-    { who: "", scene: "3_1", text: "森を 進んでいると、遠くから 大きな うなり声が 聞こえてきた。ゴォォォ…！「なに!? すごい音…！」" },
-    { who: "", scene: "3_2", text: "音の する方へ 行ってみると、岩山の 前に 大きな かげが あった。「あれは… ドラゴン…!?」" },
-    { who: "きみ", scene: "3_3", text: "近づくのは こわいけど、ぼくは 一歩 前に 進んだ。「でも… 逃げない！ 勇気を 出そう！」" },
-    { who: "", scene: "3_4", text: "すると、赤くて 大きな ドラゴンが すがたを あらわした。ガオォ…!!「わぁ…！ すごい…！」" },
-    { who: "ドラゴン", scene: "3_5", text: "ドラゴンは 大きな 声で 言った。「……おまえたち 何者だ？」" },
-    { who: "きみ", scene: "3_6", text: "ぼくは 少し ふるえながらも、そろばんを 見せた。「ぼくは、そろばんが 大好きです。もっと たくさんの 人に そろばんの 楽しさを 伝えたいんです！」" },
-    { who: "ドラゴン", scene: "3_7", text: "ドラゴンは ふしぎそうに そろばんを 見つめた。「……これは 小さな 珠で 大きな 力を 生み出す 道具なのか……？」" },
-    { who: "ドラゴン", scene: "3_8", text: "すると、ドラゴンの 表情が 少し やわらかくなった。「おもしろい！ そんな 夢を 持つ 子に 出会えるなんて 久しぶりだ！」" },
-    { who: "", scene: "3_9", text: "ぼくたちの 仲間も、勇気を 出して 話しかけた。「よろしく お願いします！」「一緒に 冒険しよう！」" },
-    { who: "カケル", scene: "3_10", text: "ドラゴンは 大きく 笑った。ハハッ！「いいだろう！ ぼくは カケル。かけ算が 得意なんだ！」" },
-    { who: "カケル", scene: "3_11", text: "カケルは つばさを 広げ、空高く 舞い上がった。「一緒に 行こう！ 君たちと なら もっと 遠くへ 行ける！」「わぁ…！ かっこいい！」" },
-    { who: "", scene: "3_12", text: "カケルが 舞い降りて、そっと 言った。「これから よろしく！ カケル！」「よろしく！ ぼくたち 一緒に がんばろう！」" },
-    { who: "", scene: "3_13", text: "こうして、カケルは ぼくたちの 仲間に なった。「やったね！ 新しい 仲間だ！」" },
-    { who: "カケル", scene: "3_14", text: "カケルは みんなに 話してくれた。「ぼくは かけ算の 力で、こまっている 人の 力に なりたい。君たちの 夢を 必ず 応援するよ！」" },
-    { who: "", scene: "3_15", text: "夕日が 森を 照らす中、新しい 冒険が はじまる 予感が した。「もっと たくさんの 仲間と 出会って、みんなで 進もう！」" },
-    { who: "", scene: "3_16", text: "こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——" } ] },
-  { id: "ep4", n: "第4話", t: "こんどは ぼくが", lv: 4, scene: 5, lines: [
-    { who: "", pose: "run", text: "王国に「数の乱れ」が おきて、仲間たちが こまっている。" },
-    { who: "ソロモン", pose: "angry", text: "こんどは ぼくが 仲間を たすける！ きみと いっしょなら できる！" },
-    { who: "", pose: "friends", text: "🤝 ソロモンは、だれかの ために がんばれるように なった。　「仲間を たすけられる ソロモン」" } ] },
+  // 第3話は 12コマ（scene_3_1〜3_12）。赤い ドラゴン＝カケルは 仲間に ならず 飛び去る → ホームに「🔒 カケルの谷」
+  { id: "ep3", n: "第3話", t: "空を たどる 赤い影", lv: 3, scene: 3, lines: [
+    { who: "", scene: "3_1", text: "森での 練習を 終えた 帰り道、空に 大きな かげが よぎった。「わぁ…！ あれは…？」" },
+    { who: "きみ", scene: "3_2", text: "「すごい…！ あんなに 大きい ドラゴン、はじめて 見たよ！」" },
+    { who: "", scene: "3_3", text: "たどり着いたのは、山の ふもと。そこに 赤い ドラゴンが いた。ゴォォォ…" },
+    { who: "ドラゴン", scene: "3_4", text: "「……よく ここまで 来たな、小さな そろばん使いよ。」" },
+    { who: "カケル", scene: "3_5", text: "「きみは…？」「私は カケル。この山の 向こうで 王国の 空を 守っている ドラゴンだ。」" },
+    { who: "カケル", scene: "3_6", text: "「この世界には、まだ 解決できていない “数の乱れ” が ある。その先へ 行くには、もっと 強い 力が 必要だ。」" },
+    { who: "", scene: "3_7", text: "「ぼくたちも 一緒に 行きたい！」「うん…！ ぼくたち、もっと 強く なりたい！」" },
+    { who: "カケル", scene: "3_8", text: "「……その気持ちは うれしい。だが、いまの 力では まだ 早い。」" },
+    { who: "カケル", scene: "3_9", text: "「その そろばんで、ここまで 来られるか？」「……はい！」" },
+    { who: "カケル", scene: "3_10", text: "「ならば、また 会おう。もっと 成長したときに、その先の 世界へ 案内してやる。」バサッ…！" },
+    { who: "", scene: "3_11", text: "そう言うと、カケルは 大きく はばたき、空の 向こうへと 消えていった。「カケルー！！」「……うん。ぼくたち、がんばろう！」" },
+    { who: "", scene: "3_12", text: "それから、ホームに 新しい 場所が あらわれた。🔒 カケルの谷——あと {valley}回 練習すると この場所が ひらくよ！　カケルに また 会うために、ぼくたちの そろばんの 冒険は つづく！" } ] },
+  // 第4話は「カケルの谷」の 道が 開いたら（第3話を 読んでから 練習 VALLEY_NEED 回）。16コマ（scene_4_1〜4_16）
+  { id: "ep4", n: "第4話", t: "カケルの谷", gate: "valley", lv: 3, scene: 4, lines: [
+    { who: "", scene: "4_1", text: "道が 開いた。谷を 進んでいると、遠くから 大きな うなり声が 聞こえてきた。ゴォォォ…！「なに!? すごい音…！」" },
+    { who: "", scene: "4_2", text: "音の する方へ 行ってみると、岩山の 前に 大きな かげが あった。「あれは… ドラゴン…!?」" },
+    { who: "きみ", scene: "4_3", text: "近づくのは こわいけど、ぼくは 一歩 前に 進んだ。「でも… 逃げない！ 勇気を 出そう！」" },
+    { who: "", scene: "4_4", text: "すると、赤くて 大きな ドラゴンが すがたを あらわした。ガオォ…!!「わぁ…！ すごい…！」" },
+    { who: "カケル", scene: "4_5", text: "ドラゴンは 大きな 声で 言った。「……おまえたち、ほんとうに ここまで 来たのか？」" },
+    { who: "きみ", scene: "4_6", text: "ぼくは 少し ふるえながらも、そろばんを 見せた。「ぼくは、そろばんが 大好きです。もっと たくさんの 人に そろばんの 楽しさを 伝えたいんです！」" },
+    { who: "カケル", scene: "4_7", text: "カケルは ふしぎそうに そろばんを 見つめた。「……これは 小さな 珠で 大きな 力を 生み出す 道具なのか……？」" },
+    { who: "カケル", scene: "4_8", text: "すると、カケルの 表情が 少し やわらかくなった。「おもしろい！ そんな 夢を 持つ 子に 出会えるなんて 久しぶりだ！」" },
+    { who: "", scene: "4_9", text: "ぼくたちの 仲間も、勇気を 出して 話しかけた。「よろしく お願いします！」「一緒に 冒険しよう！」" },
+    { who: "カケル", scene: "4_10", text: "カケルは 大きく 笑った。ハハッ！「いいだろう！ 私は カケル。かけ算が 得意なんだ！」" },
+    { who: "カケル", scene: "4_11", text: "カケルは つばさを 広げ、空高く 舞い上がった。「一緒に 行こう！ 君たちと なら もっと 遠くへ 行ける！」「わぁ…！ かっこいい！」" },
+    { who: "", scene: "4_12", text: "カケルが 舞い降りて、そっと 言った。「これから よろしく！」「よろしく！ ぼくたち 一緒に がんばろう！」" },
+    { who: "", scene: "4_13", text: "こうして、カケルは ぼくたちの 仲間に なった。「やったね！ 新しい 仲間だ！」" },
+    { who: "カケル", scene: "4_14", text: "カケルは みんなに 話してくれた。「私は かけ算の 力で、こまっている 人の 力に なりたい。君たちの 夢を 必ず 応援するよ！」" },
+    { who: "", scene: "4_15", text: "夕日が 森を 照らす中、新しい 冒険が はじまる 予感が した。「もっと たくさんの 仲間と 出会って、みんなで 進もう！」" },
+    { who: "", scene: "4_16", text: "こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——" } ] },
   { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, scene: 6, lines: [
     { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
     { who: "きみ", pose: "friends", text: "これからも いっしょだよ。" },
@@ -4896,12 +4906,23 @@ const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばん�
   { who: "ソロモン", pose: "happy", text: "そろばんを やった日が、30日に なったよ！" },
   { who: "ソロモン", pose: "front", text: "最初は 数字を 見ると こわかったけど……" },
   { who: "ソロモン", pose: "friends", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
+/* ---- カケルの谷：第3話を 読んでから 練習 VALLEY_NEED 回で 道が 開く（第4話） ----
+   「あと○回 練習すると 道が 開く」と 場所で 見せる（成績表の 数字に しない） */
+const VALLEY_NEED = 10;
+function valleyLeft() {
+  const st = soloState(); if (!st.seen.ep3) return VALLEY_NEED;
+  const since = typeof st.seen.ep3 === "string" ? st.seen.ep3 : (st.met || "");
+  const n = studySessions().filter((e) => (e.d || "") >= since).length;
+  return Math.max(0, VALLEY_NEED - n);
+}
+const valleyOpen = () => !!soloState().seen.ep3 && valleyLeft() === 0;
 /* 物語を 見せる（絵＋セリフ、「つぎへ」で 進む。動画は 無くても 成り立つ。将来 pose を 短い動画に 差しかえられる） */
 function soloStory(ep, onClose) {
   const el = fxLayer(); let i = 0;
   const d = document.createElement("div"); d.className = "tip-back story-back";
   const render = () => {
-    const L = ep.lines[i], last = i === ep.lines.length - 1;
+    const L0 = ep.lines[i], last = i === ep.lines.length - 1;
+    const L = Object.assign({}, L0, { text: String(L0.text).replace("{valley}", String(valleyLeft() || VALLEY_NEED)) });
     // 場面：絵（scene_N.png）が あれば それを 大きく。無ければ 空と 草原の 上に ソロモン
     const sc = L.scene || ep.scene;
     const scene = '<div class="story-scene' + (sc ? "" : " noscene") + '">' +
@@ -4912,7 +4933,7 @@ function soloStory(ep, onClose) {
       '<button class="tip-ok">' + (last ? "とじる" : "つぎへ ▶") + '</button><div class="story-skip">' + (i + 1) + " / " + ep.lines.length + "</div></div>";
     d.querySelector(".tip-ok").onclick = () => {
       try { clickSnd(); } catch (e) { }
-      if (last) { d.remove(); const st = soloState(); st.seen[ep.id] = 1; soloSave(st); if (onClose) onClose(); }
+      if (last) { d.remove(); const st = soloState(); if (!st.seen[ep.id]) st.seen[ep.id] = today(); soloSave(st); if (onClose) onClose(); }   // 読んだ日を 覚える（谷の 数え始め）
       else { i++; render(); }
     };
   };
@@ -4938,7 +4959,8 @@ function solomonAfterStudy() {
   const s = soloStats(), before = st.lv || 0, lv = soloLevel(s, st);
   st.lv = lv;
   const queue = [];
-  for (let k = before + 1; k <= lv; k++) { const ep = SOLO_EPISODES.find((e) => e.lv === k); if (ep && !st.seen[ep.id]) queue.push(ep); }
+  for (let k = before + 1; k <= lv; k++) { const ep = SOLO_EPISODES.find((e) => e.lv === k && !e.gate); if (ep && !st.seen[ep.id]) queue.push(ep); }
+  if (valleyOpen() && !st.seen.ep4) queue.push(SOLO_EPISODES.find((e) => e.id === "ep4"));   // 🏔 カケルの谷の 道が 開いた
   if (s.days >= 30 && !st.said.d30) { st.said.d30 = 1; queue.push(SOLO_SPECIAL_30); }
   soloSave(st);
   const next = () => { const ep = queue.shift(); if (ep) soloStory(ep, next); else renderSolomonCard(); };
@@ -4956,8 +4978,17 @@ function renderSolomonCard() {
     '<div class="solo-speech">「' + soloSpeech(s, lv) + '」</div>' +
     '<div class="solo-row"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
     '<div class="solo-next">つぎの 成長まで：' + soloNext(s, lv) + "</div>" +
+    soloValleyHTML(st) +
     '<button id="homeToSolomon" class="wide-btn">🐣 ソロモンを 見る</button>';
   $("#homeToSolomon").onclick = () => { showView("solomon"); setActiveNav(document.querySelector('.nav[data-view="solomon"]')); };
+  const vg = $("#valleyGo"); if (vg) vg.onclick = () => soloStory(SOLO_EPISODES.find((e) => e.id === "ep4"), renderSolomonCard);
+}
+// 🔒 カケルの谷（第3話を 読んだ子にだけ 出る）
+function soloValleyHTML(st) {
+  if (!st.seen.ep3) return "";
+  if (st.seen.ep4) return '<div class="solo-valley open">🏔 カケルの谷　カケルが 仲間に なった！</div>';
+  if (valleyOpen()) return '<div class="solo-valley open">🏔 カケルの谷の 道が 開いた！ <button id="valleyGo" class="hw-go">▶ 進む</button></div>';
+  return '<div class="solo-valley">🔒 カケルの谷　あと <b>' + valleyLeft() + '</b>回 練習すると 道が 開く</div>';
 }
 /* ソロモンの 画面（図鑑＋物語） */
 function renderSolomon() {
@@ -4977,9 +5008,10 @@ function renderSolomon() {
     '<div class="solo-cond"><b>つぎの 成長まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
   const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
   eps.innerHTML = all.map((ep, i) => {
-    const open = ep.id === "d30" || lv >= ep.lv || st.seen[ep.id];
+    const open = ep.id === "d30" || st.seen[ep.id] || (ep.gate === "valley" ? valleyOpen() : lv >= ep.lv);
+    const lock = ep.gate === "valley" ? (st.seen.ep3 ? "🔒 あと " + valleyLeft() + "回 練習で 道が 開く" : "🔒 第3話の あとで") : "🔒 Lv." + ep.lv + " で ひらく";
     return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : "？？？") + "</b>" +
-      (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? "もう一度 よむ" : "▶ よむ") + "</button>" : "<small>🔒 Lv." + ep.lv + " で ひらく</small>") + "</div>";
+      (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? "もう一度 よむ" : "▶ よむ") + "</button>" : "<small>" + lock + "</small>") + "</div>";
   }).join("") + '<p class="sub">物語は「そろばんの 練習」で 進みます。パズルや たいせんでは 進みません。</p>';
   eps.querySelectorAll(".ep-read").forEach((b) => { b.onclick = () => soloStory(all[+b.dataset.i], renderSolomon); });
 }

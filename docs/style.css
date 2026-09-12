@@ -1324,6 +1324,10 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .solo-row b { color: #b8860b; letter-spacing: 2px; font-size: 16px; }
 .solo-row.big { justify-content: center; gap: 12px; font-size: 16px; } .solo-row.big b { font-size: 22px; }
 .solo-next { font-size: 13px; color: var(--navy); font-weight: 700; margin: 4px 0 8px; }
+.solo-valley { background: #f1ede4; border: 2px dashed #b9ad95; border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; font-size: 13px; font-weight: 700; color: #6b5a45; }
+.solo-valley b { color: var(--accent); font-size: 16px; }
+.solo-valley.open { background: #e7f5ec; border: 2px solid #1f8a4c; color: #1f8a4c; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.solo-valley .hw-go { font-size: 14px; padding: 6px 12px; }
 .solo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .solo-main { text-align: center; }
 .solo-main .solo-pic { width: 180px; height: 180px; } .solo-main .solo-pic i { font-size: 120px; }
