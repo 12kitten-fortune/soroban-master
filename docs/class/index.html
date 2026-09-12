@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=382" />
+    <link rel="stylesheet" href="class.css?v=383" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=382"></script>
-    <script src="store.js?v=382"></script>
+    <script src="../firebase-config.js?v=383"></script>
+    <script src="store.js?v=383"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -31,6 +31,8 @@
     </header>
     <main class="doc-main cls-main">
       <div id="modeNote" class="cls-mode hidden"></div>
+      <!-- いまの プラン（人数の 上限・のこり日数） -->
+      <div id="planNote" class="cls-plan hidden"></div>
 
       <!-- つぎに やること（状況に あわせて 変わる） -->
       <div id="guideBar" class="guide hidden">
@@ -171,6 +173,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=382"></script>
+    <script src="class.js?v=383"></script>
   </body>
 </html>

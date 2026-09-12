@@ -108,8 +108,21 @@
     me = t;
     $("#whoami").textContent = t ? (t.name || t.email || "") : "";
     $("#logoutBtn").classList.toggle("hidden", !t);
+    renderPlan();
     if (t) { await renderClasses(); show("classes"); } else show("login");
   });
+  /* ---------- プラン（人数の 上限・のこり日数）。先生は 自分で 変えられない＝運営者が 入れる ---------- */
+  function renderPlan() {
+    const el = $("#planNote"); if (!el) return;
+    if (!me) { el.classList.add("hidden"); return; }
+    const p = S.planInfo(me);
+    let s = "<b>いまの プラン：" + esc(p.name) + "</b>（生徒 " + p.max + "人まで";
+    if (p.until) s += "・" + (p.expired ? "期限が すぎています" : "あと " + p.daysLeft + "日") ;
+    s += "）";
+    if (p.key === "trial") s += '　<a href="../kyoshitsu.html#plans" target="_blank" rel="noopener">教室プラン（40人）・スクールプラン（150人）を 見る</a>';
+    if (p.expired) s += "<br>おためしの 期間が おわりました。記録は 見られますが、生徒の 追加は できません。つづける ときは 上の プランへ。";
+    el.innerHTML = s; el.classList.remove("hidden"); el.classList.toggle("over", !!p.expired);
+  }
   $("#lgToggle").addEventListener("click", (e) => {
     e.preventDefault();
     signup = !signup;
@@ -265,6 +278,13 @@
     if (!nicks.length) return;
     const have = new Set(curStudents.map((s) => s.nick));
     const fresh = nicks.filter((n) => !have.has(n));
+    // プランの 上限（人数・期限）。こえるときは 登録せず、理由を 画面に 出す
+    const p = S.planInfo(me), total = await S.countStudents();
+    if (p.expired) { alert("おためしの 期間が おわっているため、生徒を 追加できません。教室プランへの 切りかえは 塾向けページから お申し込みください。"); return; }
+    if (total + fresh.length > p.max) {
+      alert(p.name + "は 生徒 " + p.max + "人までです（いま " + total + "人）。あと " + Math.max(0, p.max - total) + "人 登録できます。もっと 登録する ときは 教室プラン（40人）／スクールプラン（150人）へ。");
+      return;
+    }
     if (fresh.length) await S.addStudents(cur.id, fresh);
     $("#addNicks").value = "";
     await renderStudents();

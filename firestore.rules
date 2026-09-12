@@ -46,9 +46,15 @@ service cloud.firestore {
         && d.createdAt is int;
     }
 
-    /* 先生の 名前。本人だけ */
+    /* 先生の 名前・プラン。本人だけ 読める。
+       plan / planUntil は 運営者が コンソールで 入れる（先生は 自分で 書きかえられない） */
     match /teachers/{uid} {
-      allow read, write: if teacher() && request.auth.uid == uid;
+      allow read:   if teacher() && request.auth.uid == uid;
+      allow create: if teacher() && request.auth.uid == uid
+        && !request.resource.data.keys().hasAny(['plan', 'planUntil']);
+      allow update: if teacher() && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'planUntil']);
+      allow delete: if false;
     }
 
     /* クラスコード → 教室。生徒は コードを 1つずつ 引けるだけ（総なめは できない） */

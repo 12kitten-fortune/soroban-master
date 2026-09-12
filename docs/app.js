@@ -4021,6 +4021,7 @@ function creditHTML() {
     "<p><b>効果音</b>：効果音ラボ（https://soundeffect-lab.info/）<br>" +
     "商用利用・クレジット表記なしで つかえます（音源ファイルそのものの 再配布は できません）。</p>" +
     "<p><b>イラスト</b>：生成AIで 作ったものを つかっています。</p>" +
+    '<p><a href="legal.html#tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>　<a href="legal.html#privacy" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="legal.html#terms" target="_blank" rel="noopener">利用規約</a></p>' +
     "<p><b>問題の内容</b>：出題の形式（桁数・口数）は、公開されている 珠算検定の 出題例を 参考にした <b>このアプリ独自</b>の めやすです。問題は すべて このアプリが その場で 作っています（数字を どこかから 写して いません）。" +
     "当アプリは 個人が 作った 非公式の 練習アプリで、珠算の 検定を 行う 団体とは 一切 関係ありません。</p>";
 }

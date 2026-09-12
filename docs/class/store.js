@@ -34,6 +34,22 @@
   function hwDone(h, list) {
     return list.filter((e) => (e.t || 0) >= (h.createdAt || 0) && e.subj === h.subj && e.g === h.g).length;
   }
+  /* プラン：生徒の 人数の 上限。plan は 運営者が Firebase の 画面で 入れる（trial が はじめの 値）
+     trial＝おためし（10人・登録から 31日）／pioneer＝先行10教室（1年 無料）／class＝教室／school＝スクール */
+  const PLANS = {
+    trial:   { name: "おためし", max: 10, days: 31 },
+    pioneer: { name: "先行教室（1年 無料）", max: 40 },
+    class:   { name: "教室プラン", max: 40 },
+    school:  { name: "スクールプラン", max: 150 },
+  };
+  function planInfo(t) {
+    const key = t && PLANS[t.plan] ? t.plan : "trial", P = PLANS[key];
+    let until = t && t.planUntil ? String(t.planUntil) : "";
+    if (!until && P.days && t && t.createdAt) until = new Date(t.createdAt + P.days * 86400000).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const daysLeft = until ? Math.ceil((new Date(until + "T00:00:00") - new Date(today + "T00:00:00")) / 86400000) : null;
+    return { key, name: P.name, max: P.max, until, daysLeft, expired: daysLeft != null && daysLeft < 0 };
+  }
   const HW_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
   function cleanHomework(hw) {
     return {
@@ -57,8 +73,9 @@
     return {
       mode: "local",
       onAuth(cb) { authCbs.push(cb); setTimeout(() => cb(db.teacher), 0); },
-      async signUp(email, pw, name) { db.teacher = { uid: "local", email: email || "", name: name || "先生" }; save(); fire(); return db.teacher; },
-      async signIn(email) { db.teacher = db.teacher || { uid: "local", email: email || "", name: "先生" }; save(); fire(); return db.teacher; },
+      async signUp(email, pw, name) { db.teacher = { uid: "local", email: email || "", name: name || "先生", plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
+      async signIn(email) { db.teacher = db.teacher || { uid: "local", email: email || "", name: "先生", plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
+      async countStudents() { return Object.values(db.students).reduce((a, m) => a + Object.keys(m).length, 0); },
       async signOut() { db.teacher = null; save(); fire(); },
       async listClasses() { return Object.values(db.classes).sort((a, b) => a.createdAt - b.createdAt); },
       async createClass(name) {
@@ -119,9 +136,9 @@
       onAuth(cb) {
         auth.onAuthStateChanged(async (u) => {
           if (u && !u.isAnonymous) {
-            let name = "";
-            try { const t = await tRef(u.uid).get(); name = t.exists ? (t.data().name || "") : ""; } catch (e) { }
-            me = { uid: u.uid, email: u.email, name: name || (u.email || "").split("@")[0] };
+            let d = {};
+            try { const t = await tRef(u.uid).get(); d = t.exists ? (t.data() || {}) : {}; } catch (e) { }
+            me = { uid: u.uid, email: u.email, name: d.name || (u.email || "").split("@")[0], plan: d.plan || "trial", planUntil: d.planUntil || "", createdAt: d.createdAt || 0 };
           } else me = null;
           cb(me);
         });
@@ -136,6 +153,12 @@
       async listClasses() {
         const q = await fs.collection("classes").where("teacherUid", "==", me.uid).get();
         return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt);
+      },
+      // 先生の 生徒の 合計（プランの 上限を 見るため。教室は 少ないので 順に 数える）
+      async countStudents() {
+        const cs = await this.listClasses(); let n = 0;
+        for (const c of cs) { const q = await cRef(c.id).collection("students").get(); n += q.size; }
+        return n;
       },
       async createClass(name) {
         // クラスコードの 重複を さける：codes/{code} を 同じ トランザクションで 先に 押さえる
@@ -231,4 +254,6 @@
   global.SKStore = (cfg && global.firebase) ? FireStore(cfg) : LocalStore();
   global.SKStore.statOf = statOf;
   global.SKStore.hwDone = hwDone;
+  global.SKStore.PLANS = PLANS;
+  global.SKStore.planInfo = planInfo;
 })(window);
