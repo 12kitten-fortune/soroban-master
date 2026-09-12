@@ -4839,10 +4839,11 @@ function soloSpeech(s, lv) {
 }
 /* 絵：docs/assets/solomon/{pose}.png（front / side / soroban / happy / cry / angry / run / friends / zukan / story）。
    無ければ 🐣 で 代わりを 出す（絵が 届いたら 置くだけで 変わる） */
+const SOLO_IMG_VER = "?v=2";   // 絵を 入れかえたら 上げる（端末に 残った 古い絵を 使わせない）
 function soloPic(pose, cls) {
   // その ポーズの 絵が 無ければ 正面（front）を 使い、それも 無ければ 🐣
-  return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png" alt="ソロモン" ' +
-    'onerror="if(!this.dataset.f){this.dataset.f=1;this.src=\'assets/solomon/front.png\'}else{this.parentNode.classList.add(\'nopic\')}"><i>🐣</i></span>';
+  return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png' + SOLO_IMG_VER + '" alt="ソロモン" ' +
+    'onerror="if(!this.dataset.f){this.dataset.f=1;this.src=\'assets/solomon/front.png' + SOLO_IMG_VER + '\'}else{this.parentNode.classList.add(\'nopic\')}"><i>🐣</i></span>';
 }
 /* 物語（1話 30秒〜1分）。lv＝その段階に なったとき 読める（0＝はじめて ホームを 開いたとき）
    scene＝場面の絵 docs/assets/solomon/scene_N.png（「はじまりの物語」の 6コマ：1出会い 2一緒に練習 3仲間が増える 4数の乱れ 5みんなで立ち向かう 6もっと大きな世界へ）。
