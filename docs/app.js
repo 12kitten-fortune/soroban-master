@@ -4928,14 +4928,14 @@ const SOLO_EPISODES = [
     { who: "", scene: "4_16", text: "こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——" } ] },
   { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, scene: 6, lines: [
     { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
-    { who: "きみ", pose: "friends", text: "これからも いっしょだよ。" },
+    { who: "きみ", pose: "celebrate", text: "これからも いっしょだよ。" },
     { who: "ソロモン", pose: "side", text: "うん！ つぎは どこへ 行こうかな！" },
-    { who: "", pose: "friends", text: "👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！" } ] },
+    { who: "", pose: "celebrate", text: "👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！" } ] },
 ];
 const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばんを やった日が 30日！", lv: 0, scene: 6, lines: [
   { who: "ソロモン", pose: "happy", text: "そろばんを やった日が、30日に なったよ！" },
   { who: "ソロモン", pose: "front", text: "最初は 数字を 見ると こわかったけど……" },
-  { who: "ソロモン", pose: "friends", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
+  { who: "ソロモン", pose: "celebrate", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
 /* ---- カケルの谷：第3話を 読んでから 練習 VALLEY_NEED 回で 道が 開く（第4話） ----
    「あと○回 練習すると 道が 開く」と 場所で 見せる（成績表の 数字に しない） */
 const VALLEY_NEED = 10;
@@ -4964,25 +4964,26 @@ function storyOnAnswer(ok) {
   const S = session.story; if (!S) return 850;
   if (ok) {
     const was = S.retry; S.retry = false; S.hits++;
-    renderBridge(was ? S.miss[1] : S.react[Math.min(S.hits, S.react.length) - 1]);
+    const done = S.hits >= S.n;
+    renderBridge(was ? S.miss[1] : S.react[Math.min(S.hits, S.react.length) - 1], was ? "cheer" : done ? "celebrate" : S.hits === 1 ? "idea" : "soroban2");
     return 1400;
   }
   if (!S.retry) {
     S.retry = true;
     session.queue = [session.cur].concat(session.queue || []); session.N++;   // 同じ問題を もう一回（1問ぶん のびる）
-    renderBridge(S.miss[0] + "　→ もう一回 やってみよう");
+    renderBridge(S.miss[0] + "　→ もう一回 やってみよう", "sad");
     return 1800;
   }
-  renderBridge("だいじょうぶ、つぎに いこう。");
+  renderBridge("だいじょうぶ、つぎに いこう。", "wave");
   return 1200;
 }
-// 橋：正解の数だけ 板が のびる（そろばん＝世界を 動かす 道具）
-function renderBridge(say) {
+// 橋：正解の数だけ 板が のびる（そろばん＝世界を 動かす 道具）。pose＝そのとき の ソロモンの 絵
+function renderBridge(say, pose) {
   const b = $("#storyBridge"); if (!b) return;
   if (!session || !session.story) { b.classList.add("hidden"); return; }
   const S = session.story, done = S.hits >= S.n;
   b.classList.remove("hidden");
-  b.innerHTML = '<div class="bridge"><span class="bridge-end">🐣</span>' +
+  b.innerHTML = '<div class="bridge">' + soloPic(pose || "soroban", "bridge-pic") +
     Array.from({ length: S.n }, (_, k) => '<i class="' + (k < S.hits ? "on" : "") + '"></i>').join("") +
     '<span class="bridge-end">' + (done ? "🌉" : "🏔") + '</span></div>' +
     '<div class="bridge-say">' + (say || (S.hits ? "" : "正解するたびに、橋が のびるよ")) + (done ? "　パチン！ 橋が できた！" : "") + "</div>";
@@ -5070,7 +5071,8 @@ function renderSolomonCard() {
   if (!storyOn()) { box.classList.add("hidden"); box.innerHTML = ""; return; }
   box.classList.remove("hidden");
   const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
-  box.innerHTML = '<div class="solo-top">' + soloPic(lv >= 5 ? "friends" : lv >= 3 ? "happy" : "front") +
+  // 絵：きょう 練習ずみ→よろこぶ／まだ→手をふる（Lv.5は マント）／出会う前→正面
+  box.innerHTML = '<div class="solo-top">' + soloPic(lv === 0 ? "front" : s.todayDone ? "happy" : lv >= 5 ? "zukan" : "wave") +
     "<div><b>🐣 ソロモン</b><small>" + (lv ? "Lv." + lv + " " + SOLO_LEVELS[lv - 1].name : "まだ 出会ったばかり") + "</small></div></div>" +
     '<div class="solo-speech">「' + soloSpeech(s, lv) + '」</div>' +
     '<div class="solo-row"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
@@ -5093,7 +5095,7 @@ function renderSolomon() {
   const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
   const L = SOLO_LEVELS[lv - 1];
   const fmtMet = st.met ? st.met.slice(0, 4) + "年" + (+st.met.slice(5, 7)) + "月" + (+st.met.slice(8, 10)) + "日" : "—";
-  main.innerHTML = soloPic(lv >= 5 ? "friends" : lv >= 4 ? "run" : lv >= 3 ? "happy" : lv >= 2 ? "soroban" : "zukan") +
+  main.innerHTML = soloPic(lv >= 5 ? "celebrate" : lv >= 4 ? "zukan" : lv >= 3 ? "happy" : lv >= 2 ? "soroban" : lv >= 1 ? "front" : "wonder") +
     '<div class="solo-lvname">' + soloTitle(lv) + "</div>" +
     '<div class="solo-quote">「' + (L ? pickToday(L.talk) : "そろばん、いっしょに やってみる？") + '」</div>' +
     '<div class="solo-row big"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +

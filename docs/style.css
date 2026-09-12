@@ -1365,6 +1365,7 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .story-bridge { background: linear-gradient(180deg, #8fd0ff, #d9efff); border: 2px solid #c9a227; border-radius: 12px; padding: 8px 12px; margin: 0 0 8px; text-align: center; }
 .bridge { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .bridge-end { font-size: 26px; line-height: 1; }
+.bridge .bridge-pic { width: 48px; height: 48px; animation: soloPop .4s ease; } .bridge .bridge-pic i { font-size: 30px; }
 .bridge i { display: block; width: 44px; height: 14px; border-radius: 4px; background: #e6ddc9; border: 1px solid #b9ad95; transition: background .3s, transform .3s; }
 .bridge i.on { background: linear-gradient(180deg, #d19a4a, #9c6a2a); border-color: #6b4a1e; transform: scaleY(1.15); }
 .bridge-say { font-size: 14px; font-weight: 800; color: var(--navy); margin-top: 4px; min-height: 1.4em; }
