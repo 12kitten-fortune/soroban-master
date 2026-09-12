@@ -1417,6 +1417,7 @@ document.addEventListener("click", function (e) {
 });
 function renderSettings() {
   renderSound2();
+  const stg = $("#storyToggle"); if (stg) { stg.checked = storyOn(); stg.onchange = () => { setStoryOn(stg.checked); }; }
   const cr = $("#setCredit"); if (cr) cr.innerHTML = creditHTML();
   const p = profile();
   $("#nameInput").value = p.name;
@@ -4755,6 +4756,15 @@ if (classLink()) setTimeout(function () { fetchHomework().then(() => pushToClass
    ★ ソロモンは「ゲームの キャラ」ではなく「そろばんを いっしょに がんばる 相棒」。
      段階ごとに 性格と 言葉が 変わる（レベル上げ でなく 物語）。 */
 const SOLO_KEY = "soroban_solomon";
+/* オフスイッチ：物語や ゲームの 感じが いやな子は 設定で 切れる。
+   切っても 記録は ふつうに 数えつづける（あとで オンに すると そのまま 成長が 出る） */
+const STORY_KEY = "soroban_story";
+const storyOn = () => { try { return localStorage.getItem(STORY_KEY) !== "off"; } catch (e) { return true; } };
+function setStoryOn(on) {
+  try { localStorage.setItem(STORY_KEY, on ? "on" : "off"); } catch (e) { }
+  renderSolomonCard();
+  const m = $("#saveMsg"); if (m) m.textContent = on ? "ソロモンと 物語を つかいます" : "ソロモンと 物語を 出さないように しました";
+}
 function soloState() { try { return Object.assign({ met: "", seen: {}, lv: 0, said: {} }, JSON.parse(localStorage.getItem(SOLO_KEY) || "{}")); } catch (e) { return { met: "", seen: {}, lv: 0, said: {} }; } }
 function soloSave(s) { try { localStorage.setItem(SOLO_KEY, JSON.stringify(s)); } catch (e) { console.error("ソロモンの 保存に 失敗", e); } }
 const SOLO_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
@@ -5024,6 +5034,7 @@ function soloStory(ep, onClose, startIdx) {
 }
 // はじめて ホームを 開いたとき：第1話（出会い）
 function soloIntro() {
+  if (!storyOn()) return;
   const st = soloState();
   if (st.seen.ep1) return;
   if (!st.met) { st.met = today(); soloSave(st); }
@@ -5041,6 +5052,7 @@ function solomonAfterStudy() {
   const st = soloState(); if (!st.met) st.met = today();
   const s = soloStats(), before = st.lv || 0, lv = soloLevel(s, st);
   st.lv = lv;
+  if (!storyOn()) { soloSave(st); return; }   // オフのときは 静かに 数えるだけ（お話も ひとことも 出さない）
   const queue = [];
   for (let k = before + 1; k <= lv; k++) { const ep = SOLO_EPISODES.find((e) => e.lv === k && !e.gate); if (ep && !st.seen[ep.id]) queue.push(ep); }
   if (valleyOpen() && !st.seen.ep4) queue.push(SOLO_EPISODES.find((e) => e.id === "ep4"));   // 🏔 カケルの谷の 道が 開いた
@@ -5055,6 +5067,8 @@ function solomonAfterStudy() {
 /* ホームの カード */
 function renderSolomonCard() {
   const box = $("#homeSolomon"); if (!box) return;
+  if (!storyOn()) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  box.classList.remove("hidden");
   const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
   box.innerHTML = '<div class="solo-top">' + soloPic(lv >= 5 ? "friends" : lv >= 3 ? "happy" : "front") +
     "<div><b>🐣 ソロモン</b><small>" + (lv ? "Lv." + lv + " " + SOLO_LEVELS[lv - 1].name : "まだ 出会ったばかり") + "</small></div></div>" +
@@ -5090,7 +5104,7 @@ function renderSolomon() {
     '<p class="sub">★は ソロモンと 出会ってから、その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>' +
     '<div class="solo-cond"><b>つぎの 場所まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
   const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
-  eps.innerHTML = all.map((ep, i) => {
+  eps.innerHTML = (storyOn() ? "" : '<p class="sub">いま「ソロモンと 物語」は オフです（設定で オンに できます）。図鑑は 見られます。</p>') + all.map((ep, i) => {
     const open = ep.id === "d30" || st.seen[ep.id] || (ep.gate === "valley" ? valleyOpen() : lv >= ep.lv);
     const lock = ep.gate === "valley" ? (st.seen.ep3 ? "🔒 あと " + valleyLeft() + "回 練習で 道が 開く" : "🔒 第3話の あとで") : "🔒 Lv." + ep.lv + " で ひらく";
     return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : "？？？") + "</b>" +

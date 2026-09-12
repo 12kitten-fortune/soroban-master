@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260912g" />
+    <link rel="stylesheet" href="style.css?v=20260912h" />
   </head>
   <body>
     <div class="app">
@@ -49,23 +49,24 @@
         </div>
         <nav class="side-nav" id="sideNav">
           <button class="nav active" data-view="home">🏠 ホーム</button>
-          <button class="nav" data-view="solomon">🐣 ソロモン</button>
           <button class="nav" data-view="today">🔥 本日の練習</button>
-          <button class="nav" data-view="battle">⚔️ たいせん</button>
-          <button class="nav" data-view="puzzle">🧩 パズル</button>
-          <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
           <div class="nav-sec">学習する</div>
           <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
           <button class="nav subj-nav" data-subj="kake">✏️ かけ算</button>
           <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
           <button class="nav subj-nav" data-subj="flash">⚡ フラッシュ暗算</button>
           <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
+          <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
+          <div class="nav-sec">あそぶ</div>
+          <button class="nav" data-view="battle">⚔️ たいせん</button>
+          <button class="nav" data-view="puzzle">🧩 パズル</button>
           <div class="nav-sec">きょうしつ</div>
           <button class="nav" data-view="join">🏫 教室に 参加</button>
           <div class="nav-sec">けんてい</div>
           <button class="nav" data-view="kentei">🏅 SK検定</button>
           <div class="nav-sec">きろく</div>
           <button class="nav" data-view="records">📊 記録を見る</button>
+          <button class="nav" data-view="solomon">🐣 ソロモン図鑑</button>
           <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
           <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
           <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
@@ -422,6 +423,11 @@
             <p id="saveMsg" class="sub"></p>
           </div>
           <div class="card">
+            <h3>🐣 ソロモンと 物語</h3>
+            <label class="toggle"><input type="checkbox" id="storyToggle" checked /> ソロモンと 物語を つかう</label>
+            <p class="sub">オフにすると、ホームの ソロモンの カードと お話（漫画）が 出なくなり、練習は ふつうの 練習だけに なります。記録・GOLD・級は そのままです。あとから オンに もどせます（それまでの 練習も ちゃんと 数えています）。</p>
+          </div>
+          <div class="card">
             <h3>🔊 音</h3>
             <div class="field">🔊 効果音の音量
               <div class="seg vol-seg" data-kind="sfx"><button data-lv="0">切</button><button data-lv="1">小</button><button data-lv="2">中</button><button data-lv="3">大</button></div>
@@ -532,7 +538,7 @@
       <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
     </div>
 
-    <script src="app.js?v=20260912g"></script>
+    <script src="app.js?v=20260912h"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
