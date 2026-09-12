@@ -1498,6 +1498,8 @@ function startSession(subj) {
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   // 📖 物語の中の 練習（数問だけ・タイマーなし・1問ずつ ◎×）。問題の作り方・採点は ふつうと 同じ
   if (pendingStory) { session.N = pendingStory.n; session.timed = false; session.mode = "each"; session.story = pendingStory; pendingStory = null; }
+  // 🌉 クエスト：ふつうの練習にも「壊れた橋を 直せ！」の 演出を つける（問題は そのまま。物語オフなら 出さない）
+  if (storyOn()) session.quest = { key: "bridge", n: session.N, hits: 0 };
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
@@ -1597,7 +1599,10 @@ function submitAnswer(val) {
     session.locking = true;
     ok ? correctSnd() : wrongSnd();
     showMark(ok);
-    const wait = session.story ? storyOnAnswer(ok) : 850;   // 📖 物語の中では 仲間が 反応する
+    if (session.quest && ok) session.quest.hits++;                       // 🌉 橋が 1つ のびる
+    let wait = 850;
+    if (session.story) wait = storyOnAnswer(ok);                          // 📖 物語の中では 仲間が 反応する
+    else if (session.quest) renderBridge(ok ? "" : "だいじょうぶ。つぎの 石を 取りに いこう。", ok ? "" : "sad");
     setTimeout(() => { session.locking = false; advance(); }, wait);
   }
 }
@@ -1655,6 +1660,7 @@ function finishSession() {
     if (pass) { certify(session.grade.key, session.subj); msg += `<br>🎓 ${session.grade.key} 認定！ 合格証が もらえるよ`; }
   }
   msg += report;
+  if (completed && session.quest && storyOn()) { const q = QUESTS[session.quest.key] || QUESTS.bridge; msg += `<div class="quest-done">🌉 ${q.name}　${q.done}</div>`; }
   if (completed) { // GOLDは学習の成果としてのみ付与
     // 合格ずみの級は「級ごと」に数える（種目を変えて 回数をリセットできないように）
     const below = gradeIdxOf(session.grade) <= myRankIdx();
@@ -4977,16 +4983,29 @@ function storyOnAnswer(ok) {
   renderBridge("だいじょうぶ、つぎに いこう。", "wave");
   return 1200;
 }
-// 橋：正解の数だけ 板が のびる（そろばん＝世界を 動かす 道具）。pose＝そのとき の ソロモンの 絵
+/* 🌉 クエスト：練習に「意味」を つける。中身の 問題は ふつうと 同じ。
+   before/after の 2枚の 絵が 同じ構図で、正解の ぶんだけ after が 左から あらわれる（＝橋が のびる） */
+const QUESTS = {
+  bridge: { name: "壊れた橋を 直せ！", before: "assets/quests/bridge_before.jpg", after: "assets/quests/bridge_after.jpg",
+    start: "数の乱れで 橋が 消えちゃった！ 正解するたびに 橋が のびるよ。", done: "パチン！ 橋が できた！　🐣「渡れるー！！」" },
+};
+// 橋：正解の数だけ のびる（そろばん＝世界を 動かす 道具）。say＝ことば、pose＝そのとき の ソロモンの 絵
 function renderBridge(say, pose) {
   const b = $("#storyBridge"); if (!b) return;
-  if (!session || !session.story) { b.classList.add("hidden"); return; }
-  const S = session.story, done = S.hits >= S.n;
+  const Q = session && session.quest; if (!Q || !storyOn()) { b.classList.add("hidden"); return; }
+  const q = QUESTS[Q.key] || QUESTS.bridge, n = Math.max(1, Q.n), hits = Math.min(n, Q.hits), done = hits >= n;
+  const pct = Math.round((hits / n) * 100);
+  const wasHidden = b.classList.contains("hidden");
   b.classList.remove("hidden");
-  b.innerHTML = '<div class="bridge">' + soloPic(pose || "soroban", "bridge-pic") +
-    Array.from({ length: S.n }, (_, k) => '<i class="' + (k < S.hits ? "on" : "") + '"></i>').join("") +
-    '<span class="bridge-end">' + (done ? "🌉" : "🏔") + '</span></div>' +
-    '<div class="bridge-say">' + (say || (S.hits ? "" : "正解するたびに、橋が のびるよ")) + (done ? "　パチン！ 橋が できた！" : "") + "</div>";
+  if (wasHidden || !b.querySelector(".qscene")) {
+    b.innerHTML = '<div class="qscene"><img class="q-before" src="' + q.before + '" alt="" onerror="this.parentNode.classList.add(\'noimg\')">' +
+      '<img class="q-after" src="' + q.after + '" alt=""><div class="q-title"></div></div>' +
+      '<div class="bridge-say"><span class="bridge-pic-wrap"></span><span class="bridge-txt"></span></div>';
+  }
+  b.querySelector(".q-after").style.clipPath = "inset(0 " + (100 - pct) + "% 0 0)";
+  b.querySelector(".q-title").textContent = "🌉 " + q.name + "　" + hits + " / " + n;
+  b.querySelector(".bridge-pic-wrap").innerHTML = soloPic(pose || (done ? "celebrate" : hits ? "soroban2" : "soroban"), "bridge-pic");
+  b.querySelector(".bridge-txt").textContent = done ? q.done : (say || (hits ? "" : q.start));
 }
 // 練習が 終わったら、物語の つづきへ（そのあとで ソロモンの 成長を たしかめる）
 function storyResume(S) {
