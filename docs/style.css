@@ -1347,7 +1347,7 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .story-scene::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: -30%; height: 60%; border-radius: 50%;
   background: radial-gradient(ellipse at center, #8fd35a, #63b43c 70%); }
 .story-scene::after { content: "🏰"; position: absolute; right: 8%; top: 24%; font-size: 44px; opacity: .9; filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); }
-.story-scene-img { position: relative; z-index: 2; width: 100%; height: 100%; object-fit: cover; display: block; }
+.story-scene-img { position: relative; z-index: 2; width: 100%; height: 100%; object-fit: contain; display: block; background: #2b2b2b; }   /* 字や 吹き出しが 切れないよう 全体を 見せる */
 .story-scene.noscene .story-scene-img { display: none; }
 .story-scene .story-pic { display: none; }
 .story-scene.noscene .story-pic { display: inline-flex; position: absolute; left: 50%; bottom: 4%; transform: translateX(-50%); z-index: 3; }
