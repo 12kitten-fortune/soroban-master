@@ -4839,7 +4839,7 @@ function soloSpeech(s, lv) {
 }
 /* 絵：docs/assets/solomon/{pose}.png（front / side / soroban / happy / cry / angry / run / friends / zukan / story）。
    無ければ 🐣 で 代わりを 出す（絵が 届いたら 置くだけで 変わる） */
-const SOLO_IMG_VER = "?v=2";   // 絵を 入れかえたら 上げる（端末に 残った 古い絵を 使わせない）
+const SOLO_IMG_VER = "?v=3";   // 絵（ポーズ・漫画のコマ）を 入れかえたら 上げる（端末に 残った 古い絵を 使わせない）
 function soloPic(pose, cls) {
   // その ポーズの 絵が 無ければ 正面（front）を 使い、それも 無ければ 🐣
   return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png' + SOLO_IMG_VER + '" alt="ソロモン" ' +
@@ -5035,7 +5035,7 @@ function soloStory(ep, onClose, startIdx) {
     // 場面：絵（scene_N.png）が あれば それを 大きく。無ければ 空と 草原の 上に ソロモン
     const sc = L.scene || ep.scene;
     const scene = '<div class="story-scene' + (sc ? "" : " noscene") + '">' +
-      (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + '.png" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
+      (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + '.png' + SOLO_IMG_VER + '" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
       soloPic(L.pose, "story-pic") + "</div>";
     d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
       scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
