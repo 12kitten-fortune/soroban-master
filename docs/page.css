@@ -65,3 +65,10 @@ body.doc { background: var(--bg); }
 .doc-form-n a { color: #f0d68a; font-weight: 700; }
 .doc-box-n { font-size: 14px; margin-top: 14px !important; text-align: center !important; color: #6b5836; }
 .doc-box-n a { color: var(--navy); font-weight: 800; }
+
+/* ---- プランの お申し込み ボタン（塾向けページ）。リンクが 無い あいだは 灰色の「準備中」 ---- */
+.doc-plans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0 6px; }
+.doc-plans .doc-cta { margin: 0; text-align: center; white-space: normal; }
+.doc-cta.soon { background: #d9d3c4; color: #6b5f4c; cursor: default; box-shadow: none; }
+.doc-plans-n { font-size: 14px; color: #6b5f4c; margin-top: 6px; }
+@media (max-width: 640px) { .doc-plans { grid-template-columns: 1fr; } }

@@ -217,6 +217,38 @@ write({
   });
 }
 
+/* ---- Stripe の 支払いリンク（`Stripeの設定手順.md` で 作った URL を ここに 入れる。空の あいだは「準備中」） ---- */
+const STRIPE = {
+  class: "",      // 教室プラン 9,800円
+  school: "",     // スクールプラン 19,800円
+  family: "",     // 家庭プラン 2,980円
+  family2: "",    // 家庭プラン（2人目から）1,490円
+  portal: "",     // カスタマーポータル（解約・カード変更）
+};
+const planBtn = (key, label) => STRIPE[key]
+  ? `<a class="doc-cta big" href="${STRIPE[key]}" target="_blank" rel="noopener" data-plan="${key}">${label}</a>`
+  : `<span class="doc-cta big soon" data-plan="${key}">${label}　<small>（準備中）</small></span>`;
+
+/* ---- 支払いの あとの ページ ---- */
+write({
+  file: "thanks.html",
+  title: "お申し込み ありがとうございます｜そろばんキングダム",
+  desc: "そろばんキングダムの プランの お申し込みが 完了しました。先生画面への 反映は 1〜2営業日 以内です。",
+  h1: "お申し込み ありがとうございます",
+  lead: "お申し込みを 受けつけました。<b>先生画面への プランの 反映は 1〜2営業日 以内</b>に 行い、メールで お知らせします。初月（31日間）は 無料です。",
+  box: "",
+  body:
+    `<h2>つぎに すること</h2>
+    <ol>
+      <li>先生画面（<a href="class/">sorobankingdom.com/class/</a>）を、お申し込みと <b>同じ メールアドレス</b>で 作ってあるか 確かめる（まだなら 作ってください）</li>
+      <li>反映の お知らせが 届いたら、先生画面を 開きなおす → 上の 青い帯が「教室プラン」などに 変わります</li>
+      <li>生徒を 登録し、「ログインカード」と「保護者への 案内」を 印刷して 渡す</li>
+    </ol>
+    <h2>解約・カードの 変更</h2>
+    <p>${STRIPE.portal ? '<a class="doc-cta" href="' + STRIPE.portal + '" target="_blank" rel="noopener">お客様ページを ひらく</a>' : "お客様ページ（準備中）"}から いつでも できます。無料の あいだに 解約すれば 請求は ありません。</p>
+    <p class="un-note">お困りのときは info@sorobankingdom.com まで。<a href="legal.html#tokushoho">特定商取引法に基づく表記</a>・<a href="legal.html#privacy">プライバシーポリシー</a></p>`,
+});
+
 /* ---- そろばん教室の 先生むけ ページ ---- */
 write({
   file: "kyoshitsu.html",
@@ -261,6 +293,17 @@ write({
     <p>教室プランには、生徒が 家で 使う分が ぜんぶ 入っています。<b>ご家庭の 追加料金・登録は ありません</b>（先生は「保護者への 案内カード」を 配るだけ。売りこみは いりません）。
       教室に 入っていない ご家庭は、家庭プラン（月 2,980円・初月 無料・2人目から 半額・予定）で 独学でも 使えます。</p>
     <p><b>先行10教室は 1年間 無料</b>で、使い心地の ご意見を いただきながら 作ります。お支払いは クレジットカード（準備中）。<a href="legal.html#tokushoho">特定商取引法に基づく表記</a>・<a href="legal.html#terms">利用規約</a></p>
+
+    <h2 id="apply">プランの お申し込み（初月 無料）</h2>
+    <p>クレジットカードで お申し込みできます（Stripe）。<b>先生画面と 同じ メールアドレス</b>で お申し込みください。1〜2営業日で 先生画面に プランが 反映されます。</p>
+    <div class="doc-plans">
+      ${planBtn("class", "🏫 教室プラン　月 9,800円（40人まで）")}
+      ${planBtn("school", "🏫 スクールプラン　月 19,800円（150人まで）")}
+      ${planBtn("family", "🏠 家庭プラン　月 2,980円（1人）")}
+      ${planBtn("family2", "🏠 家庭プラン（2人目から）　月 1,490円")}
+    </div>
+    <p class="doc-plans-n">初月（31日間）は 無料。無料の あいだに やめれば 0円です。解約・カードの 変更は ${STRIPE.portal ? '<a href="' + STRIPE.portal + '" target="_blank" rel="noopener">お客様ページ</a>' : "お客様ページ（準備中）"}から いつでも できます。
+      <a href="legal.html#tokushoho">特定商取引法に基づく表記</a>・<a href="legal.html#terms">利用規約</a></p>
 
     <h2 id="contact">先行10教室の お申し込み・お問い合わせ</h2>
     <p>下の ボタンから 1分で 送れます。<b>2〜3日以内に ご返信</b>します。ご質問だけでも かまいません。</p>
