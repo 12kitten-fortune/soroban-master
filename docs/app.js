@@ -1500,7 +1500,7 @@ function startSession(subj) {
   if (pendingStory) { session.N = pendingStory.n; session.timed = false; session.mode = "each"; session.story = pendingStory; pendingStory = null; }
   // 🌉 クエスト：ふつうの練習にも「壊れた橋を 直せ！」などの 演出を つける（問題は そのまま。物語オフなら 出さない）
   // けんてい方式（最後に まとめて 採点）は 正解が その場で わからないので、クエストは 出さない
-  if (storyOn() && session.mode === "each") session.quest = { key: questOfToday(), n: session.N, hits: 0 };
+  if (storyOn() && session.mode === "each") session.quest = { key: (session.story && session.story.quest) || questOfToday(), n: session.N, hits: 0 };   // 物語が 場面を 指定していれば それ（例：こわれた橋）
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
@@ -4938,6 +4938,26 @@ const SOLO_EPISODES = [
     { who: "カケル", scene: "4_14", text: "カケルは みんなに 話してくれた。「私は かけ算の 力で、こまっている 人の 力に なりたい。君たちの 夢を 必ず 応援するよ！」" },
     { who: "", scene: "4_15", text: "夕日が 森を 照らす中、新しい 冒険が はじまる 予感が した。「もっと たくさんの 仲間と 出会って、みんなで 進もう！」" },
     { who: "", scene: "4_16", text: "こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——" } ] },
+  // 第4話つづき「こわれた橋」：第4話の すぐあと。20コマ目で 止まり、本物の そろばんで 3問（橋クエスト）→ 23コマ目へ
+  { id: "ep4b", n: "第4話（つづき）", t: "こわれた橋", gate: "after-ep4", lv: 3, scene: "4b_18", lines: [
+    { who: "カケル", scene: "4b_17", text: "朝、カケルが みんなを 起こしに きた。「おはよう！ 今日は 次の 場所へ 行こう！」「うん！」「わくわく！」" },
+    { who: "", scene: "4b_18", text: "森を 進むと、大きな 川が 見えてきた。「あっ…！ 橋が こわれてる…！」" },
+    { who: "", scene: "4b_19", text: "向こう側には、見たことのない 町が ある。「あの町へ 行くには この橋を 直すしか ないみたいだね。」「みんなで 力を 合わせよう！」" },
+    { who: "カケル", scene: "4b_20", text: "カケルが 言った。「橋を 直すには 数の力が 必要だ。そろばんで 問題を 解いて 橋の石を 集めよう！」「おれも 応援するぞ！」" },
+    { who: "", scene: "4b_play", text: "さあ、きみの 番だ。そろばんで 3問 とくと、橋の石が 3つ 集まる。まちがえても だいじょうぶ、もう一回 やればいい。",
+      practice: { n: 3, subj: "mitori", label: "橋の石を 集める 3問", quest: "bridge",
+        react: ["カケル「いいぞ！ 石が ひとつ 集まった！」", "ルート「橋が つながって いってる！」", "ソロモン「やった！ もう少しだよ！」"],
+        miss: ["ルート「ぼくも まちがえたこと あるよ。もう一回！」", "カケル「あきらめなかったな。それが 数の力だ。」"] } },
+    { who: "", scene: "4b_23", text: "1問 できるごとに、橋の 一部が 直っていく。「すごい！ 橋が つながって いってる！」" },
+    { who: "", scene: "4b_24", text: "みんなで 協力して たくさんの 問題を 解いた。「やった！ もう少しだよ！」「この調子！」" },
+    { who: "", scene: "4b_25", text: "そして——ついに！「できたー！」" },
+    { who: "カケル", scene: "4b_26", text: "橋を 渡る前に、カケルが 言った。「よくやった！ これからも 困ったことが あったら、そろばんの 力で 乗りこえていける。おれは いつも そばに いるぞ！」" },
+    { who: "ソロモン", scene: "4b_27", text: "ソロモンが うれしそうに 言った。「みんなと いっしょなら どんなことも できるね！ もっと いろんな 場所へ 行こう！」" },
+    { who: "きみ", scene: "4b_28", text: "少年は 新しい 仲間たちを 見て、心の中で 思った。「そろばんが あれば ぼくは きっと——もっと たくさんの 冒険が できる！」" },
+    { who: "", scene: "4b_29", text: "3匹も それぞれ 決意を 新たに した。ソロモン「みんなを 元気にするよ！」ルート「まちがえても あきらめない！」カケル「もっと 強くなるために いっしょに 進もう！」" },
+    { who: "", scene: "4b_30", text: "橋の 向こうには、きらめく 王都が 待っている。「さあ！ 次の 冒険へ 出発だ！」新しい 出会いが ぼくらを 待っている——" },
+    { who: "", scene: "4b_31", text: "そろばんの 力は 一人ではなく 仲間と 一緒に あると もっと 大きくなる。これからも——たくさんの 冒険が ぼくらを 待っている！" },
+    { who: "", scene: "4b_32", text: "つぎの 世界へ——　つづく！" } ] },
   { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, scene: 6, lines: [
     { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
     { who: "きみ", pose: "celebrate", text: "これからも いっしょだよ。" },
@@ -4967,7 +4987,7 @@ function startStorySession(ep, idx) {
   let subj = P.subj || "mitori";
   if (!difficulty(currentGrade(), subj)) subj = difficulty(currentGrade(), "anzan") ? "anzan" : "mitori";
   const st = soloState(); st.prog = st.prog || {}; st.prog[ep.id] = idx; soloSave(st);   // とちゅうで やめても ここから 再開
-  pendingStory = { ep: ep.id, idx, n: P.n || 3, hits: 0, retry: false, label: P.label || ("いっしょに " + (P.n || 3) + "問"), react: P.react || [], miss: P.miss || [] };
+  pendingStory = { ep: ep.id, idx, n: P.n || 3, hits: 0, retry: false, label: P.label || ("いっしょに " + (P.n || 3) + "問"), react: P.react || [], miss: P.miss || [], quest: P.quest || "" };
   subject = subj; renderGrid(); updateInfo();
   startWithTips(subj);              // はじめての子には ゆびの 使い方の 説明が 先に 出る
 }
@@ -5053,7 +5073,7 @@ function soloStory(ep, onClose, startIdx) {
     // 場面：絵（scene_N.png）が あれば それを 大きく。無ければ 空と 草原の 上に ソロモン
     const sc = L.scene || ep.scene;
     const scene = '<div class="story-scene' + (sc ? "" : " noscene") + '">' +
-      (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + '.png' + SOLO_IMG_VER + '" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
+      (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + (String(sc).endsWith("_play") ? ".jpg" : ".png") + SOLO_IMG_VER + '" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
       soloPic(L.pose, "story-pic") + "</div>";
     d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
       scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
@@ -5098,6 +5118,7 @@ function solomonAfterStudy() {
   const queue = [];
   for (let k = before + 1; k <= lv; k++) { const ep = SOLO_EPISODES.find((e) => e.lv === k && !e.gate); if (ep && !st.seen[ep.id]) queue.push(ep); }
   if (valleyOpen() && !st.seen.ep4) queue.push(SOLO_EPISODES.find((e) => e.id === "ep4"));   // 🏔 カケルの谷の 道が 開いた
+  if (st.seen.ep4 && !st.seen.ep4b) queue.push(SOLO_EPISODES.find((e) => e.id === "ep4b"));   // 🌉 第4話の つぎの 練習で「こわれた橋」
   if (s.days >= 30 && !st.said.d30) { st.said.d30 = 1; queue.push(SOLO_SPECIAL_30); }
   soloSave(st);
   const next = () => { const ep = queue.shift(); if (ep) soloStory(ep, next); else renderSolomonCard(); };
@@ -5122,10 +5143,12 @@ function renderSolomonCard() {
     '<button id="homeToSolomon" class="wide-btn">🐣 ソロモンを 見る</button>';
   $("#homeToSolomon").onclick = () => { showView("solomon"); setActiveNav(document.querySelector('.nav[data-view="solomon"]')); };
   const vg = $("#valleyGo"); if (vg) vg.onclick = () => soloStory(SOLO_EPISODES.find((e) => e.id === "ep4"), renderSolomonCard);
+  const vg2 = $("#valleyGo2"); if (vg2) vg2.onclick = () => soloStory(SOLO_EPISODES.find((e) => e.id === "ep4b"), renderSolomonCard);
 }
 // 🔒 カケルの谷（第3話を 読んだ子にだけ 出る）
 function soloValleyHTML(st) {
   if (!st.seen.ep3) return "";
+  if (st.seen.ep4 && !st.seen.ep4b) return '<div class="solo-valley open">🌉 こわれた橋　つぎの 練習で 橋を 直そう！ <button id="valleyGo2" class="hw-go">▶ 読む</button></div>';
   if (st.seen.ep4) return '<div class="solo-valley open">🏔 カケルの谷　カケルが 仲間に なった！</div>';
   if (valleyOpen()) return '<div class="solo-valley open">🏔 カケルの谷の 道が 開いた！ <button id="valleyGo" class="hw-go">▶ 進む</button></div>';
   return '<div class="solo-valley">🔒 カケルの谷　あと <b>' + valleyLeft() + '</b>回 練習すると 道が 開く</div>';
@@ -5148,8 +5171,9 @@ function renderSolomon() {
     '<div class="solo-cond"><b>つぎの 場所まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
   const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
   eps.innerHTML = (storyOn() ? "" : '<p class="sub">いま「ソロモンと 物語」は オフです（設定で オンに できます）。図鑑は 見られます。</p>') + all.map((ep, i) => {
-    const open = ep.id === "d30" || st.seen[ep.id] || (ep.gate === "valley" ? valleyOpen() : lv >= ep.lv);
-    const lock = ep.gate === "valley" ? (st.seen.ep3 ? "🔒 あと " + valleyLeft() + "回 練習で 道が 開く" : "🔒 第3話の あとで") : "🔒 Lv." + ep.lv + " で ひらく";
+    const open = ep.id === "d30" || st.seen[ep.id] || (ep.gate === "valley" ? valleyOpen() : ep.gate === "after-ep4" ? !!st.seen.ep4 : lv >= ep.lv);
+    const lock = ep.gate === "valley" ? (st.seen.ep3 ? "🔒 あと " + valleyLeft() + "回 練習で 道が 開く" : "🔒 第3話の あとで")
+      : ep.gate === "after-ep4" ? "🔒 第4話の あとで" : "🔒 Lv." + ep.lv + " で ひらく";
     return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : "？？？") + "</b>" +
       (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? "もう一度 よむ" : "▶ よむ") + "</button>" : "<small>" + lock + "</small>") + "</div>";
   }).join("") + '<p class="sub">物語は「そろばんの 練習」で 進みます。パズルや たいせんでは 進みません。</p>';
