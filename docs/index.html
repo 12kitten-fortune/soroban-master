@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260912f" />
+    <link rel="stylesheet" href="style.css?v=20260912g" />
   </head>
   <body>
     <div class="app">
@@ -178,6 +178,8 @@
               <span id="playProgress">0 / 0</span>
               <span class="snd-mini"><button class="snd-btn" data-kind="sfx" title="効果音">🔊</button><button class="snd-btn" data-kind="bgm" title="BGM">🎵</button></span>
             </div>
+            <!-- 📖 物語の中の 練習：正解するたびに 橋が のびる -->
+            <div id="storyBridge" class="story-bridge hidden"></div>
             <div class="problem-wrap" id="playProblemWrap">
               <div id="playProblem" class="problem"></div>
               <div id="playMark" class="mark hidden"></div>
@@ -530,7 +532,7 @@
       <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
     </div>
 
-    <script src="app.js?v=20260912f"></script>
+    <script src="app.js?v=20260912g"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

@@ -1360,6 +1360,15 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .story-who { font-weight: 900; color: var(--navy); margin-top: 6px; min-height: 1.2em; }
 .story-text { font-size: 17px; line-height: 1.8; color: #2b2b2b; min-height: 3.6em; margin: 4px 0; }
 .story-skip { font-size: 12px; color: #999; margin-top: 6px; }
+.story-skip-btn { display: block; margin: 8px auto 0; background: transparent; color: #8a7a5c; border: 1px solid #cfc3a8; border-radius: 999px; padding: 6px 14px; font-size: 13px; }
+/* 📖 物語の中の 練習：橋（正解の数だけ 板が のびる） */
+.story-bridge { background: linear-gradient(180deg, #8fd0ff, #d9efff); border: 2px solid #c9a227; border-radius: 12px; padding: 8px 12px; margin: 0 0 8px; text-align: center; }
+.bridge { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.bridge-end { font-size: 26px; line-height: 1; }
+.bridge i { display: block; width: 44px; height: 14px; border-radius: 4px; background: #e6ddc9; border: 1px solid #b9ad95; transition: background .3s, transform .3s; }
+.bridge i.on { background: linear-gradient(180deg, #d19a4a, #9c6a2a); border-color: #6b4a1e; transform: scaleY(1.15); }
+.bridge-say { font-size: 14px; font-weight: 800; color: var(--navy); margin-top: 4px; min-height: 1.4em; }
+@media (max-width: 640px) { .bridge i { width: 30px; } .bridge-say { font-size: 13px; } }
 .solo-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #fffaf0; border: 3px solid var(--royal-gold);
   border-radius: 999px; padding: 10px 18px; font-weight: 800; color: var(--navy); z-index: 9500; box-shadow: 0 6px 18px rgba(0,0,0,.2); max-width: calc(100% - 24px); text-align: center; font-size: 14px; }
 @media (max-width: 900px) { .solo-layout { grid-template-columns: 1fr; } }
