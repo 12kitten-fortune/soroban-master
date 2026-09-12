@@ -1498,8 +1498,9 @@ function startSession(subj) {
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   // 📖 物語の中の 練習（数問だけ・タイマーなし・1問ずつ ◎×）。問題の作り方・採点は ふつうと 同じ
   if (pendingStory) { session.N = pendingStory.n; session.timed = false; session.mode = "each"; session.story = pendingStory; pendingStory = null; }
-  // 🌉 クエスト：ふつうの練習にも「壊れた橋を 直せ！」の 演出を つける（問題は そのまま。物語オフなら 出さない）
-  if (storyOn()) session.quest = { key: "bridge", n: session.N, hits: 0 };
+  // 🌉 クエスト：ふつうの練習にも「壊れた橋を 直せ！」などの 演出を つける（問題は そのまま。物語オフなら 出さない）
+  // けんてい方式（最後に まとめて 採点）は 正解が その場で わからないので、クエストは 出さない
+  if (storyOn() && session.mode === "each") session.quest = { key: questOfToday(), n: session.N, hits: 0 };
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
@@ -1660,7 +1661,7 @@ function finishSession() {
     if (pass) { certify(session.grade.key, session.subj); msg += `<br>🎓 ${session.grade.key} 認定！ 合格証が もらえるよ`; }
   }
   msg += report;
-  if (completed && session.quest && storyOn()) { const q = QUESTS[session.quest.key] || QUESTS.bridge; msg += `<div class="quest-done">🌉 ${q.name}　${q.done}</div>`; }
+  if (completed && session.quest && storyOn()) { const q = QUESTS[session.quest.key] || QUESTS.bridge; msg += `<div class="quest-done">${q.em || "🌉"} ${q.name}　${q.done}</div>`; }
   if (completed) { // GOLDは学習の成果としてのみ付与
     // 合格ずみの級は「級ごと」に数える（種目を変えて 回数をリセットできないように）
     const below = gradeIdxOf(session.grade) <= myRankIdx();
@@ -4991,9 +4992,25 @@ function storyOnAnswer(ok) {
 /* 🌉 クエスト：練習に「意味」を つける。中身の 問題は ふつうと 同じ。
    before/after の 2枚の 絵が 同じ構図で、正解の ぶんだけ after が 左から あらわれる（＝橋が のびる） */
 const QUESTS = {
-  bridge: { name: "壊れた橋を 直せ！", before: "assets/quests/bridge_before.jpg", after: "assets/quests/bridge_after.jpg",
+  bridge: { name: "壊れた橋を 直せ！", em: "🌉", before: "assets/quests/bridge_before.jpg", after: "assets/quests/bridge_after.jpg",
     start: "数の乱れで 橋が 消えちゃった！ 正解するたびに 橋が のびるよ。", done: "パチン！ 橋が できた！　🐣「渡れるー！！」" },
+  town:   { name: "暗い町に 灯りを ともせ！", em: "🔦", before: "assets/quests/town_before.jpg", after: "assets/quests/town_after.jpg",
+    start: "町の 灯りが ぜんぶ 消えちゃった！ 正解するたびに 灯りが ともるよ。", done: "パッ！ 町が 明るくなった！　🐣「みんな 出てきたよ！」" },
+  forest: { name: "迷子の森を ぬけろ！", em: "🐾", before: "assets/quests/forest_before.jpg", after: "assets/quests/forest_after.jpg",
+    start: "霧で 道が 見えない…。正解するたびに 霧が 晴れるよ。", done: "霧が 晴れて 道しるべが 見えた！　🐣「こっちだ！」" },
+  ship:   { name: "沈みそうな船を 助けろ！", em: "⛵", before: "assets/quests/ship_before.jpg", after: "assets/quests/ship_after.jpg",
+    start: "あらしで 船が かたむいてる！ 正解するたびに 海が おだやかに なるよ。", done: "船が 港に 着いた！　🐣「たすかった！」" },
+  valley: { name: "カケルの谷へ 進め！", em: "⛰️", before: "assets/quests/valley_before.jpg", after: "assets/quests/valley_after.jpg",
+    start: "数の霧で 谷の 道が 見えない！ 正解するたびに 道が あらわれるよ。", done: "谷の 向こうに 塔が 見えた！　🐣「もう少しだ！」" },
 };
+const QUEST_ORDER = ["bridge", "town", "forest", "ship", "valley"];
+// きょうの クエスト：日付で かわる（同じ日は 同じ）。カケルの谷を 追いかけている あいだは 谷の 道を 多めに
+function questOfToday() {
+  const d = today(), n = d.split("-").reduce((a, x) => a + parseInt(x, 10), 0);
+  const st = soloState();
+  if (st.seen && st.seen.ep3 && !st.seen.ep4 && n % 2 === 0) return "valley";
+  return QUEST_ORDER[n % QUEST_ORDER.length];
+}
 // 橋：正解の数だけ のびる（そろばん＝世界を 動かす 道具）。say＝ことば、pose＝そのとき の ソロモンの 絵
 function renderBridge(say, pose) {
   const b = $("#storyBridge"); if (!b) return;
@@ -5008,7 +5025,7 @@ function renderBridge(say, pose) {
       '<div class="bridge-say"><span class="bridge-pic-wrap"></span><span class="bridge-txt"></span></div>';
   }
   b.querySelector(".q-after").style.clipPath = "inset(0 " + (100 - pct) + "% 0 0)";
-  b.querySelector(".q-title").textContent = "🌉 " + q.name + "　" + hits + " / " + n;
+  b.querySelector(".q-title").textContent = (q.em || "🌉") + " " + q.name + "　" + hits + " / " + n;
   b.querySelector(".bridge-pic-wrap").innerHTML = soloPic(pose || (done ? "celebrate" : hits ? "soroban2" : "soroban"), "bridge-pic");
   b.querySelector(".bridge-txt").textContent = done ? q.done : (say || (hits ? "" : q.start));
 }
