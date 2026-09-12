@@ -1342,7 +1342,7 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .story-card { text-align: center; max-width: 480px; }
 .story-h { font-size: 14px; font-weight: 800; color: #b8860b; margin-bottom: 6px; }
 /* 場面：絵が あれば それを 出す。無ければ 空・草原・お城の 世界の 上に ソロモン（切り抜きだけに ならないように） */
-.story-scene { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 3px solid #c9a227;
+.story-scene { position: relative; width: 100%; aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden; border: 3px solid #c9a227;
   background: linear-gradient(180deg, #8fd0ff 0%, #d9efff 52%, #a9dd6a 52%, #6fbf45 100%); }
 .story-scene::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: -30%; height: 60%; border-radius: 50%;
   background: radial-gradient(ellipse at center, #8fd35a, #63b43c 70%); }
