@@ -225,7 +225,7 @@ const STRIPE = {
   school: "https://buy.stripe.com/bJebJ09dEbJFb0tdQEe7m05",     // スクールプラン 19,800円
   family: "https://buy.stripe.com/6oUeVc3Tk9BxfgJ27We7m03",     // 家庭プラン 2,980円
   family2: "https://buy.stripe.com/14AeVcahIeVR0lP5k8e7m04",    // 家庭プラン（2人目から）1,490円
-  portal: "",     // カスタマーポータル（解約・カード変更）… まだ
+  portal: "https://billing.stripe.com/p/login/14A8wO89AcNJ0lPfYMe7m00",   // カスタマーポータル（解約・カード変更。メールで ログイン）
 };
 const planBtn = (key, label) => STRIPE[key]
   ? `<a class="doc-cta big" href="${STRIPE[key]}" target="_blank" rel="noopener" data-plan="${key}">${label}</a>`
