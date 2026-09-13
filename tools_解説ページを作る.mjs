@@ -218,12 +218,14 @@ write({
 }
 
 /* ---- Stripe の 支払いリンク（`Stripeの設定手順.md` で 作った URL を ここに 入れる。空の あいだは「準備中」） ---- */
+/* 2026-09-13 に 作った 本番の リンク。末尾の 番号は 作った順（00＝教室 19:03、03＝家庭 19:19、04＝家庭2人目 19:28、05＝スクール 19:30）。
+   どれも 無料トライアル 31日・氏名を 収集・支払い後は thanks.html */
 const STRIPE = {
-  class: "",      // 教室プラン 9,800円
-  school: "",     // スクールプラン 19,800円
-  family: "",     // 家庭プラン 2,980円
-  family2: "",    // 家庭プラン（2人目から）1,490円
-  portal: "",     // カスタマーポータル（解約・カード変更）
+  class: "https://buy.stripe.com/14A8wO89AcNJ0lPfYMe7m00",      // 教室プラン 9,800円
+  school: "https://buy.stripe.com/bJebJ09dEbJFb0tdQEe7m05",     // スクールプラン 19,800円
+  family: "https://buy.stripe.com/6oUeVc3Tk9BxfgJ27We7m03",     // 家庭プラン 2,980円
+  family2: "https://buy.stripe.com/14AeVcahIeVR0lP5k8e7m04",    // 家庭プラン（2人目から）1,490円
+  portal: "",     // カスタマーポータル（解約・カード変更）… まだ
 };
 const planBtn = (key, label) => STRIPE[key]
   ? `<a class="doc-cta big" href="${STRIPE[key]}" target="_blank" rel="noopener" data-plan="${key}">${label}</a>`
