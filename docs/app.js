@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-13-383"; // 最新反映の確認用
+const BUILD = "2026-09-13-384"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -425,6 +425,7 @@ function logSession(subj, N, correct, sumSec, pauses, results, src) {
   try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-6000))); }
   catch (err) { try { localStorage.setItem(SESSIONS, JSON.stringify(l.slice(-2000))); } catch (e2) { console.error("記録の保存に失敗", e2); } }
   try { if (typeof schedulePush === "function") schedulePush(); } catch (e) { }
+  try { if (typeof rankSyncSoon === "function") rankSyncSoon(); } catch (e) { }   // 🏆 参加中なら ランキングの 行を 新しく
 }
 const allSessions = () => JSON.parse(localStorage.getItem(SESSIONS) || "[]");
 function sessionsBetween(from, to) { return allSessions().filter((e) => e.d >= from && e.d <= to); }
@@ -665,18 +666,9 @@ function setBgmLevel(n) {
   bgmAskHide();                      // 一度でも 決めたら「流しますか？」は もう出さない
   renderVolSegs();
 }
-/* ---- はじめて開いたときの「音楽を 流しますか？」 ----
-   まだ 一度も 決めていない人にだけ 出す。おした指が「音を出してよい」合図にもなるので、
-   iPhone でも そのまま 鳴りはじめる。 */
+/* BGM は はじめから 切（2026-09-13 ユーザー決定：新しい曲は 作らない・ほしい人だけ 🎵 で 入れる）。
+   以前は はじめて開いたとき「音楽を 流しますか？」を 出していたが、やめた（軽く・静かに） */
 function bgmAskHide() { const a = $("#bgmAsk"); if (a) a.classList.add("hidden"); }
-(function () {
-  const a = $("#bgmAsk"); if (!a) return;
-  if (BGML_SAVED !== null) return;                // もう 決めてある
-  a.classList.remove("hidden");
-  const on = $("#bgmAskOn"), off = $("#bgmAskOff");
-  if (on) on.addEventListener("click", function () { unlockAudio(); setBgmLevel(1); });   // 小さく 流す
-  if (off) off.addEventListener("click", function () { setBgmLevel(0); });                 // 流さない
-})();
 
 /* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
 const BGM_LIST = [
@@ -909,7 +901,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", solomon: "ソロモン", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
+const TITLES = { home: "ホーム", solomon: "ソロモン", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", ranking: "ランキング", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
 function showView(v) {
   curView = v;
   bgmForView(v);
@@ -927,6 +919,7 @@ function showView(v) {
   if (v === "parent") renderParent();
   if (v === "sheet") renderSheet();
   if (v === "kentei") renderKentei();
+  if (v === "ranking") renderRanking();
   if (v === "join") renderJoin();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
@@ -4757,6 +4750,90 @@ function loadStore() {
     .catch((e) => { storeLoading = null; throw e; });
   return storeLoading;
 }
+/* ============================================================ 🏆 ランキング（月ごと・世界／国内／教室）
+   ・出すのは「今月の 正解数」（級に 関係なく 同じ ものさし）。本名は 集めない。教室名は 任意
+   ・参加は 本人（保護者）が このページで オンに したときだけ。Firestore ranking/{月}/rows/{端末のuid}
+   ・自分の 行は この端末の 記録から 毎回 計算して 送る（ズルが しにくい・二重に 数えない） */
+const RANK_KEY = "soroban_ranking";   // { on, country, cls }（"soroban_rank" は 認定級の 保存に 使っているので 別の名前）
+const RANK_COUNTRIES = [["JP", "日本"], ["US", "アメリカ"], ["CA", "カナダ"], ["MY", "マレーシア"], ["SG", "シンガポール"], ["IN", "インド"],
+  ["AE", "UAE"], ["SA", "サウジアラビア"], ["GB", "イギリス"], ["AU", "オーストラリア"], ["TH", "タイ"], ["PH", "フィリピン"],
+  ["ID", "インドネシア"], ["VN", "ベトナム"], ["KR", "韓国"], ["TW", "台湾"], ["CN", "中国"], ["BR", "ブラジル"], ["MX", "メキシコ"], ["ES", "スペイン"], ["ZZ", "そのほか"]];
+const rankCfg = () => { try { return Object.assign({ on: false, country: "JP", cls: "" }, JSON.parse(localStorage.getItem(RANK_KEY) || "{}")); } catch (e) { return { on: false, country: "JP", cls: "" }; } };
+const rankSave = (c) => { try { localStorage.setItem(RANK_KEY, JSON.stringify(c)); } catch (e) { } };
+const rankMonth = () => today().slice(0, 7);
+const rankFlag = (cc) => (cc && cc !== "ZZ" && /^[A-Z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc].map((ch) => 0x1F1E6 + ch.charCodeAt(0) - 65)) : "🌐";
+const rankCountryName = (cc) => (RANK_COUNTRIES.find((x) => x[0] === cc) || ["", cc])[1];
+// 自分の 行（今月の 記録から。たいせんは 数えない）
+function rankMine() {
+  const c = rankCfg(), m = rankMonth();
+  const ss = allSessions().filter((e) => (e.d || "").startsWith(m) && e.src !== "battle");
+  const fb = bestPerSubject().flash;
+  let r = null; try { r = JSON.parse(localStorage.getItem(RANK) || "null"); } catch (e) { }
+  return {
+    nick: String(profile().name || "").trim().slice(0, 20) || "そろ太くん",
+    country: /^[A-Z]{2}$/.test(c.country) ? c.country : "JP",
+    cls: String(c.cls || "").trim().slice(0, 30),
+    correct: ss.reduce((a, e) => a + (e.correct || 0), 0),
+    sessions: ss.length,
+    days: new Set(ss.map((e) => e.d)).size,
+    flashBest: fb != null ? Math.round(fb * 100) / 100 : 0,
+    grade: r && r.key ? String(r.key).slice(0, 4) : "",
+    updatedAt: Date.now(),
+  };
+}
+let rankTimer = null, rankLastSent = "";
+// 練習が 終わるたびに 呼ぶ。少し 待ってから まとめて 送る（連続で 終わっても 1回）
+function rankSyncSoon() { if (!rankCfg().on) return; clearTimeout(rankTimer); rankTimer = setTimeout(rankSync, 1500); }
+async function rankSync() {
+  if (!rankCfg().on) return false;
+  try {
+    const S = await loadStore(); const d = rankMine();
+    const key = JSON.stringify([d.nick, d.country, d.cls, d.correct, d.sessions, d.days, d.flashBest, d.grade]);
+    if (key === rankLastSent) return true;
+    await S.rankUpsert(rankMonth(), d); rankLastSent = key; return true;
+  } catch (e) { console.warn("ランキングに 送れませんでした", e); return false; }
+}
+let rankTab = "world";
+function rankSetupHTML(c) {
+  const opts = RANK_COUNTRIES.map((x) => `<option value="${x[0]}"${x[0] === c.country ? " selected" : ""}>${rankFlag(x[0])} ${x[1]}</option>`).join("");
+  const fields = `<label>国 <select id="rankCountry">${opts}</select></label>` +
+    `<label>教室名（なくても よい）<input id="rankCls" maxlength="30" placeholder="例：○○そろばん教室" value="${jesc(c.cls || "")}" /></label>`;
+  if (!c.on) return `<div class="rank-setup"><div class="rank-setup-t">🏆 参加すると、あなたの にっくねーむ「<b>${jesc(profile().name || "")}</b>」と 今月の 正解数が、世界の みんなと ならびます。</div>${fields}<button id="rankJoin">参加する</button></div>`;
+  return `<div class="rank-setup"><div class="rank-setup-t">✅ 参加中：<b>${jesc(profile().name || "")}</b></div>${fields}<button id="rankSaveBtn" class="ghost">変更を 保存</button><button id="rankLeave" class="ghost">やめる（行を 消す）</button></div>`;
+}
+async function renderRanking() {
+  const box = $("#rankList"), setup = $("#rankSetup"), me = $("#rankMe"); if (!box) return;
+  const c = rankCfg();
+  setup.innerHTML = rankSetupHTML(c);
+  const readCfg = () => ({ on: c.on, country: $("#rankCountry").value, cls: String($("#rankCls").value || "").trim().slice(0, 30) });
+  const join = $("#rankJoin"); if (join) join.onclick = async () => { const n = readCfg(); n.on = true; rankSave(n); rankLastSent = ""; join.disabled = true; join.textContent = "送っています…"; const ok = await rankSync(); if (!ok) { alert("いま つながりません。あとで もう一度 ためしてください"); } renderRanking(); };
+  const sv = $("#rankSaveBtn"); if (sv) sv.onclick = async () => { rankSave(readCfg()); rankLastSent = ""; sv.textContent = "保存しました"; await rankSync(); renderRanking(); };
+  const lv = $("#rankLeave"); if (lv) lv.onclick = async () => { if (!confirm("ランキングから 抜けますか？（あなたの 行を 消します。記録は 消えません）")) return; const n = readCfg(); n.on = false; rankSave(n); try { const S = await loadStore(); await S.rankRemove(rankMonth()); } catch (e) { } rankLastSent = ""; renderRanking(); };
+  $$("#rankTabs button").forEach((b) => { b.classList.toggle("on", b.dataset.t === rankTab); b.onclick = () => { rankTab = b.dataset.t; renderRanking(); }; });
+  const cb = $('#rankTabs button[data-t="country"]'); if (cb) cb.textContent = rankFlag(c.country) + " 国内";
+  box.innerHTML = '<div class="sub">読みこみ中…</div>'; me.textContent = "";
+  let rows = [], uid = "";
+  try { const S = await loadStore(); if (c.on) await rankSync(); rows = await S.rankTop(rankMonth(), 300); uid = S.rankUid(); }
+  catch (e) { box.innerHTML = '<div class="sub">いま ランキングを 読めません（通信を 確かめてください）</div>'; return; }
+  if (rankTab === "country") rows = rows.filter((r) => r.country === c.country);
+  if (rankTab === "cls") {
+    if (!c.cls) { box.innerHTML = '<div class="sub">上の「教室名」を 入れて 保存すると、同じ 教室名の 子と くらべられます。</div>'; return; }
+    rows = rows.filter((r) => (r.cls || "") === c.cls);
+  }
+  rows.sort((a, b) => (b.correct || 0) - (a.correct || 0) || (a.updatedAt || 0) - (b.updatedAt || 0));
+  const myIdx = rows.findIndex((r) => r.uid === uid);
+  if (c.on) me.textContent = myIdx >= 0 ? `あなたは ${myIdx + 1}位（今月 ${rows[myIdx].correct}問 正解）` : `あなたは まだ 300位より 下（今月 ${rankMine().correct}問 正解）。れんしゅうすると 上がるよ`;
+  else me.textContent = "";
+  if (!rows.length) { box.innerHTML = '<div class="sub">まだ だれも いません。いちばん 最初に 参加してみよう！</div>'; return; }
+  box.innerHTML = rows.slice(0, 100).map((r, i) => {
+    const no = i + 1, medal = no === 1 ? "🥇" : no === 2 ? "🥈" : no === 3 ? "🥉" : no + "位";
+    return `<div class="rank-row${r.uid === uid ? " me" : ""}"><span class="rank-no${no <= 3 ? " top" : ""}">${medal}</span><span class="rank-flag" title="${jesc(rankCountryName(r.country))}">${rankFlag(r.country)}</span>` +
+      `<span class="rank-nick">${jesc(r.nick || "")}${r.grade ? `<small>${jesc(r.grade)}</small>` : ""}${r.cls ? `<small>🏫 ${jesc(r.cls)}</small>` : ""}</span><span class="rank-val">${(r.correct || 0).toLocaleString()}問</span></div>`;
+  }).join("");
+}
+// 開いたとき 参加中なら 今月の 行を 新しくしておく（前の月の ぶんは 送らない＝月が かわると 0から）
+setTimeout(() => { if (rankCfg().on) rankSyncSoon(); }, 5000);
+
 function renderJoin() {
   const box = $("#joinBox"); if (!box) return;
   const cl = classLink();

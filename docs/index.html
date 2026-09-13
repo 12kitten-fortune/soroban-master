@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260913c" />
+    <link rel="stylesheet" href="style.css?v=20260913d" />
   </head>
   <body>
     <div class="app">
@@ -66,6 +66,7 @@
           <button class="nav" data-view="kentei">🏅 SK検定</button>
           <div class="nav-sec">きろく</div>
           <button class="nav" data-view="records">📊 記録を見る</button>
+          <button class="nav" data-view="ranking">🏆 ランキング</button>
           <button class="nav" data-view="solomon">🐣 ソロモン図鑑</button>
           <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
           <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
@@ -284,6 +285,22 @@
         </div>
 
         <!-- 記録 -->
+        <!-- 🏆 ランキング：今月の 正解数。世界／国内／教室。参加は 設定で オンにした人だけ -->
+        <div id="view-ranking" class="view hidden">
+          <div class="card">
+            <h3>🏆 ランキング（今月の 正解数）</h3>
+            <div id="rankSetup"></div>
+            <div class="rank-tabs" id="rankTabs">
+              <button data-t="world" class="on">🌍 世界</button>
+              <button data-t="country">🏳️ 国内</button>
+              <button data-t="cls">🏫 教室</button>
+            </div>
+            <div id="rankMe" class="rank-me"></div>
+            <div id="rankList"></div>
+            <p class="sub">出るのは にっくねーむ・国・教室名（入れた人だけ）・今月の 正解数 だけ。本名は 出ません。毎月 1日に あたらしく はじまります。ランキングは「今月 どれだけ 練習したか」なので、上の級でも 下の級でも 同じ ものさしです。</p>
+          </div>
+        </div>
+
         <div id="view-records" class="view hidden">
           <div class="card">
             <h3>📊 せいせきの うつりかわり（本日の練習）</h3>
@@ -548,13 +565,9 @@
     </div>
 
     <!-- はじめて開いたとき：音楽を 流すか きく（いきなり 大きな音を 出さないため） -->
-    <div id="bgmAsk" class="bgm-ask hidden" role="dialog" aria-live="polite">
-      <div class="bgm-ask-t">🎵 音楽（BGM）を 小さく 流しますか？</div>
-      <div class="bgm-ask-s">あとから 上の 🎵 ボタンで 大きさを 変えたり、切ったり できます</div>
-      <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
-    </div>
+    <!-- BGM は はじめから 切。ほしい人だけ 上の 🎵 ボタンで 入れる（「流しますか？」は 出さない＝軽く・静かに） -->
 
-    <script src="app.js?v=20260913c"></script>
+    <script src="app.js?v=20260913d"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

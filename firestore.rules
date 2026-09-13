@@ -115,5 +115,30 @@ service cloud.firestore {
         allow delete:    if classOwner(cid);
       }
     }
+
+    /* 🏆 ランキング（月ごと）。ranking/2026-09/rows/{その端末の uid}
+       ・だれでも 読める（にっくねーむ・国・任意の教室名・今月の正解数 だけ。本名は 入れない）
+       ・書けるのは 自分の 行だけ。形と 範囲を 検査する
+       ・参加は 設定で 本人（保護者）が オンに したときだけ */
+    function validRank(d) {
+      return d.keys().hasOnly(['nick', 'country', 'cls', 'correct', 'sessions', 'days', 'flashBest', 'grade', 'updatedAt'])
+        && d.nick is string && d.nick.size() >= 1 && d.nick.size() <= 20
+        && d.country is string && d.country.size() == 2
+        && d.cls is string && d.cls.size() <= 30
+        && d.correct is int && d.correct >= 0 && d.correct <= 200000
+        && d.sessions is int && d.sessions >= 0 && d.sessions <= 20000
+        && d.days is int && d.days >= 0 && d.days <= 31
+        && d.flashBest is number && d.flashBest >= 0 && d.flashBest <= 600
+        && d.grade is string && d.grade.size() <= 4
+        && d.updatedAt is int
+        && d.updatedAt > request.time.toMillis() - 6 * 3600000
+        && d.updatedAt < request.time.toMillis() + 6 * 3600000;
+    }
+    match /ranking/{month}/rows/{uid} {
+      allow get, list: if true;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && month.size() == 7 && validRank(request.resource.data);
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
   }
 }

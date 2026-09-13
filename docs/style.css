@@ -1414,6 +1414,26 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   border-radius: 999px; padding: 10px 18px; font-weight: 800; color: var(--navy); z-index: 9500; box-shadow: 0 6px 18px rgba(0,0,0,.2); max-width: calc(100% - 24px); text-align: center; font-size: 14px; }
 @media (max-width: 900px) { .solo-layout { grid-template-columns: 1fr; } }
 
+/* ---- 🏆 ランキング ---- */
+.rank-setup { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; background: #fffdf7; border: 1px dashed var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-size: 14px; }
+.rank-setup-t { flex: 1 0 100%; }
+.rank-setup label { display: inline-flex; align-items: center; gap: 6px; }
+.rank-setup select, .rank-setup input { font-size: 15px; padding: 6px 8px; border: 2px solid var(--line); border-radius: 8px; background: #fff; }
+.rank-setup input { width: 200px; max-width: 100%; }
+.rank-tabs { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+.rank-tabs button { background: #fff; color: var(--navy); border: 2px solid var(--line); border-radius: 999px; padding: 6px 14px; font-weight: 700; }
+.rank-tabs button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.rank-me { margin: 6px 0; font-weight: 800; color: var(--navy); }
+.rank-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid #eee5d0; font-size: 15px; }
+.rank-row.me { background: #fff4d6; border-radius: 8px; font-weight: 800; }
+.rank-no { width: 2.6em; text-align: right; font-weight: 800; color: var(--frame); white-space: nowrap; }
+.rank-no.top { font-size: 22px; }
+.rank-flag { font-size: 20px; }
+.rank-nick { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-nick small { color: #7a6a50; font-weight: 400; margin-left: 6px; font-size: 12px; }
+.rank-val { font-weight: 800; color: var(--navy); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .rank-row { font-size: 14px; gap: 6px; padding: 7px 4px; } .rank-nick small { display: block; margin-left: 0; } }
+
 /* ---- 先生からの 宿題（ホーム・教室に参加） ---- */
 .hw-box { background: linear-gradient(180deg, #fff8e4, #ffefc4); border: 3px solid var(--royal-gold); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
 .hw-h { font-size: 18px; font-weight: 900; color: var(--navy); margin-bottom: 6px; }

@@ -64,7 +64,7 @@
 
   /* ============================================================ お試し（この端末の中だけ） */
   function LocalStore() {
-    const empty = () => ({ teacher: null, classes: {}, students: {}, sessions: {}, homework: {} });
+    const empty = () => ({ teacher: null, classes: {}, students: {}, sessions: {}, homework: {}, rank: {} });
     const load = () => { try { return Object.assign(empty(), JSON.parse(localStorage.getItem(LS_KEY) || "null") || {}); } catch (e) { return empty(); } };
     const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(db)); } catch (e) { console.error("保存に 失敗", e); } };
     let db = load(); const authCbs = [];
@@ -116,6 +116,14 @@
         const s = db.students[cid] && db.students[cid][sid];
         if (s) { s.lastSeen = now(); s.stat = statOf(allList || db.sessions[k], hws || Object.values(db.homework[cid] || {})); }
         save();
+      },
+      /* ---- 🏆 ランキング（お試しは この端末の 1行だけ） ---- */
+      rankUid() { return "local"; },
+      async rankUpsert(month, d) { db.rank = db.rank || {}; db.rank[month] = db.rank[month] || {}; db.rank[month].local = d; save(); },
+      async rankRemove(month) { if (db.rank && db.rank[month]) delete db.rank[month].local; save(); },
+      async rankTop(month, n) {
+        return Object.entries((db.rank || {})[month] || {}).map(([uid, d]) => Object.assign({ uid }, d))
+          .sort((a, b) => (b.correct || 0) - (a.correct || 0)).slice(0, n || 300);
       },
     };
   }
@@ -244,6 +252,14 @@
           if (!sent && list.length) throw err;
         }
         await sRef(cid, sid).set({ lastSeen: now(), stat: statOf(allList || list, hws || []) }, { merge: true });
+      },
+      /* ---- 🏆 ランキング：ranking/{YYYY-MM}/rows/{uid}。自分の 行だけ 書ける（ルールで 検査）。読むのは だれでも ---- */
+      rankUid() { return auth.currentUser ? auth.currentUser.uid : ""; },
+      async rankUpsert(month, d) { const u = await anon(); await fs.collection("ranking").doc(month).collection("rows").doc(u.uid).set(d); },
+      async rankRemove(month) { const u = await anon(); await fs.collection("ranking").doc(month).collection("rows").doc(u.uid).delete(); },
+      async rankTop(month, n) {
+        const q = await fs.collection("ranking").doc(month).collection("rows").orderBy("correct", "desc").limit(n || 300).get();
+        return q.docs.map((d) => Object.assign({ uid: d.id }, d.data()));
       },
     };
   }
