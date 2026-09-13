@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260912q" />
+    <link rel="stylesheet" href="style.css?v=20260913a" />
   </head>
   <body>
     <div class="app">
@@ -216,6 +216,22 @@
               <div id="flashInfo" class="sub"></div>
               <button id="flashStart">▶ スタート</button>
               <label class="toggle"><input type="checkbox" id="flashExamMode" /> けんていモード（20もん・140点で ごうかく）</label>
+              <!-- じぶんで 何桁・何口・速さ・問数を きめる。どの級に あたるかを その場で 出す -->
+              <details id="flashCustom" class="flash-custom">
+                <summary>⚙ じぶんで きめる（何桁・何口・速さ）</summary>
+                <div class="fc-row">
+                  <label>けた <select id="fcDigits"></select></label>
+                  <label>口 <select id="fcTerms"></select></label>
+                  <label>1個 <select id="fcPace"></select> 秒</label>
+                  <label>問数 <select id="fcN"></select></label>
+                </div>
+                <div id="fcLevel" class="fc-level"></div>
+                <div class="btn-row">
+                  <button id="fcStart">▶ この設定で スタート</button>
+                  <button id="fcReset" class="ghost hidden">級の設定に もどす</button>
+                </div>
+                <div class="sub">じぶんで きめた練習は、級の認定と 自己ベストには 入らないよ（GOLD は もらえる）</div>
+              </details>
               <div id="flashProgress" class="sub"></div>
               <div id="flashSignal" class="signal hidden">
                 <span class="lamp" data-c="red"></span>
@@ -538,7 +554,7 @@
       <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
     </div>
 
-    <script src="app.js?v=20260912q"></script>
+    <script src="app.js?v=20260913a"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

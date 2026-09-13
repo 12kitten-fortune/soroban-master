@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-11-380"; // 最新反映の確認用
+const BUILD = "2026-09-13-381"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -2279,8 +2279,75 @@ let flashRun = 0;   // 何回目の表示か。画面を離れたら 番号を�
 let flashExam = { on: false, idx: 0, N: 10, correct: 0, times: [] };
 let flashAskAt = 0;   // 数字が消えてから答えるまでの時間をはかる
 const FLASH_SET = 10;  // ふつうの練習の1セット（検定は20問）
+/* ---- じぶんで きめる：何桁・何口・1個の秒・問数。null なら 級の設定どおり ---- */
+let flashCustom = null;
+const flashPaceNow = () => flashCustom ? flashCustom.pace * 1000 : flashPaceMs(flashGrade);
+/* むずかしさの 点数＝けた×10 ＋ 口×0.8 ＋ 速さ（1秒に 何個）×3。
+   級の表と くらべて いちばん近い級を「だいたい ○級」と出す。まったく同じ設定なら「＝○級」 */
+const flashScore = (digits, terms, pace) => digits * 10 + terms * 0.8 + 3 / pace;
+function flashLevelOf(digits, terms, pace) {
+  const rows = GRADES.map((g) => { const s = difficulty(g, "flash"); return { g, s, p: flashPaceMs(g) / 1000 }; }).filter((r) => r.s);
+  const same = rows.filter((r) => r.s.digits === digits && r.s.terms === terms && Math.abs(r.p - pace) < 0.06)
+    .sort((a, b) => Math.abs(a.p - pace) - Math.abs(b.p - pace));
+  if (same.length) return { g: same[0].g, exact: true };
+  const sc = flashScore(digits, terms, pace);
+  // 10級より やさしいときだけ 11〜20級（練習級）で くらべる。それ以外は 10級〜十段で
+  const std = rows.filter((r) => r.g.band === "dan" || r.g.kyu <= 10);
+  const low = rows.filter((r) => r.g.band === "kyu" && r.g.kyu > 10);
+  const s10 = flashScore(FLASH_STD[10].digits, FLASH_STD[10].terms, flashPaceMs(GRADES.find((g) => g.key === "10級")) / 1000);
+  const cands = sc < s10 ? low : std;
+  // 上の級ほど 点数が 大きくなるよう ならす（表の ばらつきで 順番が 逆にならないように）
+  let run = -1; const list = cands.map((r) => { run = Math.max(run + 0.01, flashScore(r.s.digits, r.s.terms, r.p)); return { g: r.g, v: run }; });
+  let best = list[0]; for (const it of list) if (Math.abs(it.v - sc) < Math.abs(best.v - sc)) best = it;
+  return { g: best.g, exact: false };
+}
+function fcFill() {   // セレクトの 中身（1回だけ）
+  const opt = (sel, vals, fmt) => { const el = $(sel); if (el.options.length) return; el.innerHTML = vals.map((v) => `<option value="${v}">${fmt ? fmt(v) : v}</option>`).join(""); };
+  opt("#fcDigits", [1, 2, 3, 4]);
+  opt("#fcTerms", Array.from({ length: 19 }, (_, i) => i + 2));
+  opt("#fcPace", [0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.2, 1.5, 2, 3], (v) => v.toFixed(v < 1 && v * 100 % 10 ? 2 : 1));
+  opt("#fcN", [5, 10, 20]);
+}
+const fcRead = () => ({ digits: +$("#fcDigits").value, terms: +$("#fcTerms").value, pace: +$("#fcPace").value, N: +$("#fcN").value });
+function fcShowLevel() {
+  const c = fcRead(); const lv = flashLevelOf(c.digits, c.terms, c.pace);
+  const spec = difficulty(lv.g, "flash");
+  $("#fcLevel").innerHTML = (lv.exact ? `＝ <b>${lv.g.key}</b> と 同じ設定` : `だいたい <b>${lv.g.key}</b> 相当`) +
+    `<span class="sub">（${lv.g.key}は ${spec.digits}けた ${spec.terms}口・1個 ${(flashPaceMs(lv.g) / 1000).toFixed(2)}秒）</span>`;
+  return lv;
+}
+// 級の設定を セレクトに 入れる（級を かえたとき）
+function fcSync(spec, paceMs) {
+  fcFill();
+  $("#fcDigits").value = Math.min(4, spec.digits); $("#fcTerms").value = Math.min(20, Math.max(2, spec.terms));
+  // 級の速さが 選択肢に 無ければ 足す（1.05秒など）。丸めると となりの級に なってしまうため
+  const sec = +(paceMs / 1000).toFixed(2), sel = $("#fcPace");
+  if (![...sel.options].some((o) => Math.abs(+o.value - sec) < 0.005)) {
+    const o = document.createElement("option"); o.value = sec; o.textContent = sec.toFixed(2);
+    const after = [...sel.options].find((x) => +x.value > sec); sel.insertBefore(o, after || null);
+  }
+  sel.value = sec;
+  $("#fcN").value = FLASH_SET;
+  fcShowLevel();
+}
+["#fcDigits", "#fcTerms", "#fcPace", "#fcN"].forEach((s) => $(s).addEventListener("change", fcShowLevel));
+$("#fcStart").addEventListener("click", () => {
+  if (flashBusy) return;
+  const c = fcRead(); const lv = flashLevelOf(c.digits, c.terms, c.pace);
+  flashCustom = { ...c, eq: lv.g, exact: lv.exact };
+  flashSpec = { digits: c.digits, terms: c.terms };
+  $("#flashExamMode").checked = false; $("#flashExamMode").disabled = true;   // じぶんで きめた練習は 検定に ならない
+  $("#fcReset").classList.remove("hidden");
+  $("#flashInfo").textContent = `⚙ じぶんで きめた：${c.digits}けた ${c.terms}口 / 1個 ${c.pace}秒ずつ（${lv.exact ? "＝" : "だいたい "}${lv.g.key}${lv.exact ? " と同じ" : " 相当"}）`;
+  flashExam = { on: false, idx: 0, N: c.N, correct: 0, times: [] };
+  $("#flashCustom").open = false;
+  runFlash();
+});
+$("#fcReset").addEventListener("click", () => { if (!flashBusy) startFlash(flashGrade); });
 function startFlash(grade) {
   flashSpec = difficulty(grade, "flash"); flashGrade = grade; session = null;
+  flashCustom = null; $("#flashExamMode").disabled = false; $("#fcReset").classList.add("hidden"); $("#flashCustom").open = false;
+  fcSync(flashSpec, flashPaceMs(grade));
   hidePauseUI();
   showView("play");
   bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
@@ -2300,8 +2367,8 @@ function startFlash(grade) {
   flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
 }
 $("#flashStart").addEventListener("click", () => {
-  const ex = $("#flashExamMode").checked;
-  if (ex !== flashExam.on || flashExam.idx >= flashExam.N) flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
+  const ex = !flashCustom && $("#flashExamMode").checked;
+  if (ex !== flashExam.on || flashExam.idx >= flashExam.N) flashExam = { on: ex, idx: 0, N: ex ? 20 : (flashCustom ? flashCustom.N : FLASH_SET), correct: 0, times: [] };
   runFlash();
 });
 // 数字1個ごとの音（1個目・2個目…とドレミで上がっていく＝リズムが分かる）
@@ -2333,7 +2400,7 @@ async function runFlash() {
   const dots = $("#flashDots").querySelectorAll(".dot");
 
   // すべての時刻をこの1点から計算（＝ドリフトしない）
-  const slot = flashPaceMs(flashGrade) / 1000; // 秒
+  const slot = flashPaceNow() / 1000; // 秒（じぶんで きめた速さが あれば それ）
   const show = slot - Math.min(0.12, slot * 0.22);
   const step = 0.6;                       // 信号 赤・黄 の各時間
   const cdStart = ctx.currentTime + 0.2;
@@ -2430,13 +2497,19 @@ function finishFlashSet(res) {
   // 自己ベストは「1問あたりの考えた時間」で見る（練習10問と検定20問を同じものさしで比べるため）。
   // ただし わざと速く まちがえて記録を作れないよう、正答率70%以上のときだけ更新する。
   const okRate = N ? correct / N : 0;
-  const r = okRate >= 0.7 ? saveTime(flashGrade.key, "flash", avg)
+  // じぶんで きめた練習は 級の自己ベストに 混ぜない（設定が ちがうので くらべられない）
+  const r = flashCustom ? { improved: false, prev: null }
+    : okRate >= 0.7 ? saveTime(flashGrade.key, "flash", avg)
     : { improved: false, prev: bestTime(flashGrade.key, "flash") };
   const pass = flashExam.on && correct * 10 >= 140;
+  // GOLD の 級の倍率は、じぶんで きめた練習なら「相当する級」で 計算する
+  const gradeFor = flashCustom ? flashCustom.eq : flashGrade;
   let msg = "";
   if (flashExam.on) {
     msg += `検定結果：${correct}/${N} 正解　<b>${correct * 10}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
     if (pass) { certify(flashGrade.key, "flash"); msg += `<br>🎓 ${flashGrade.key} 認定！ 合格証が もらえるよ`; }
+  } else if (flashCustom) {
+    msg += `⚙ ${flashCustom.digits}けた ${flashCustom.terms}口・1個 ${flashCustom.pace}秒（${flashCustom.exact ? "＝" : "だいたい "}${gradeFor.key}${flashCustom.exact ? "" : " 相当"}）${N}問 おわり！`;
   } else {
     msg += `⚡ ${N}問 おわり！`;
   }
@@ -2447,13 +2520,14 @@ function finishFlashSet(res) {
     (okTs.length ? `<div class="fs-row"><span>正解できた問題の平均</span><b>${okAvg.toFixed(1)}秒</b></div>` : "") +
     `<div class="fs-row"><span>合計の 考えた時間</span><b>${sum.toFixed(1)}秒</b></div>` +
     (r.improved ? `<div class="fs-best">✨ 1問の平均で 自己ベスト更新！（${flashGrade.key}）</div>`
+      : flashCustom ? `<div class="fs-best sub">じぶんで きめた練習は 自己ベストに 入らないよ</div>`
       : (r.prev != null ? `<div class="fs-best sub">${flashGrade.key}の 自己ベスト ${r.prev.toFixed(1)}秒／問　あと ${(avg - r.prev).toFixed(1)}秒 はやく</div>`
         : `<div class="fs-best sub">正答率70%以上で 自己ベストに 記録されるよ</div>`)) +
     `</div>`;
   // 報酬は他の種目とまったく同じ計算（正解・正答率・自己ベスト・完走 × 級の倍率）
-  const fkey = (gradeIdxOf(flashGrade) <= myRankIdx() ? flashGrade.key + "_low" : flashGrade.key + "_flash");
+  const fkey = (gradeIdxOf(gradeFor) <= myRankIdx() ? gradeFor.key + "_low" : gradeFor.key + "_flash") + (flashCustom ? "_c" : "");
   const { g, lines } = goldForSection({ correct, N, bestUpdated: r.improved, completed: true,
-    grade: flashGrade, subj: "flash", count: dailyCount(fkey) });
+    grade: gradeFor, subj: "flash", count: dailyCount(fkey) });
   dailyCount(fkey, true);
   let earned = g;
   if (pass) { earned += 50; lines.push("🎓 検定合格 ＋50"); }
@@ -2463,7 +2537,7 @@ function finishFlashSet(res) {
   solomonAfterStudy();               // 🐣 フラッシュ暗算も 練習のうち
   msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   msg += maybeDropItem(acc, true);
-  msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : FLASH_SET + "問"} が はじまるよ</div>`;
+  msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : N + "問"} が はじまるよ</div>`;
   if (flashExam.on) {
     if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + " ごうかく！", correct + " / " + N + " 正解");
     else fxCheer("あと すこし…", "合格は 140点。もう一度 いこう！");
