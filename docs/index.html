@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260913a" />
+    <link rel="stylesheet" href="style.css?v=20260913b" />
   </head>
   <body>
     <div class="app">
@@ -214,7 +214,7 @@
             </form>
             <div id="playFlashWrap" class="hidden">
               <div id="flashInfo" class="sub"></div>
-              <button id="flashStart">▶ スタート</button>
+              <!-- スタートは まん中の 大きな 表示（#flashDisplay）が そのまま ボタン。左上の 小さなボタンは やめた -->
               <label class="toggle"><input type="checkbox" id="flashExamMode" /> けんていモード（20もん・140点で ごうかく）</label>
               <!-- じぶんで 何桁・何口・速さ・問数を きめる。どの級に あたるかを その場で 出す -->
               <details id="flashCustom" class="flash-custom">
@@ -238,7 +238,7 @@
                 <span class="lamp" data-c="yellow"></span>
                 <span class="lamp" data-c="green"></span>
               </div>
-              <div id="flashDisplay" class="flash-display">▶ を押してスタート</div>
+              <div id="flashDisplay" class="flash-display msg btn" role="button" tabindex="0">▶ スタート</div>
               <div id="flashDots" class="flash-dots"></div>
               <div id="flashMeasure" class="sub"></div>
               <form id="flashForm" class="answer-row hidden">
@@ -554,7 +554,7 @@
       <div class="bgm-ask-b"><button id="bgmAskOn">🎵 小さく 流す</button><button id="bgmAskOff" class="ghost">流さない</button></div>
     </div>
 
-    <script src="app.js?v=20260913a"></script>
+    <script src="app.js?v=20260913b"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

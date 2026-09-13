@@ -113,6 +113,9 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .flash-display { font-size: 72px; font-weight: 800; height: 140px; display: flex; align-items: center; justify-content: center; color: var(--frame); font-variant-numeric: tabular-nums; }
 /* 数字ではなく 言葉のとき（「▶ を押してスタート」など）は 小さくして 1行におさめる */
 .flash-display.msg { font-size: 26px; height: 72px; color: #6b5f4c; }
+/* まん中の 表示が そのまま スタートボタンに なる（待っているとき） */
+.flash-display.btn { cursor: pointer; background: var(--ok); color: #fff; border-radius: 16px; font-size: 30px; height: 84px; max-width: 420px; margin: 8px auto; box-shadow: 0 4px 0 #1d6a48, 0 6px 14px rgba(0,0,0,.18); user-select: none; -webkit-tap-highlight-color: transparent; }
+.flash-display.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1d6a48; }
 .flash-display.ok { color: #2e7d5b; animation: flashpop .35s ease; }
 .flash-display.ng { color: var(--accent); animation: flashpop .35s ease; }
 @keyframes flashpop { from { transform: scale(.4); } to { transform: scale(1); } }
@@ -1008,6 +1011,16 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
   body.playing #clearSoroban2, body.playing #clearSoroban3 { padding: 7px 10px; font-size: 13px; }
   /* 答えが正しいか出す ◎× は 問題の上に かぶせる */
   body.playing .mark { font-size: 84px; }
+  /* フラッシュ暗算：スクロールなしで 最初の画面に おさめる。
+     ネコの説明は しまう（成績が その下に かくれて 見えなくなるため）。設定の行は 詰める */
+  body.playing.flashmode .card { padding-bottom: 8px; }
+  body.playing.flashmode #anzanTip { display: none; }
+  body.playing.flashmode #flashInfo { margin: 0 0 2px; font-size: 12px; }
+  body.playing.flashmode .toggle { margin-bottom: 2px; font-size: 13px; }
+  body.playing.flashmode .flash-custom { margin: 2px auto 4px; padding: 3px 10px; }
+  body.playing.flashmode .flash-custom summary { font-size: 13px; }
+  body.playing.flashmode .flash-display.btn { height: 74px; font-size: 26px; margin: 4px auto; }
+  body.playing.flashmode #flashMeasure { font-size: 11px; }
 }
 
 /* 横向きスマホで 練習しているとき：そろばんの右に「こたえる」を置いて 下の帯を うすくする。
@@ -1384,7 +1397,16 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .bridge-say .bridge-txt { background: rgba(255,253,247,.92); border-radius: 999px; padding: 2px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bridge-say .bridge-txt:empty { display: none; }
 .bridge-pic { width: 30px; height: 30px; animation: soloPop .4s ease; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); } .bridge-pic i { font-size: 22px; }
-@media (max-width: 640px) { .story-bridge { height: 52px; } .bridge-say { font-size: 11px; } .q-title { font-size: 11px; } .bridge-pic { width: 26px; height: 26px; } }
+/* スマホ：帯の 中に 文字を 重ねると 絵が 見えなくなるので、ことばは 絵の 下に 出す。ことばが 無いときは 絵だけ */
+@media (max-width: 640px) {
+  .story-bridge { height: auto; }
+  .story-bridge .qscene { height: 76px; }
+  .q-title { font-size: 11px; left: 4px; top: 4px; }
+  .bridge-say { position: static; padding: 3px 8px; background: #fffdf7; font-size: 12px; gap: 6px; border-top: 1px solid #eadfc4; }
+  .bridge-say:has(.bridge-txt:empty) { display: none; }
+  .bridge-say .bridge-txt { background: none; padding: 0; white-space: normal; overflow: visible; line-height: 1.35; }
+  .bridge-pic { width: 26px; height: 26px; flex: 0 0 auto; }
+}
 .quest-done { margin: 8px 0; padding: 8px 12px; background: #e7f5ec; border: 2px solid #1f8a4c; border-radius: 10px; font-weight: 800; color: #1f8a4c; }
 .solo-toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); background: #fffaf0; border: 3px solid var(--royal-gold);
   border-radius: 999px; padding: 10px 18px; font-weight: 800; color: var(--navy); z-index: 9500; box-shadow: 0 6px 18px rgba(0,0,0,.2); max-width: calc(100% - 24px); text-align: center; font-size: 14px; }

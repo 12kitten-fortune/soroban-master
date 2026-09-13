@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-13-381"; // 最新反映の確認用
+const BUILD = "2026-09-13-382"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -930,6 +930,7 @@ function showView(v) {
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
   document.body.classList.toggle("playing", v === "play" || (v === "battle" && !!(battle && battle.running)));
+  if (v !== "play") document.body.classList.remove("flashmode");   // フラッシュ暗算の 詰めた画面は 練習画面だけ
   // スマホでは そろばんが 画面より広い。開いたとき 一の位が見える位置にしておく
   if (v === "play" || v === "battle") setTimeout(function () { try { sorobanQuiz.centerOnes(); sorobanBattle.centerOnes(); } catch (e) { } fitSoroPad(); }, 30);
 }
@@ -950,6 +951,7 @@ function abandonActivity() {
   routineState = null; routineActive = false;  // 本日の練習：中断（時間経過で練習画面に戻さない）
   battle = null;                               // たいせん：不戦敗（GOLDなし）
   flashSpec = null; flashAnswer = null; flashBusy = false; flashRun++;   // フラッシュ暗算：表示を止める
+  document.body.classList.remove("flashmode");
   if (pz && !pz.done) pz = null;               // パズル：途中なら 捨てる（つづきは できない）
   $("#playRest").classList.add("hidden");
   hidePauseUI();
@@ -1493,6 +1495,7 @@ if (window.visualViewport) window.visualViewport.addEventListener("resize", onVi
 function startSession(subj) {
   const grade = currentGrade();
   if (subj === "flash") return startFlash(grade);
+  document.body.classList.remove("flashmode");
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
   const cf = SUBJECT[subj];
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
@@ -2362,15 +2365,26 @@ function startFlash(grade) {
   $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
   // 数字ではなく 言葉を出すときは 小さめの字にする（大きいままだと 画面からはみ出す）
-  $("#flashDisplay").textContent = "▶ を押してスタート"; $("#flashDisplay").className = "flash-display msg"; $("#flashForm").classList.add("hidden");
+  flashIdle(true, "▶ スタート"); $("#flashForm").classList.add("hidden");
+  document.body.classList.add("flashmode");   // スマホで 画面を 詰める（そろばんの帯の すきま・ネコの説明を しまう）
   const ex = $("#flashExamMode").checked;
   flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
 }
-$("#flashStart").addEventListener("click", () => {
+/* まん中の 大きな 表示が そのまま スタートボタン（待っているときだけ 押せる）。
+   左上に 小さな ボタンを 置くと、スマホで スクロールして もどる間に 数字が 出おわってしまうため */
+function flashIdle(on, text) {
+  const d = $("#flashDisplay");
+  if (on) { d.textContent = text || "▶ スタート"; d.className = "flash-display msg btn"; }
+  else d.classList.remove("btn");
+}
+function flashStartClick() {
+  if (flashBusy || !flashSpec || !$("#flashDisplay").classList.contains("btn")) return;
   const ex = !flashCustom && $("#flashExamMode").checked;
   if (ex !== flashExam.on || flashExam.idx >= flashExam.N) flashExam = { on: ex, idx: 0, N: ex ? 20 : (flashCustom ? flashCustom.N : FLASH_SET), correct: 0, times: [] };
   runFlash();
-});
+}
+$("#flashDisplay").addEventListener("click", flashStartClick);
+$("#flashDisplay").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flashStartClick(); } });
 // 数字1個ごとの音（1個目・2個目…とドレミで上がっていく＝リズムが分かる）
 const FLASH_SCALE = [523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319];
 // 絶対時刻(audioCtxの秒)で音を予約（ズレない）。soundOff時は無音だが時計は進む
@@ -2386,7 +2400,7 @@ function flashScheduleTone(ctx, t0, freq, dur = 0.1, type = "triangle", vol = 0.
 }
 async function runFlash() {
   if (flashBusy || !flashSpec) return; flashBusy = true;
-  $("#flashStart").disabled = true; $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
+  flashIdle(false); $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
   $("#flashProgress").textContent = `${flashExam.on ? "検定" : "れんしゅう"} ${Math.min(flashExam.idx + 1, flashExam.N)} / ${flashExam.N}　正解 ${flashExam.correct}`;
 
   const ctx = ensureAudio();
@@ -2453,7 +2467,7 @@ async function runFlash() {
     requestAnimationFrame(draw);
   });
   document.removeEventListener("visibilitychange", onHide);
-  if (myRun !== flashRun || !flashSpec) { flashBusy = false; $("#flashStart").disabled = false; return; }   // 途中で 画面を離れた
+  if (myRun !== flashRun || !flashSpec) { flashBusy = false; if (flashSpec) flashIdle(true, "▶ もう一回"); return; }   // 途中で 画面を離れた
   $("#flashDots").innerHTML = ""; sigBox.classList.add("hidden");
 
   // 実測の間隔を別欄に表示（「何桁何口」の欄は消さない）
@@ -2464,7 +2478,7 @@ async function runFlash() {
   }
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   flashAskAt = performance.now();   // ここから「考えている時間」
-  $("#flashStart").disabled = false; flashBusy = false;
+  flashBusy = false;
 }
 $("#flashForm").addEventListener("submit", (e) => {
   e.preventDefault(); if (flashAnswer === null) return;
@@ -2537,7 +2551,9 @@ function finishFlashSet(res) {
   solomonAfterStudy();               // 🐣 フラッシュ暗算も 練習のうち
   msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
   msg += maybeDropItem(acc, true);
-  msg += `<div class="sub">▶ スタート で つぎの ${flashExam.on ? "検定" : N + "問"} が はじまるよ</div>`;
+  // ⭕❌ を 見せたあと、まん中を「▶ つぎ」の ボタンに もどす
+  const nextLabel = flashExam.on ? "▶ つぎの 検定" : `▶ つぎの ${N}問`;
+  setTimeout(() => { if (flashSpec && !flashBusy && $("#flashForm").classList.contains("hidden")) flashIdle(true, nextLabel); }, 1200);
   if (flashExam.on) {
     if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + " ごうかく！", correct + " / " + N + " 正解");
     else fxCheer("あと すこし…", "合格は 140点。もう一度 いこう！");
