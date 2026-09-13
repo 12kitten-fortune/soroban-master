@@ -116,10 +116,12 @@
     const el = $("#planNote"); if (!el) return;
     if (!me) { el.classList.add("hidden"); return; }
     const p = S.planInfo(me);
-    let s = "<b>いまの プラン：" + esc(p.name) + "</b>（生徒 " + p.max + "人まで";
+    let s = "<b>いまの プラン：" + esc(p.name) + "</b>（" + (p.home ? "お子さま " : "生徒 ") + p.max + "人まで";
     if (p.until) s += "・" + (p.expired ? "期限が すぎています" : "あと " + p.daysLeft + "日") ;
     s += "）";
     if (p.key === "trial") s += '　<a href="../kyoshitsu.html#plans" target="_blank" rel="noopener">教室プラン（40人）・スクールプラン（150人）を 見る</a>';
+    // 家庭プラン：この画面は「おうちの 先生画面」。2人目からは 追加の お申し込み
+    if (p.home) s += '　<a href="../katei.html#next" target="_blank" rel="noopener">おうちでの 使い方</a>・<a href="../katei.html#plans" target="_blank" rel="noopener">2人目からの お申し込み（＋1,490円）</a>';
     if (p.expired) s += "<br>おためしの 期間が おわりました。記録は 見られますが、生徒の 追加は できません。つづける ときは 上の プランへ。";
     el.innerHTML = s; el.classList.remove("hidden"); el.classList.toggle("over", !!p.expired);
   }
@@ -282,7 +284,9 @@
     const p = S.planInfo(me), total = await S.countStudents();
     if (p.expired) { alert("おためしの 期間が おわっているため、生徒を 追加できません。教室プランへの 切りかえは 塾向けページから お申し込みください。"); return; }
     if (total + fresh.length > p.max) {
-      alert(p.name + "は 生徒 " + p.max + "人までです（いま " + total + "人）。あと " + Math.max(0, p.max - total) + "人 登録できます。もっと 登録する ときは 教室プラン（40人）／スクールプラン（150人）へ。");
+      alert(p.home
+        ? p.name + "は お子さま " + p.max + "人までです（いま " + total + "人）。2人目からは「家庭プラン（2人目から）＋1,490円」を お申し込みください（katei.html）。反映後に 登録できます。"
+        : p.name + "は 生徒 " + p.max + "人までです（いま " + total + "人）。あと " + Math.max(0, p.max - total) + "人 登録できます。もっと 登録する ときは 教室プラン（40人）／スクールプラン（150人）へ。");
       return;
     }
     if (fresh.length) await S.addStudents(cur.id, fresh);

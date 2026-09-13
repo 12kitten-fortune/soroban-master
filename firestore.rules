@@ -51,9 +51,9 @@ service cloud.firestore {
     match /teachers/{uid} {
       allow read:   if teacher() && request.auth.uid == uid;
       allow create: if teacher() && request.auth.uid == uid
-        && !request.resource.data.keys().hasAny(['plan', 'planUntil']);
+        && !request.resource.data.keys().hasAny(['plan', 'planUntil', 'planMax']);
       allow update: if teacher() && request.auth.uid == uid
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'planUntil']);
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['plan', 'planUntil', 'planMax']);
       allow delete: if false;
     }
 

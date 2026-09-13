@@ -41,6 +41,8 @@
     pioneer: { name: "先行教室（1年 無料）", max: 40 },
     class:   { name: "教室プラン", max: 40 },
     school:  { name: "スクールプラン", max: 150 },
+    // 家庭プラン＝保護者が 先生画面を おうちで 使う。1人。2人目からは Stripe の「2人目から」の 件数ぶん、運営者が planMax を 2, 3… と 入れる
+    family:  { name: "家庭プラン", max: 1, home: true },
   };
   function planInfo(t) {
     const key = t && PLANS[t.plan] ? t.plan : "trial", P = PLANS[key];
@@ -48,7 +50,8 @@
     if (!until && P.days && t && t.createdAt) until = new Date(t.createdAt + P.days * 86400000).toISOString().slice(0, 10);
     const today = new Date().toISOString().slice(0, 10);
     const daysLeft = until ? Math.ceil((new Date(until + "T00:00:00") - new Date(today + "T00:00:00")) / 86400000) : null;
-    return { key, name: P.name, max: P.max, until, daysLeft, expired: daysLeft != null && daysLeft < 0 };
+    const max = t && t.planMax > 0 ? t.planMax : P.max;   // planMax＝運営者が 入れる 人数の 上書き（家庭の 2人目など）
+    return { key, name: P.name, max, home: !!P.home, until, daysLeft, expired: daysLeft != null && daysLeft < 0 };
   }
   const HW_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
   function cleanHomework(hw) {
@@ -146,7 +149,7 @@
           if (u && !u.isAnonymous) {
             let d = {};
             try { const t = await tRef(u.uid).get(); d = t.exists ? (t.data() || {}) : {}; } catch (e) { }
-            me = { uid: u.uid, email: u.email, name: d.name || (u.email || "").split("@")[0], plan: d.plan || "trial", planUntil: d.planUntil || "", createdAt: d.createdAt || 0 };
+            me = { uid: u.uid, email: u.email, name: d.name || (u.email || "").split("@")[0], plan: d.plan || "trial", planUntil: d.planUntil || "", planMax: d.planMax || 0, createdAt: d.createdAt || 0 };
           } else me = null;
           cb(me);
         });
