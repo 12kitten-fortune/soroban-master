@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-13-382"; // 最新反映の確認用
+const BUILD = "2026-09-13-383"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級） */
 // 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
@@ -761,6 +761,7 @@ let bgmArea = "";
 let curView = "home";                              // いま 開いている画面（音楽を あとから つけるときに 使う）
 function bgmForView(v, next) {
   const area = bgmAreaOf(v);
+  if (area === "study" && document.body.classList.contains("flashmode")) return bgmStop();   // フラッシュ暗算中は 鳴らさない（🎵を あとから 入れても）
   if (area === bgmArea && bgmEl && !next) return;   // 同じ場所の中では 曲を そのままにする
   bgmArea = area;
   if (area === "battle") return bgmPlay(BGM_BATTLE.f);
@@ -2353,7 +2354,9 @@ function startFlash(grade) {
   fcSync(flashSpec, flashPaceMs(grade));
   hidePauseUI();
   showView("play");
-  bgmForStudy(true);                 // セットごとに 曲をかえる（同じ曲で あきないように）
+  // フラッシュ暗算は BGM なし。数字の音と BGM が 同じ音の道（AudioContext）を 通るので、
+  // まざって 音が 乱れる。画面を 出たら（bgmArea が かわるので）また 鳴る
+  bgmStop(); bgmArea = "flash";
   $("#playRest").classList.add("hidden");
   // フラッシュ暗算は 数字を #flashDisplay に出すので、上の問題の場所は 使わない（すきまが空くだけ）
   $("#playProblemWrap").classList.add("hidden");

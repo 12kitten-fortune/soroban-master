@@ -113,6 +113,8 @@ input { border: 2px solid var(--line); border-radius: 8px; padding: 10px 12px; f
 .flash-display { font-size: 72px; font-weight: 800; height: 140px; display: flex; align-items: center; justify-content: center; color: var(--frame); font-variant-numeric: tabular-nums; }
 /* 数字ではなく 言葉のとき（「▶ を押してスタート」など）は 小さくして 1行におさめる */
 .flash-display.msg { font-size: 26px; height: 72px; color: #6b5f4c; }
+/* フラッシュ暗算中は BGM を 鳴らさないので、🎵 の 小さなボタンも しまう */
+body.flashmode .snd-btn[data-kind="bgm"] { display: none; }
 /* まん中の 表示が そのまま スタートボタンに なる（待っているとき） */
 .flash-display.btn { cursor: pointer; background: var(--ok); color: #fff; border-radius: 16px; font-size: 30px; height: 84px; max-width: 420px; margin: 8px auto; box-shadow: 0 4px 0 #1d6a48, 0 6px 14px rgba(0,0,0,.18); user-select: none; -webkit-tap-highlight-color: transparent; }
 .flash-display.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1d6a48; }
