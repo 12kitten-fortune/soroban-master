@@ -28,7 +28,10 @@
     const last = list.length ? list[list.length - 1] : null;
     const hw = {};
     (hws || []).forEach((h) => { hw[h.id] = hwDone(h, list); });
-    return { n7: w.length, acc7: N ? Math.round((C / N) * 100) : null, last: last ? last.t : 0, lastG: last ? last.g : "", miss7: miss, hw };
+    // 🔍 弱点診断：直近30日の 技ごとの [正解, 出題]（app.js の ft を 合計）
+    const lim30 = now() - 30 * 86400000, tech = {};
+    list.filter((e) => e.ft && (e.t || 0) >= lim30).forEach((e) => Object.entries(e.ft).forEach(([k, a]) => { const t = tech[k] || (tech[k] = [0, 0]); t[0] += a[0] || 0; t[1] += a[1] || 0; }));
+    return { n7: w.length, acc7: N ? Math.round((C / N) * 100) : null, last: last ? last.t : 0, lastG: last ? last.g : "", miss7: miss, hw, tech };
   }
   /* 宿題が いくつ できたか：宿題を 出した あとの 記録で、しゅもくと 級が 同じ セットを 数える */
   function hwDone(h, list) {

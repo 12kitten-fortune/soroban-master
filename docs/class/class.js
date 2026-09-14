@@ -535,9 +535,15 @@
       "<div><b>" + (st.last ? fmtDate(st.last) : "—") + T("</b><span>最後に 練習</span></div>");
     const miss = {}; list.forEach((e) => (e.miss || []).forEach((m) => { miss[m.k || "other"] = (miss[m.k || "other"] || 0) + 1; }));
     const ent = Object.entries(miss).sort((a, b) => b[1] - a[1]), mx = ent.length ? ent[0][1] : 1;
-    $("#stMiss").innerHTML = ent.length
+    // 🔍 弱点診断：技ごとの 正答率（直近30日・出題5問以上）。低い順
+    const TECH = { five: T("5の友（五玉）"), ten: T("10の友（くり上がり・くり下がり）"), carry2: T("くり上がり 2回以上"), sub: T("ひき算が まざる"), plain: T("技を 使わない たし算"), dg1: T("1桁"), dg2: T("2桁"), dg3: T("3桁"), dg4: T("4桁以上"), tm_s: T("口数 2〜3"), tm_m: T("口数 4〜6"), tm_l: T("口数 7以上"), kuku: T("九九"), kk1: T("かけ算 ×1桁"), kk2: T("かけ算 ×2桁以上"), wr: T("わり算") };
+    const tech = Object.entries(st.tech || {}).filter(([k, a]) => TECH[k] && a[1] >= 5).map(([k, a]) => ({ k, c: a[0], t: a[1], rate: Math.round((a[0] / a[1]) * 100) })).sort((x, y) => x.rate - y.rate);
+    const techHtml = tech.length
+      ? T("<h2>🔍 弱点診断（技ごとの 正答率・直近30日）</h2>") + tech.map((r) => '<div class="miss-bar' + (r.rate < 70 || (st.acc7 != null && r.rate <= st.acc7 - 10) ? " weak" : "") + '"><span style="width:200px">' + esc(TECH[r.k]) + '</span><i style="width:' + Math.max(6, Math.round(r.rate * 2.2)) + 'px"></i><span>' + r.rate + "%（" + r.c + "／" + r.t + T("問）</span></div>")).join("")
+      : "";
+    $("#stMiss").innerHTML = techHtml + (ent.length
       ? T("<h2>まちがえ方の クセ（通算）</h2>") + ent.map(([k, v]) => '<div class="miss-bar"><span style="width:160px">' + esc(MISS[k] || k) + '</span><i style="width:' + Math.max(6, Math.round((v / mx) * 220)) + 'px"></i><span>' + v + T("回</span></div>")).join("")
-      : T('<p class="cls-empty">まちがいの 記録は まだ ありません。</p>');
+      : T('<p class="cls-empty">まちがいの 記録は まだ ありません。</p>'));
     $("#stSessions").innerHTML = list.length
       ? T('<div class="doc-table"><table class="rec-table"><tr><th>日</th><th>級</th><th>しゅもく</th><th>正解</th><th>タイム</th><th>まちがい</th></tr>') +
         list.slice().reverse().slice(0, 100).map((e) => "<tr><td>" + esc(e.d || fmtDate(e.t)) + "</td><td>" + esc(e.g || "") + "</td><td>" + esc(SUBJ[e.subj] || e.subj) + '</td><td class="num">' + e.correct + " / " + e.N + '</td><td class="num">' + fmtSec(e.sec) + "</td><td>" +

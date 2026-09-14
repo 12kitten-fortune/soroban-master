@@ -1503,3 +1503,23 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .side-nav details.nav-more .nav:hover { background: var(--side-hi); }
 .side-nav details.nav-more .nav.active { background: var(--gold); color: #2b2b2b; }
 @media (max-width: 900px) { .side-nav.open details.nav-more .nav { background: rgba(255,255,255,.08); } }
+
+/* ============================================================ 🔍 弱点しんだん（フェーズB-1） */
+.weak-diag { margin-top: 12px; background: #fffdf7; border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.wd-h { font-weight: 900; color: var(--navy); display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.wd-all { font-size: 12px; font-weight: 700; color: #6b5a45; background: #f3ecd9; border-radius: 999px; padding: 2px 10px; }
+.wd-lead { font-size: 14px; color: #2b2b2b; margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.wd-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 8px; font-size: 13px; }
+.wd-row.weak { background: #fff1ea; }
+.wd-row.good { opacity: .85; }
+.wd-em { width: 22px; text-align: center; font-size: 15px; }
+.wd-n { flex: 0 0 auto; min-width: 150px; font-weight: 700; color: var(--frame); }
+.wd-bar { flex: 1; height: 10px; background: #eee5d0; border-radius: 999px; overflow: hidden; min-width: 60px; }
+.wd-bar > div { height: 100%; background: linear-gradient(90deg, #3d8e6a, #62b88f); border-radius: 999px; }
+.wd-row.weak .wd-bar > div { background: linear-gradient(90deg, #c0392b, #e57a5f); }
+.wd-rate { width: 44px; text-align: right; color: var(--navy); font-variant-numeric: tabular-nums; }
+.wd-c { font-size: 11px; color: #7a6a50; white-space: nowrap; }
+.wd-tag { font-size: 11px; color: #c0392b; font-weight: 800; white-space: nowrap; }
+.wd-go { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--ok); color: #fff; border: none; white-space: nowrap; }
+.wd-none { font-size: 13px; color: #7a6a50; }
+@media (max-width: 640px) { .wd-n { min-width: 0; flex: 1 1 100%; } .wd-row { flex-wrap: wrap; row-gap: 2px; } }

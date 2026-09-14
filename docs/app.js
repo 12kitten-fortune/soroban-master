@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-394"; // 最新反映の確認用
+const BUILD = "2026-09-14-395"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -375,6 +375,8 @@ function logSession(subj, N, correct, sumSec, pauses, results, src) {
   // まちがえた問題は「何をどう間違えたか」まで残す（あとで週ごとのクセを出すため）
   const miss = (results || []).filter((r) => !r.ok).slice(0, 8).map((r) => ({ q: r.compact, u: r.user, a: r.ans, k: missKind(r) }));
   if (miss.length) e.miss = miss;
+  // 🔍 弱点診断の 材料：問題ごとの「使う技（5の友・10の友…）・桁・口数」ごとの 正解／出題／秒
+  try { const ft = sessionFeatures(results); if (Object.keys(ft).length) e.ft = ft; } catch (err) { }
   l.push(e);
   // 1件はおよそ200バイト。6000件でも 約1.2MB で、ブラウザの上限(5MB前後)に とどかない。
   // 1日4セットなら 4年分のこる。
@@ -876,6 +878,7 @@ function showView(v) {
   if (v === "sheet") renderSheet();
   if (v === "kentei") renderKentei();
   if (v === "ranking") renderRanking();
+  if (v === "parent") renderParentTech();
   if (v === "join") renderJoin();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
@@ -1102,6 +1105,7 @@ function renderHome() {
   const doneToday = JSON.parse(localStorage.getItem(ROUTINE) || "[]").some((h) => h.date === today());
   $("#homeStatus").innerHTML = doneToday ? T("✅ 今日の練習：<b>完了！</b>　えらい！") : T("今日の練習：<b>0 / 1</b>　さあ始めよう！");
   renderWeakMenu();
+  renderWeakDiag();   // 🔍 弱点しんだん（技ごとの 正答率）
   renderHomework();                  // 教室に 入っている子：先生からの 宿題
   renderSolomonCard();               // 🐣 ソロモン
   renderGoldPill();
@@ -1120,6 +1124,89 @@ function weakProfile(days) {
     .map((k) => ({ k, n: tally[k] })).sort((a, b) => b.n - a.n);
 }
 
+/* ============================================================ 🔍 弱点診断（フェーズB-1）
+   「正答率 83%」で 終わらせず、「10の友が 72%」まで 分ける。
+   1問ごとに、その問題を 解くのに 使う 技（5の友・10の友・くり上がり2回以上・ひき算）と 桁・口数を 調べ、
+   記録（soroban_sessions の ft）に「技ごとの 正解／出題／秒」を ためる。診断は 直近30日を 合計して 出す。
+   技の 有無は 解き方の 手順（solveSteps）から 数える＝「解き方をみる」と 同じ ものさし */
+const FEAT = {
+  five:   { n: T("5の友（五玉）"), em: "🖐", weak: "five" },
+  ten:    { n: T("10の友（くり上がり・くり下がり）"), em: "🔟", weak: "ten" },
+  carry2: { n: T("くり上がりが 2回以上"), em: "🔁", weak: "ten" },
+  sub:    { n: T("ひき算が まざる"), em: "➖", weak: "" },
+  plain:  { n: T("技を 使わない たし算"), em: "🟢", weak: "" },
+  dg1: { n: T("1桁の 数"), em: "1️⃣", weak: "" }, dg2: { n: T("2桁の 数"), em: "2️⃣", weak: "" }, dg3: { n: T("3桁の 数"), em: "3️⃣", weak: "" }, dg4: { n: T("4桁以上の 数"), em: "4️⃣", weak: "" },
+  tm_s: { n: T("口数 2〜3"), em: "📏", weak: "" }, tm_m: { n: T("口数 4〜6"), em: "📏", weak: "" }, tm_l: { n: T("口数 7以上"), em: "📏", weak: "" },
+  kuku: { n: T("九九（1桁×1桁）"), em: "✖", weak: "kuku" }, kk1: { n: T("かけ算（×1桁）"), em: "✏️", weak: "" }, kk2: { n: T("かけ算（×2桁以上）"), em: "✏️", weak: "" },
+  wr: { n: T("わり算"), em: "➗", weak: "" },
+};
+// 1問の 特徴（技・桁・口数）。r＝結果 { subj, nums, compact }
+function problemFeatures(r) {
+  const f = [];
+  if (r.nums && r.nums.length) {
+    let five = 0, ten = 0;
+    try { solveSteps(r.nums).forEach((t) => t.moves.forEach((m) => { if (m.indexOf(T("5の友")) >= 0) five++; if (m.indexOf(T("10の友")) >= 0) ten++; })); } catch (e) { }
+    if (five) f.push("five"); if (ten) f.push("ten"); if (ten >= 2) f.push("carry2"); if (!five && !ten) f.push("plain");
+    if (r.nums.some((v) => v < 0)) f.push("sub");
+    const dg = Math.max(...r.nums.map((v) => String(Math.abs(v)).length)); f.push(dg >= 4 ? "dg4" : "dg" + dg);
+    const tm = r.nums.length; f.push(tm <= 3 ? "tm_s" : tm <= 6 ? "tm_m" : "tm_l");
+  } else if (r.subj === "kake") {
+    const m = /^([\d,]+)\s*[×x]\s*([\d,]+)/.exec(r.compact || "");
+    if (m) { const a = m[1].replace(/,/g, "").length, b = m[2].replace(/,/g, "").length; f.push(a === 1 && b === 1 ? "kuku" : (a >= 2 && b >= 2 ? "kk2" : "kk1")); }
+  } else if (r.subj === "wari") f.push("wr");
+  return f;
+}
+// 1セットぶん：技ごとに [正解, 出題, 秒の合計]
+function sessionFeatures(results) {
+  const ft = {};
+  (results || []).forEach((r) => { problemFeatures(r).forEach((k) => { const a = ft[k] || (ft[k] = [0, 0, 0]); a[1]++; if (r.ok) a[0]++; if (typeof r.t === "number" && isFinite(r.t)) a[2] = Math.round((a[2] + r.t) * 10) / 10; }); });
+  return ft;
+}
+// 直近 days 日の 診断。rows＝技ごとの { k, n, em, c, t, rate, sec, weak }（出題 5問以上のみ）。overall＝全体の 正答率
+function weakDiagnosis(days) {
+  const from = daysAgo(days || 30), tot = {}; let C = 0, N = 0;
+  allSessions().filter((e) => e.ft && (e.d || "") >= from && e.src !== "battle").forEach((e) => {
+    C += e.correct || 0; N += e.N || 0;
+    Object.entries(e.ft).forEach(([k, a]) => { if (!FEAT[k]) return; const t = tot[k] || (tot[k] = [0, 0, 0]); t[0] += a[0] || 0; t[1] += a[1] || 0; t[2] += a[2] || 0; });
+  });
+  const rows = Object.entries(tot).filter(([k, a]) => a[1] >= 5).map(([k, a]) => ({ k, n: FEAT[k].n, em: FEAT[k].em, c: a[0], t: a[1], rate: Math.round((a[0] / a[1]) * 100), sec: a[1] ? Math.round((a[2] / a[1]) * 10) / 10 : 0, weak: FEAT[k].weak }));
+  rows.sort((x, y) => x.rate - y.rate || y.t - x.t);
+  const overall = N ? Math.round((C / N) * 100) : null;
+  // 「にがて」＝全体より 10ポイント以上 低い、または 70% 未満
+  rows.forEach((r) => { r.isWeak = overall != null ? (r.rate <= overall - 10 || r.rate < 70) : r.rate < 70; });
+  return { rows, overall, N };
+}
+function weakDiagHTML(d, opts) {
+  const o = opts || {};
+  if (!d.rows.length) return T('<div class="wd-none">れんしゅうが たまると、ここに「どの技が にがてか」が 出ます（技ごとに 5問 以上 やってから）。</div>');
+  const top = o.all ? d.rows : d.rows.slice(0, o.max || 4);
+  return top.map((r) => {
+    const cls = r.isWeak ? " weak" : (r.rate >= 90 ? " good" : "");
+    return `<div class="wd-row${cls}"><span class="wd-em">${r.em}</span><span class="wd-n">${r.n}</span>` +
+      `<div class="wd-bar"><div style="width:${r.rate}%"></div></div><b class="wd-rate">${r.rate}%</b>` +
+      T('<span class="wd-c">{c}／{t}問</span>', { c: r.c, t: r.t }) +
+      (r.isWeak ? T('<span class="wd-tag">ここが にがて</span>') : "") +
+      (r.isWeak && r.weak && !o.noBtn ? T('<button class="wd-go" data-k="{v1}">▶ 5問 やる</button>', { v1: r.weak }) : "") +
+      "</div>";
+  }).join("");
+}
+function renderWeakDiag() {
+  const el = $("#weakDiag"); if (!el) return;
+  const d = weakDiagnosis(30);
+  if (!d.rows.length) { el.innerHTML = ""; el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  const w = d.rows.filter((r) => r.isWeak)[0];
+  const head = w ? T("いま いちばん にがてなのは <b>{n}</b>（{rate}%）", { n: w.n, rate: w.rate }) : T("にがてな 技は ありません。この調子！");
+  el.innerHTML = T('<div class="wd-h">🔍 弱点しんだん（30日）<span class="wd-all">ぜんぶ {overall}%</span></div>', { overall: d.overall == null ? "—" : d.overall }) +
+    '<div class="wd-lead">' + head + " " + sayBtn(head) + "</div>" + weakDiagHTML(d, { max: 4 });
+  $$("#weakDiag .wd-go").forEach((b) => { b.onclick = () => startWeakSession(b.dataset.k, 5); });
+}
+function renderParentTech() {
+  const el = $("#parentTech"); if (!el) return;
+  const d = weakDiagnosis(30);
+  el.innerHTML = (d.overall != null ? T('<p class="sub">直近30日 ぜんぶで {overall}%（{N}問）。技ごとに 見ると：</p>', { overall: d.overall, N: d.N }) : "") + weakDiagHTML(d, { all: true, noBtn: true }) +
+    T('<p class="sub">「にがて」＝ ぜんたいより 10ポイント以上 低い、または 70% 未満。1問あたりの 秒は 記録に 残しています（今後の「速度が 落ちる所」の 診断に 使います）。</p>');
+}
 function renderWeakMenu() {
   const el = $("#weakMenu"); if (!el) return;
   const w = weakProfile(14);

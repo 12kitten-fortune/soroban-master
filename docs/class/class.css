@@ -200,3 +200,5 @@ table.ce .ce-note { font-size: 11px; color: #8a7a5c; }
 table.ce.cmp { min-width: 0; width: 100%; }
 table.ce.cmp td { white-space: normal; font-size: 13px; line-height: 1.5; }
 table.ce.cmp td:first-child { background: #f6f0e1; }
+.miss-bar.weak span:first-child { color: #c0392b; font-weight: 800; }
+.miss-bar.weak i { background: #e57a5f; }
