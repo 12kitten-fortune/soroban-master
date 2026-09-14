@@ -26,14 +26,22 @@ const cut = (a, b) => {
   return src.slice(i, j);
 };
 const code =
-  cut("const SOROBAN_STD = {", "// 暗算（みとり暗算）") +
-  cut("const ANZAN_LOW = {", "// フラッシュ暗算 10〜1級") +
-  cut("const SUBJECT = {", "/* ---------- 級・段ラダー") +
-  cut("const GRADES = [];", "let gradeIdx =") +
   cut("function sbSVG(", "/* ============================================================ はじめての案内") +
   cut("const LESSON_LOW = {", "function lessonFor(") +
   cut("const FINGER = {", "const TIP_FINGER =");
-const M = new Function(code + "; return { sbSVG, sbStep, unshiHTML, LESSON_LOW, LESSON_KAKE, LESSON_WARI, SOROBAN_STD, ANZAN_LOW, GRADES, SUBJECT };")();
+const M = new Function(code + "; return { sbSVG, sbStep, unshiHTML, LESSON_LOW, LESSON_KAKE, LESSON_WARI };")();
+/* ---- 級体系は docs/curriculum/sk.js（JSON の 表）から 読む。ページで 使いやすい 形に 直す ---- */
+{
+  const win = {}; new Function("window", fs.readFileSync(path.join(DOCS, "curriculum", "sk.js"), "utf8"))(win);
+  const cur = win.SK_CURRICULA.sk;
+  M.GRADES = cur.grades.map((g) => ({ key: g.key, band: g.band, kyu: g.band === "kyu" ? g.n : undefined, dan: g.band === "dan" ? g.n : undefined }));
+  M.SUBJECT = cur.subjects;
+  M.SOROBAN_STD = {}; M.ANZAN_LOW = {};
+  cur.grades.filter((g) => g.band === "kyu").forEach((g) => {
+    if (g.n <= 15) M.SOROBAN_STD[g.n] = { mitori: g.mitori, kake: g.kake, wari: g.wari };
+    else M.ANZAN_LOW[g.n] = g.mitori;
+  });
+}
 
 /* ---- ページの 型 ---- */
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

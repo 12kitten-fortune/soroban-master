@@ -9,135 +9,45 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-13-384"; // 最新反映の確認用
+const BUILD = "2026-09-14-385"; // 最新反映の確認用
 
-/* ============================================================ 検定基準（級） */
-// 珠算（公開されている珠算検定の出題例に準拠）。かけ算は9級から、わり算は7級から、10級以下は見取算のみ
-// 珠算：公開されている珠算検定の出題例から抽出した実測値（★＝全級の出題例で確認済み）。
-// 13〜10級のみとりが同じ2桁5口なのは出題例どおり（級の差はかけ算・わり算で付く）。
-const SOROBAN_STD = {
-  1: { mitori: { digits: 6, terms: 10 }, kake: { a: 5, b: 4 }, wari: { D: 8, dv: 4, qd: 4 } }, // 全て★
-  2: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 4 }, wari: { D: 7, dv: 3, qd: 4 } }, // 全て★（みとりは3級と同じ5桁10口。差は乗除算で付く）
-  3: { mitori: { digits: 5, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 6, dv: 3, qd: 3 } }, // 全て★
-  4: { mitori: { digits: 4, terms: 10 }, kake: { a: 4, b: 3 }, wari: { D: 5, dv: 2, qd: 3 } }, // 全て★
-  5: { mitori: { digits: 4, terms: 10 }, kake: { a: 3, b: 3 }, wari: { D: 4, dv: 2, qd: 2 } }, // 全て★
-  6: { mitori: { digits: 3, terms: 10 }, kake: { a: 3, b: 2 }, wari: { D: 4, dv: 1, qd: 3 } }, // 全て★
-  7: { mitori: { digits: 2, terms: 10 }, kake: { a: 2, b: 2 }, wari: { D: 3, dv: 1, qd: 2 } }, // 全て★
-  8: { mitori: { digits: 2, terms: 8 }, kake: { a: 3, b: 1 }, wari: null },                    // ★
-  9: { mitori: { digits: 2, terms: 8 }, kake: { a: 2, b: 1 }, wari: null },                    // ★
-  // 10〜15級は「桁と口数の組み合わせ」が出題例で決まっている。桁と口数を別々に振ると
-  // 出題例に無い組み合わせ（例：10級の2桁7口）が出てしまうため、必ず variants で対にする。
-  // 1枚の中で1〜5番=5口・6〜10番=6口と変わる級は termsMax で表す。
-  10: { mitori: { variants: [{ digits: 1, terms: 7 }, { digits: 2, terms: 5 }] }, kake: null, wari: null },        // ★A=1桁7口／B・C=2桁5口
-  11: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも2桁
-  12: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも2桁
-  13: { mitori: { digits: 2, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★2桁
-  14: { mitori: { variants: [{ digits: 1, terms: 5, termsMax: 6 }, { digits: 2, terms: 5, termsMax: 6 }] }, kake: null, wari: null }, // ★A=1桁／B=2桁
-  15: { mitori: { digits: 1, terms: 5, termsMax: 6 }, kake: null, wari: null },                                    // ★A・Bとも1桁
-};
-// 暗算（みとり暗算）：同じく出題例の実測値。低い級は出題例どおり ひき算を含めない
-const ANZAN_STD = {
-  10: { digits: 1, terms: 3, sub: false }, //★
-  9: { digits: 1, terms: 4, sub: false },  //★
-  8: { digits: 2, terms: 3, sub: false },  //★
-  7: { digits: 2, terms: 3, sub: false },  //★
-  6: { digits: 2, terms: 4, sub: true },   //△（7級と5級から補間）
-  5: { digits: 2, terms: 5, sub: true },   //★
-  4: { digits: 2, terms: 6, sub: true },   //★
-  3: { digits: 2, terms: 8, sub: true },   //★
-  2: { digits: 2, terms: 12, sub: true },  //★
-  1: { digits: 3, terms: 5, sub: true },   //★
-};
-// 11〜20級は公式に無い当アプリ独自の入門ラダー
-// 11〜20級は公式に無い当アプリ独自の入門ラダー。
-// そろばんの学習順（5の友 → くり上がりなし → 10の友 → くり上がり）に合わせて
-// 「答えがいくつになるか」を決め打ちで出題する。
-const ANZAN_LOW = {
-  20: { digits: 1, terms: 2, sub: false, sumMax: 5, label: "こたえが5まで" },
-  19: { digits: 1, terms: 2, sub: false, sumMax: 9, label: "こたえが9まで（くり上がりなし）" },
-  18: { digits: 1, terms: 2, sub: false, sumMin: 6, sumMax: 10, label: "こたえが6〜10（五玉をつかう）" },
-  17: { digits: 1, terms: 2, sub: false, sumMin: 11, sumMax: 18, label: "くり上がり（こたえ11〜18）" },
-  16: { digits: 1, terms: 3, sub: false, sumMax: 9, label: "3口・くり上がりなし" },
-  15: { digits: 1, terms: 3, sub: false, sumMax: 18, label: "3口" },
-  14: { digits: 1, terms: 3, sub: false },
-  13: { digits: 1, terms: 3, sub: false },
-  12: { digits: 1, terms: 3, sub: false },
-  11: { digits: 1, terms: 3, sub: false },
-};
-// フラッシュ暗算 10〜1級（1桁→2桁→3桁の段階式。1個あたり約0.8秒で一定）
-const FLASH_STD = {
-  10: { digits: 1, terms: 3, sec: 2.4 }, 9: { digits: 1, terms: 4, sec: 3.2 }, 8: { digits: 1, terms: 5, sec: 4.0 },
-  7: { digits: 1, terms: 7, sec: 5.6 }, 6: { digits: 2, terms: 3, sec: 2.4 }, 5: { digits: 2, terms: 4, sec: 3.2 },
-  4: { digits: 2, terms: 5, sec: 4.0 }, 3: { digits: 2, terms: 7, sec: 5.6 }, 2: { digits: 2, terms: 10, sec: 8.0 },
-  1: { digits: 3, terms: 5, sec: 4.0 },
-};
-// フラッシュ暗算 段位（一般的な段位の基準。初段/二/五/七/十段は指定値、三・四・八・九段は補間、六段=3桁12口8秒）
-const FLASH_DAN = {
-  1: { digits: 2, terms: 15, sec: 10 }, 2: { digits: 3, terms: 4, sec: 4 }, 3: { digits: 3, terms: 6, sec: 5 },
-  4: { digits: 3, terms: 8, sec: 6 }, 5: { digits: 3, terms: 10, sec: 7 }, 6: { digits: 3, terms: 12, sec: 8 },
-  7: { digits: 3, terms: 15, sec: 8 }, 8: { digits: 3, terms: 15, sec: 6 }, 9: { digits: 3, terms: 15, sec: 4 },
-  10: { digits: 3, terms: 15, sec: 3 },
-};
-// フラッシュ暗算 11〜20級（練習級。すべて1桁＝10級(2桁)より易しい入門ラダー）
-const FLASH_KYU_LOW = {
-  20: { digits: 1, terms: 2, sec: 8 }, 19: { digits: 1, terms: 2, sec: 6 }, 18: { digits: 1, terms: 3, sec: 7 },
-  17: { digits: 1, terms: 3, sec: 6 }, 16: { digits: 1, terms: 4, sec: 6 }, 15: { digits: 1, terms: 4, sec: 5 },
-  14: { digits: 1, terms: 5, sec: 6 }, 13: { digits: 1, terms: 5, sec: 5 }, 12: { digits: 1, terms: 6, sec: 5 },
-  11: { digits: 1, terms: 6, sec: 4 },
-};
-// 1個あたりの表示時間(ms)。級で滑らかに変化＝全体のテンポを一定にする（秒÷口のバラつきを解消）
-function flashPaceMs(g) {
-  if (g.band === "dan") return Math.max(300, 620 - g.dan * 32); // 初段≈588 … 十段≈300（速い）
-  return Math.round(650 + (g.kyu - 1) / 19 * 400); // 1級≈650 … 20級≈1050（易しいほどゆっくり）
-}
-const SUBJECT = {
-  mitori: { name: "みとり算", answer: "soroban", N: 10, per: 10, pass: 70, limit: 420 },
-  kake: { name: "かけ算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
-  wari: { name: "わり算", answer: "soroban", N: 15, per: 10, pass: 100, limit: 420 },
-  anzan: { name: "あんざん", answer: "input", N: 10, per: 10, pass: 70, limit: 180 },
-  flash: { name: "フラッシュ暗算", answer: "flash" },
-};
-/* SK検定（このサイト独自の 検定）。珠算＝みとり・かけ・わり を つづけて、暗算＝あんざん 1しゅもく */
+/* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
+   級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
+   docs/curriculum/sk.js（JSON の 表）を 読んで、GRADES / SUBJECT / EXAM_TRACKS / difficulty() を 作る。
+   別の 級体系（教室の 独自基準・海外の レベル体系）は 同じ 形の 表を 足して applyCurriculum() で 切りかえる。 */
+const CURRICULA = window.SK_CURRICULA || {};
+let CUR = null;                    // いま 使っている 級体系
+const GRADES = [];                 // [{ key, band, kyu|dan, n }]。中身は applyCurriculum が 入れかえる
+const SUBJECT = {};                // しゅもく：name / answer / N / per / pass / limit
+const EXAM_TRACKS = {};            // SK検定の 組み合わせ（珠算＝みとり・かけ・わり、暗算＝あんざん）
 const EXAMS = "soroban_exams";
-const EXAM_TRACKS = {
-  soroban: { name: "珠算", subjs: ["mitori", "kake", "wari"] },
-  anzan: { name: "暗算", subjs: ["anzan"] },
-};
 let examState = null, examTimer = null;
+function applyCurriculum(c) {
+  if (!c || !Array.isArray(c.grades)) { alert("級の表（curriculum/sk.js）が 読みこめませんでした。ページを 更新してください。"); throw new Error("no curriculum"); }
+  CUR = c;
+  GRADES.length = 0;
+  c.grades.forEach((g) => { const row = { key: g.key, band: g.band, n: g.n }; if (g.band === "dan") row.dan = g.n; else row.kyu = g.n; GRADES.push(row); });
+  Object.keys(SUBJECT).forEach((k) => delete SUBJECT[k]); Object.assign(SUBJECT, JSON.parse(JSON.stringify(c.subjects || {})));
+  Object.keys(EXAM_TRACKS).forEach((k) => delete EXAM_TRACKS[k]); Object.assign(EXAM_TRACKS, JSON.parse(JSON.stringify(c.exams || {})));
+}
+applyCurriculum(CURRICULA.sk);
+// その級の その しゅもくの きまり。無い しゅもくは null（例：10級の かけ算）
+function difficulty(g, subj) {
+  if (!g || !CUR) return null;
+  const row = CUR.grades.find((x) => x.key === g.key);
+  return row && row[subj] ? row[subj] : null;
+}
+// フラッシュ暗算：1個あたりの 表示時間(ms)。表の pace を 使う。無ければ 級から なめらかに 決める
+function flashPaceMs(g) {
+  const d = difficulty(g, "flash"); if (d && d.pace) return d.pace;
+  if (g.band === "dan") return Math.max(300, 620 - g.dan * 32);
+  return Math.round(650 + ((g.kyu || 1) - 1) / 19 * 400);
+}
 
 /* ---------- 級・段ラダー（20級〜十段） ---------- */
-const GRADES = [];
-for (let k = 20; k >= 1; k--) GRADES.push({ key: `${k}級`, band: "kyu", kyu: k });
-["初段", "二段", "三段", "四段", "五段", "六段", "七段", "八段", "九段", "十段"].forEach((n, i) => GRADES.push({ key: n, band: "dan", dan: i + 1 }));
-let gradeIdx = GRADES.findIndex((g) => g.key === "20級");   // はじめての子は いちばん やさしい級から
+let gradeIdx = Math.max(0, GRADES.findIndex((g) => g.key === "20級"));   // はじめての子は いちばん やさしい級から
 let subject = "mitori";
 const currentGrade = () => GRADES[gradeIdx];
-
-function difficulty(g, subj) {
-  if (g.band === "kyu") {
-    const k = g.kyu;
-    if (k <= 15) {
-      const s = SOROBAN_STD[k];
-      if (subj === "mitori") return s.mitori;
-      if (subj === "kake") return s.kake;
-      if (subj === "wari") return s.wari;
-      if (subj === "anzan") return ANZAN_STD[k] || ANZAN_LOW[k]; // 暗算は暗算検定の基準を使う（見取からの代用をやめた）
-      if (subj === "flash") return k <= 10 ? FLASH_STD[k] : FLASH_KYU_LOW[k];
-    } else {
-      // 16〜20級：導入（見取・暗算・フラッシュのみ）
-      if (subj === "anzan" || subj === "mitori") return ANZAN_LOW[k]; // 入門帯は みとり も同じラダー
-      if (subj === "flash") return FLASH_KYU_LOW[k];
-      return null;
-    }
-  } else {
-    const d = g.dan; // 段位は目安（実際の検定は小数混じり50問）
-    if (subj === "mitori") return { digits: 5 + Math.floor((d - 1) / 3), terms: 15 };
-    if (subj === "kake") return { a: 5 + Math.floor((d - 1) / 3), b: 4 + Math.floor((d - 1) / 4) };
-    if (subj === "wari") return { D: 8 + Math.floor(d / 2), dv: 4 + Math.floor((d - 1) / 4), qd: null };
-    if (subj === "anzan") return { digits: 4 + Math.floor((d - 1) / 3), terms: 15 };
-    if (subj === "flash") return FLASH_DAN[d];
-  }
-}
 
 /* ============================================================ ジェネレータ */
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
@@ -2291,7 +2201,8 @@ function flashLevelOf(digits, terms, pace) {
   // 10級より やさしいときだけ 11〜20級（練習級）で くらべる。それ以外は 10級〜十段で
   const std = rows.filter((r) => r.g.band === "dan" || r.g.kyu <= 10);
   const low = rows.filter((r) => r.g.band === "kyu" && r.g.kyu > 10);
-  const s10 = flashScore(FLASH_STD[10].digits, FLASH_STD[10].terms, flashPaceMs(GRADES.find((g) => g.key === "10級")) / 1000);
+  const g10 = GRADES.find((g) => g.key === "10級"), f10 = g10 && difficulty(g10, "flash");
+  const s10 = f10 ? flashScore(f10.digits, f10.terms, flashPaceMs(g10) / 1000) : 16;
   const cands = sc < s10 ? low : std;
   // 上の級ほど 点数が 大きくなるよう ならす（表の ばらつきで 順番が 逆にならないように）
   let run = -1; const list = cands.map((r) => { run = Math.max(run + 0.01, flashScore(r.s.digits, r.s.terms, r.p)); return { g: r.g, v: run }; });
@@ -4166,7 +4077,7 @@ const TIP_PUZZLE = { t: "🧩 パズルの あそびかた",
 function tipFirstOpen() { tipOnce("first-open", TIP_OPEN.t, TIP_OPEN.b, soloIntro); }   // 説明のあと、ソロモンが あらわれる（第1話）
 
 /* ============================================================ 入門級（20〜15級）の 絵つき説明
-   ANZAN_LOW に決めた 学習の順（5の友 → くり上がりなし → 10の友 → くり上がり）に そって、
+   級体系の表（curriculum/sk.js の 20〜16級）に決めた 学習の順（5の友 → くり上がりなし → 10の友 → くり上がり）に そって、
    その級を はじめる前に 1回だけ 見せる。 */
 const LESSON_LOW = {
   20: { t: "20級：たまの いみ",
