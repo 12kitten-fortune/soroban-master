@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-396"; // 最新反映の確認用
+const BUILD = "2026-09-14-397"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -377,6 +377,7 @@ function logSession(subj, N, correct, sumSec, pauses, results, src) {
   if (miss.length) e.miss = miss;
   // 🔍 弱点診断の 材料：問題ごとの「使う技（5の友・10の友…）・桁・口数」ごとの 正解／出題／秒
   try { const ft = sessionFeatures(results); if (Object.keys(ft).length) e.ft = ft; } catch (err) { }
+  try { if (miss.length && src !== "battle") noteAddFromMiss(miss, subj); } catch (err) { }   // 📒 まちがいノートへ
   l.push(e);
   // 1件はおよそ200バイト。6000件でも 約1.2MB で、ブラウザの上限(5MB前後)に とどかない。
   // 1日4セットなら 4年分のこる。
@@ -859,7 +860,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: T("ホーム"), solomon: T("ソロモン"), grades: T("級・段を選ぶ"), play: T("れんしゅう"), today: T("本日の練習"), battle: T("たいせん"), puzzle: T("そろばんパズル"), parent: T("保護者"), records: T("記録を見る"), ranking: T("ランキング"), asobu: T("あそぶ"), settings: T("設定・プロフィール"), lesson: T("そろばんの きほん"), sheet: T("プリントを 作る"), kentei: T("SK検定"), join: T("教室に 参加") };
+const TITLES = { home: T("ホーム"), solomon: T("ソロモン"), grades: T("級・段を選ぶ"), play: T("れんしゅう"), today: T("本日の練習"), battle: T("たいせん"), puzzle: T("そろばんパズル"), parent: T("保護者"), records: T("記録を見る"), ranking: T("ランキング"), asobu: T("あそぶ"), notes: T("まちがいノート"), settings: T("設定・プロフィール"), lesson: T("そろばんの きほん"), sheet: T("プリントを 作る"), kentei: T("SK検定"), join: T("教室に 参加") };
 function showView(v) {
   curView = v;
   bgmForView(v);
@@ -879,6 +880,7 @@ function showView(v) {
   if (v === "kentei") renderKentei();
   if (v === "ranking") renderRanking();
   if (v === "parent") renderParentTech();
+  if (v === "notes") renderNotes();
   if (v === "join") renderJoin();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
   // たいせんは「はじめる前の画面」では 上のバーを 残す（そこから 出られなくなるため）
@@ -1110,6 +1112,7 @@ function renderHome() {
   $("#homeStatus").innerHTML = doneToday ? T("✅ 今日の練習：<b>完了！</b>　えらい！") : T("今日の練習：<b>0 / 1</b>　さあ始めよう！");
   renderWeakMenu();
   renderWeakDiag();   // 🔍 弱点しんだん（技ごとの 正答率）
+  renderNoteHome();   // 📒 まちがいノートの 数
   renderHomework();                  // 教室に 入っている子：先生からの 宿題
   renderSolomonCard();               // 🐣 ソロモン
   renderGoldPill();
@@ -1126,6 +1129,111 @@ function weakProfile(days) {
   });
   return Object.keys(tally).filter((k) => k !== "other")
     .map((k) => ({ k, n: tally[k] })).sort((a, b) => b.n - a.n);
+}
+
+/* ============================================================ 📒 まちがいノート（フェーズB-3）
+   まちがえた 問題を ノートに とっておき、型（10の友 など）を つけ、同じ 桁・口数・同じ 技の 類題 3問で 克服を ためす。
+   3問 ぜんぶ 正解 →「✅ 克服」（日付つきで 残る）。何回 ためしたかも 残す＝「克服の 記録」が 見える */
+const NOTES_KEY = "soroban_notes";
+const notesAll = () => { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "[]"); } catch (e) { return []; } };
+const notesSave = (l) => { try { localStorage.setItem(NOTES_KEY, JSON.stringify(l.slice(-150))); } catch (e) { } };
+// 1セットの まちがい（logSession の miss）を ノートへ。同じ 問題が まだ 克服前なら 回数だけ 増やす
+function noteAddFromMiss(miss, subj) {
+  if (!miss || !miss.length) return;
+  const l = notesAll();
+  miss.forEach((m) => {
+    if (!m.q) return;
+    const ex = l.find((n) => n.q === m.q && !n.done);
+    if (ex) { ex.seen = (ex.seen || 1) + 1; ex.d = today(); return; }
+    l.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), d: today(), q: String(m.q), u: m.u, a: m.a, k: m.k || "other", subj: subj || "mitori", tries: [], done: "", seen: 1 });
+  });
+  notesSave(l);
+}
+function noteAfterDrill(id, correct, N) {
+  const l = notesAll(), n = l.find((x) => x.id === id); if (!n) return "";
+  n.tries.push({ d: today(), c: correct, n: N });
+  if (N > 0 && correct >= N) n.done = today();
+  notesSave(l);
+  return n.done ? "done" : "try";
+}
+// 類題：同じ 桁・口数で、同じ 技（5の友・10の友）を 使う 問題を 作る
+function similarProblems(note, n) {
+  const r = problemFromMiss({ q: note.q }, note.subj); if (!r) return [];
+  const out = [], seen = {};
+  if (r.subj === "kake") {
+    const a = String(r.p.fa).length, b = String(r.p.fb).length;
+    for (let g = 0; g < 200 && out.length < n; g++) { const p = genKake({ a, b }); if (seen[p.display] || p.display === r.p.display) continue; seen[p.display] = 1; out.push({ ...p, compact: p.display }); }
+    return out;
+  }
+  if (r.subj === "wari") {
+    const dv = String(r.p.divisor).length, qd = String(r.p.quotient).length;
+    for (let g = 0; g < 200 && out.length < n; g++) { const p = genWari({ D: dv + qd, dv, qd }); if (seen[p.display] || p.display === r.p.display) continue; seen[p.display] = 1; out.push({ ...p, compact: p.display }); }
+    return out;
+  }
+  const nums = r.p.nums, digits = Math.max(...nums.map((v) => String(Math.abs(v)).length)), terms = nums.length, sub = nums.some((v) => v < 0);
+  const needle = note.k === "five" ? T("5の友") : note.k === "ten" ? T("10の友") : "";
+  const spec = sub ? { digits, terms } : { digits, terms, sub: false };
+  for (let g = 0; g < 400 && out.length < n; g++) {
+    const p = genMitori(spec);
+    if (needle && !needsTech(p.nums, needle)) continue;
+    const q = mitoriProblem(p.nums); if (seen[q.compact] || q.compact === note.q) continue; seen[q.compact] = 1; out.push(q);
+  }
+  for (let g = 0; g < 60 && out.length < n; g++) { const q = mitoriProblem(genMitori(spec).nums); if (!seen[q.compact]) { seen[q.compact] = 1; out.push(q); } }
+  return out;
+}
+function startNoteDrill(id) {
+  const n = notesAll().find((x) => x.id === id); if (!n) return;
+  const qs = similarProblems(n, 3); if (!qs.length) { alert(T("類題を うまく 作れませんでした")); return; }
+  const subj = /[×x]/.test(n.q) ? "kake" : /÷/.test(n.q) ? "wari" : (n.subj === "anzan" ? "anzan" : "mitori");
+  const cf = SUBJECT[subj], K = MISS_KINDS[n.k] || MISS_KINDS.other;
+  session = {
+    subj, grade: currentGrade(), cf, N: qs.length, idx: 0, correct: 0, answerBy: answerModeFor(cf),
+    timed: false, mode: "each", results: [], locking: false, start: performance.now(), cur: null,
+    paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0, queue: qs.slice(), note: id,
+    weak: ["five", "ten", "kuku"].includes(n.k) ? n.k : "", weakN: 3,
+  };
+  document.body.classList.remove("flashmode");
+  $("#playMark").classList.add("hidden");
+  $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
+  showView("play");
+  bgmForStudy(true);
+  $("#playRest").classList.add("hidden");
+  $("#playProblemWrap").classList.remove("hidden");
+  $("#playSorobanWrap").classList.toggle("hidden", session.answerBy !== "soroban");
+  $("#playInputWrap").classList.toggle("hidden", session.answerBy !== "input");
+  $("#playFlashWrap").classList.add("hidden");
+  $("#anzanTip").classList.add("hidden");
+  $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(subj));
+  $("#playGrade").textContent = T("📒 まちがいノート：類題 3問（{v1}）", { v1: K.n });
+  $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
+  $("#playResult").innerHTML = T("<div class=\"mr-tip\">{em} もとの 問題：<b>{q}</b>　3問 ぜんぶ 正解で 克服！</div>", { em: K.em, q: jesc(n.q) }); $("#playResult").className = "result";
+  $("#steps").classList.add("hidden");
+  startPlayTimer();
+  nextPlayProblem();
+}
+function renderNotes() {
+  const box = $("#notesBox"); if (!box) return;
+  const l = notesAll().slice().reverse(), open = l.filter((n) => !n.done), done = l.filter((n) => n.done);
+  const row = (n) => {
+    const K = MISS_KINDS[n.k] || MISS_KINDS.other, tries = (n.tries || []).length;
+    return `<div class="nt-row${n.done ? " done" : ""}"><div class="nt-q">${jesc(n.q)}</div>` +
+      T('<div class="nt-a">きみ：<s>{u}</s>　→　こたえ <b>{a}</b></div>', { u: jesc(n.u == null ? "—" : n.u), a: jesc(n.a) }) +
+      `<div class="nt-k">${K.em} ${K.n}</div>` +
+      (n.done ? T('<div class="nt-done">✅ 克服 {d}</div>', { d: n.done })
+        : T('<div class="nt-try">{v1}回 ためした</div><button class="nt-go" data-id="{id}">▶ 類題 3問</button>', { v1: tries, id: n.id })) +
+      `<div class="nt-d">${n.d}</div></div>`;
+  };
+  box.innerHTML = (open.length ? T('<h4>まだ 克服していない（{n}）</h4>', { n: open.length }) + open.map(row).join("") : T('<p class="sub">まちがえた問題は ここに たまります。いまは 空っぽ！</p>')) +
+    (done.length ? T('<h4>克服した（{n}）</h4>', { n: done.length }) + done.slice(0, 40).map(row).join("") : "");
+  $$("#notesBox .nt-go").forEach((b) => { b.onclick = () => startNoteDrill(b.dataset.id); });
+}
+function renderNoteHome() {
+  const el = $("#noteHome"); if (!el) return;
+  const l = notesAll(), open = l.filter((n) => !n.done).length, done = l.filter((n) => n.done).length;
+  if (!l.length) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.innerHTML = T('<span>📒 まちがいノート：まだ <b>{open}</b>問・克服 <b>{done}</b>問</span><button class="nt-open">ノートを ひらく</button>', { open, done });
+  el.querySelector(".nt-open").onclick = () => { showView("notes"); setActiveNav(document.querySelector('.nav[data-view="notes"]')); };
 }
 
 /* ============================================================ 🔍 弱点診断（フェーズB-1）
@@ -1754,8 +1862,10 @@ function finishSession() {
   msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<span class="rh-badge">${badge}</span>` : ""}</div>` + msg;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
   $("#playProblem").textContent = T("おつかれさま！");
-  const subj = session.subj, weak = session.weak, weakN = session.weakN; session = null;
-  $("#againBtn").onclick = () => (weak ? startWeakSession(weak, weakN) : startSession(subj));
+  // 📒 まちがいノートの 類題なら、結果を ノートに 書く（3問 ぜんぶ 正解 → 克服）
+  if (session.note) { const r = noteAfterDrill(session.note, session.correct, session.N); if (r === "done") setTimeout(() => fxCelebrate(2, T("📒 克服！"), T("この まちがいは もう だいじょうぶ")), 1200); }
+  const subj = session.subj, weak = session.weak, weakN = session.weakN, noteId = session.note; session = null;
+  $("#againBtn").onclick = () => (noteId ? startNoteDrill(noteId) : weak ? startWeakSession(weak, weakN) : startSession(subj));
   const tk = $("#toKingdomBtn"); if (tk) tk.onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
   $("#homeBtn").onclick = () => { showView("grades"); setActiveNav(document.querySelector('.nav[data-view="grades"]')); updateInfo(); };
   tipOnce("first-result", TIP_RESULT.t, TIP_RESULT.b);

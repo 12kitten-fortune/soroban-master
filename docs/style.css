@@ -1525,3 +1525,18 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 @media (max-width: 640px) { .wd-n { min-width: 0; flex: 1 1 100%; } .wd-row { flex-wrap: wrap; row-gap: 2px; } }
 /* 今日の練習の 自動編成：まちがい直し・にがて特訓の 行は 少し 目立たせる */
 .menu-row.auto span { color: #b5651d; font-weight: 800; }
+
+/* ============================================================ 📒 まちがいノート（フェーズB-3） */
+.note-home { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; background: #fff8e4; border: 2px solid var(--royal-gold); border-radius: 12px; padding: 8px 12px; font-size: 14px; color: var(--navy); font-weight: 700; }
+.note-home .nt-open { font-size: 13px; padding: 6px 12px; border-radius: 999px; }
+#notesBox h4 { margin: 12px 0 6px; color: var(--navy); font-size: 15px; }
+.nt-row { display: grid; grid-template-columns: 1.4fr 1.2fr 1fr auto auto; gap: 6px 12px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #eee5d0; font-size: 14px; }
+.nt-row.done { opacity: .8; background: #f2faf5; border-radius: 8px; }
+.nt-q { font-weight: 800; color: var(--frame); font-variant-numeric: tabular-nums; word-break: break-all; }
+.nt-a { color: #444; } .nt-a s { color: #c0392b; } .nt-a b { color: #1f8a4c; }
+.nt-k { font-size: 13px; color: #6b5a45; }
+.nt-try { font-size: 12px; color: #7a6a50; white-space: nowrap; }
+.nt-done { color: #1f8a4c; font-weight: 800; white-space: nowrap; }
+.nt-go { font-size: 13px; padding: 6px 12px; border-radius: 999px; background: var(--ok); color: #fff; border: none; white-space: nowrap; }
+.nt-d { font-size: 11px; color: #9a8a70; white-space: nowrap; }
+@media (max-width: 640px) { .nt-row { grid-template-columns: 1fr 1fr; } .nt-q { grid-column: 1 / -1; } }
