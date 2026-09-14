@@ -427,16 +427,31 @@ window.SK_CURRICULUM_CHECK = function (c) {
         if (typeof s.label === "string" && s.label.trim()) o.label = s.label.trim().slice(0, 40);
         return o;
       }
-      if (kind === "kake") { o.a = num(s.a, 1, 12); o.b = num(s.b, 1, 12); return o.a && o.b ? o : null; }
-      if (kind === "wari") { o.D = num(s.D, 1, 20); o.dv = num(s.dv, 1, 12); if (!o.D || !o.dv) return null; o.qd = num(s.qd, 1, 12); return o; }
+      const one = (v) => {
+        if (kind === "kake") { const r = { a: num(v.a, 1, 12), b: num(v.b, 1, 12) }; return r.a && r.b ? r : null; }
+        if (kind === "wari") { const r = { D: num(v.D, 1, 20), dv: num(v.dv, 1, 12) }; if (!r.D || !r.dv) return null; r.qd = num(v.qd, 1, 12); return r; }
+        return null;
+      };
+      if (kind === "kake" || kind === "wari") {
+        if (Array.isArray(s.variants) && s.variants.length) { o.variants = s.variants.slice(0, 4).map((v) => one(v || {})); if (o.variants.some((v) => !v)) return null; }
+        else { const r = one(s); if (!r) return null; Object.assign(o, r); }
+        return o;
+      }
       if (kind === "flash") { o.digits = num(s.digits, 1, 5); o.terms = num(s.terms, 2, 30); o.pace = num(s.pace, 200, 5000); if (!o.digits || !o.terms || !o.pace) return null; o.sec = Math.round(o.terms * o.pace / 100) / 10; return o; }
       return null;
+    };
+    // 級ごとの しゅもくの きまり（問題数・1問の点・合格点・制限秒）の 上書き
+    const exam = (e) => {
+      if (!e || typeof e !== "object") return null;
+      const o = {}; const N = num(e.N, 1, 100), per = num(e.per, 1, 100), pass = num(e.pass, 0, 10000), limit = num(e.limit, 10, 3600);
+      if (N) o.N = N; if (per) o.per = per; if (pass != null) o.pass = pass; if (limit) o.limit = limit;
+      return Object.keys(o).length ? o : null;
     };
     const grades = [];
     for (const g of c.grades) {
       if (!g || typeof g.key !== "string" || !g.key.trim() || g.key.trim().length > 12) return null;
       const row = { key: g.key.trim(), band: g.band === "dan" ? "dan" : "kyu", n: num(g.n, 1, 99) || 1 };
-      ["mitori", "kake", "wari", "anzan", "flash"].forEach((k) => { row[k] = g[k] ? spec(g[k], k) : null; });
+      ["mitori", "kake", "wari", "anzan", "flash"].forEach((k) => { row[k] = g[k] ? spec(g[k], k) : null; if (row[k] && g[k].exam) { const e = exam(g[k].exam); if (e) row[k].exam = e; } });
       if (!row.mitori && !row.kake && !row.wari && !row.anzan && !row.flash) return null;
       grades.push(row);
     }
@@ -444,8 +459,8 @@ window.SK_CURRICULUM_CHECK = function (c) {
     const base = window.SK_CURRICULA.sk, subjects = {};
     Object.keys(base.subjects).forEach((k) => {
       const b = base.subjects[k], src = (c.subjects && c.subjects[k]) || {};
-      subjects[k] = { name: b.name, answer: b.answer };
-      if (b.N != null) { subjects[k].N = num(src.N, 1, 100) || b.N; subjects[k].per = b.per; subjects[k].pass = num(src.pass, 0, 10000) != null ? num(src.pass, 0, 10000) : b.pass; subjects[k].limit = num(src.limit, 10, 3600) || b.limit; }
+      subjects[k] = { name: typeof src.name === "string" && src.name.trim() ? src.name.trim().slice(0, 12) : b.name, answer: ["soroban", "input", "flash"].includes(src.answer) ? src.answer : b.answer };
+      if (b.N != null) { subjects[k].N = num(src.N, 1, 100) || b.N; subjects[k].per = num(src.per, 1, 100) || b.per; subjects[k].pass = num(src.pass, 0, 10000) != null ? num(src.pass, 0, 10000) : b.pass; subjects[k].limit = num(src.limit, 10, 3600) || b.limit; }
     });
     return { id: "custom", name: String(c.name || "この教室の 基準").trim().slice(0, 30) || "この教室の 基準", note: String(c.note || "").slice(0, 200),
       subjects, exams: JSON.parse(JSON.stringify(base.exams)), grades };

@@ -1,7 +1,7 @@
 // そろばんキングダム Service Worker
 // 方針：オンライン時は最新を取得（network-first）、オフライン時はキャッシュから配信。
-const CACHE = "sk-2026-09-14-404";
-const CORE = ["./", "./index.html", "./style.css", "./app.js", "./manifest.webmanifest", "./icon.svg", "./assets/icon-180.png", "./page.css", "./firebase-config.js", "./curriculum/sk.js"];
+const CACHE = "sk-2026-09-14-405";
+const CORE = ["./", "./index.html", "./style.css", "./app.js", "./manifest.webmanifest", "./icon.svg", "./assets/icon-180.png", "./page.css", "./firebase-config.js", "./curriculum/sk.js", "./curriculum/presets_jp.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));

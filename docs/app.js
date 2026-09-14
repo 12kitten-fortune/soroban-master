@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-387"; // 最新反映の確認用
+const BUILD = "2026-09-14-388"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -48,6 +48,12 @@ function difficulty(g, subj) {
   if (!g || !CUR) return null;
   const row = CUR.grades.find((x) => x.key === g.key);
   return row && row[subj] ? row[subj] : null;
+}
+// しゅもくの きまり（問題数・1問の点・合格点・制限秒）。級の表に exam が あれば その級だけ 上書き（例：日商風の 7〜10級は 20分）
+function subjectCfg(g, subj) {
+  const base = SUBJECT[subj]; if (!base) return base;
+  const d = difficulty(g, subj);
+  return d && d.exam ? Object.assign({}, base, d.exam) : base;
 }
 // フラッシュ暗算：1個あたりの 表示時間(ms)。表の pace を 使う。無ければ 級から なめらかに 決める
 function flashPaceMs(g) {
@@ -127,8 +133,8 @@ function genProblemFor(g, subj) {
     const compact = p.nums.map((v, i) => (i === 0 ? String(v) : (v < 0 ? "−" : "+") + Math.abs(v))).join("");
     return { display: mitoriDisplay(p.nums), compact, answer: p.answer, nums: p.nums };
   }
-  if (subj === "kake") { const p = genKake(diff); return { ...p, compact: p.display }; }
-  if (subj === "wari") { const p = genWari(diff); return { ...p, compact: p.display }; }
+  if (subj === "kake") { const p = genKake(pickVariant(diff)); return { ...p, compact: p.display }; }   // variants＝桁の 組み合わせを 1つ えらぶ
+  if (subj === "wari") { const p = genWari(pickVariant(diff)); return { ...p, compact: p.display }; }
 }
 const groupInt = (s) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
@@ -951,8 +957,8 @@ function specText(g, subj) {
   const d = difficulty(g, subj);
   if (!d) return "（この級にはありません）";
   if (subj === "flash") return `${d.digits}桁 ${d.terms}口 / 約${(d.terms * flashPaceMs(g) / 1000).toFixed(1)}秒（1個 ${(flashPaceMs(g) / 1000).toFixed(1)}秒）`;
-  if (subj === "kake") return `${d.a}桁 × ${d.b}桁`;
-  if (subj === "wari") return `${d.D}桁 ÷ ${d.dv}桁`;
+  if (subj === "kake") return (d.variants || [d]).map((v) => `${v.a}桁 × ${v.b}桁`).join(" ／ ");
+  if (subj === "wari") return (d.variants || [d]).map((v) => `${v.D}桁 ÷ ${v.dv}桁`).join(" ／ ");
   const one = (v) => `${v.digits}桁 ${v.termsMax && v.termsMax > v.terms ? `${v.terms}〜${v.termsMax}` : v.terms}口`;
   if (d.label) return `${one(d)}　<b>${d.label}</b>`; // 入門級は「たして5」などの狙いを出す
   return d.variants ? d.variants.map(one).join(" ／ ") : one(d);
@@ -961,8 +967,13 @@ function updateInfo() {
   const g = currentGrade();
   $$(".chip").forEach((c) => c.classList.toggle("active", c.dataset.subj === subject));
   $$(".chip").forEach((c) => (c.disabled = !difficulty(g, c.dataset.subj)));
-  if (!difficulty(g, subject)) { subject = "mitori"; return updateInfo(); }
-  const cf = SUBJECT[subject];
+  if (!difficulty(g, subject)) {
+    // その級に 無い しゅもくなら、ある しゅもくの 最初のものへ（暗算だけの 級体系では みとり算が 無い）
+    const first = ["mitori", "kake", "wari", "anzan", "flash"].find((s) => difficulty(g, s));
+    if (!first) { $("#gradeInfo").innerHTML = `<b>${g.key}</b>：この級には しゅもくが ありません`; return; }
+    subject = first; return updateInfo();
+  }
+  const cf = subjectCfg(g, subject);
   let info = `<b>${g.key}／${cf.name}</b>：${specText(g, subject)}`;
   if (cf.answer !== "flash") info += `　｜ ${cf.N}もん・${cf.limit / 60}分いない・${cf.pass}点で ごうかく`;
   if (g.band === "dan" || g.kyu > 15) info += ` <span class="note">※目安</span>`;
@@ -1413,7 +1424,7 @@ function startSession(subj) {
   if (subj === "flash") return startFlash(grade);
   document.body.classList.remove("flashmode");
   if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
-  const cf = SUBJECT[subj];
+  const cf = subjectCfg(grade, subj);
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   // 📖 物語の中の 練習（数問だけ・タイマーなし・1問ずつ ◎×）。問題の作り方・採点は ふつうと 同じ
   if (pendingStory) { session.N = pendingStory.n; session.timed = false; session.mode = "each"; session.story = pendingStory; pendingStory = null; }
@@ -1698,7 +1709,7 @@ function runStep() {
   if (step.rest != null) showRest(step); else startQuizSection(step);
 }
 function startQuizSection(step) {
-  const grade = routineState.grade, cf = SUBJECT[step.subj];
+  const grade = routineState.grade, cf = subjectCfg(grade, step.subj);
   // 採点は最後にまとめて（mode:end）。暗算は入力式（そろばんを出さない）、かけ/わり/みとりはそろばん
   session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   $("#playMark").classList.add("hidden");
@@ -4449,7 +4460,7 @@ function sheetPrint() {
 const allExams = () => { try { return JSON.parse(localStorage.getItem(EXAMS) || "[]"); } catch (e) { return []; } };
 function examSteps(grade, track) {
   const t = EXAM_TRACKS[track]; if (!t) return [];
-  return t.subjs.filter((s) => difficulty(grade, s)).map((s) => ({ subj: s, cf: SUBJECT[s] }));
+  return t.subjs.filter((s) => difficulty(grade, s)).map((s) => ({ subj: s, cf: subjectCfg(grade, s) }));
 }
 function renderKentei() {
   const sel = $("#exGrade");

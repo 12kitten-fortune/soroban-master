@@ -203,7 +203,7 @@
     const def = keys.includes("10級") ? "10級" : keys[0];
     $("#hwGrade").innerHTML = keys.map((g) => '<option value="' + esc(g) + '"' + (g === def ? " selected" : "") + ">" + esc(g) + "</option>").join("");
   }
-  const presetNote = (preset) => { const c = curOf(preset); return c.grades.length + "段階（" + c.grades[0].key + "〜" + c.grades.slice(-1)[0].key + "）"; };
+  const presetNote = (preset) => { const c = curOf(preset); return c.grades.length + "段階（" + c.grades[0].key + "〜" + c.grades.slice(-1)[0].key + "）" + (c.note ? "　※ " + c.note : ""); };
   $("#newClassForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#ncName").value.trim(); if (!name) return;
@@ -247,9 +247,10 @@
     const num = (cls, v, extra) => '<input type="number" class="' + cls + '" value="' + (v == null ? "" : v) + '" ' + (extra || "") + " />";
     const chk = (cls, on) => '<input type="checkbox" class="' + cls + '"' + (on ? " checked" : "") + " />";
     const rows = c.grades.map((g, i) => {
-      const m = g.mitori, k = g.kake, w = g.wari, a = g.anzan, f = g.flash;
+      const m = g.mitori, k0 = g.kake, w0 = g.wari, a = g.anzan, f = g.flash;
       const mv = m && m.variants ? m.variants[0] : m, av = a && a.variants ? a.variants[0] : a;
-      const special = (m && (m.variants || m.sumMax != null || m.sumMin != null || m.sumExact != null)) || (a && (a.variants || a.sumMax != null || a.sumMin != null || a.sumExact != null));
+      const k = k0 && k0.variants ? k0.variants[0] : k0, w = w0 && w0.variants ? w0.variants[0] : w0;   // かけ・わりの variants は 1つ目を 見せる
+      const special = (m && (m.variants || m.sumMax != null || m.sumMin != null || m.sumExact != null)) || (a && (a.variants || a.sumMax != null || a.sumMin != null || a.sumExact != null)) || (k0 && k0.variants) || (w0 && w0.variants);
       return '<tr data-i="' + i + '" class="' + (m ? "" : "off-mitori ") + (k ? "" : "off-kake ") + (w ? "" : "off-wari ") + (a ? "" : "off-anzan ") + (f ? "" : "off-flash") + '">' +
         '<td><input type="text" class="ce-key" value="' + esc(g.key) + '" maxlength="12" /></td>' +
         '<td class="grp">' + chk("m-on", !!m) + "</td><td>" + num("m-in m-d", mv && mv.digits, 'min="1" max="15"') + "</td><td>" + num("m-in m-t", mv && mv.terms, 'min="2" max="30"') + "</td><td>" + '<input type="checkbox" class="m-in m-sub"' + (m && m.sub !== false ? " checked" : "") + " /></td>" +
@@ -258,7 +259,7 @@
         '<td class="grp">' + chk("a-on", !!a) + "</td><td>" + num("a-in a-d", av && av.digits, 'min="1" max="15"') + "</td><td>" + num("a-in a-t", av && av.terms, 'min="2" max="30"') + "</td><td>" + '<input type="checkbox" class="a-in a-sub"' + (a && a.sub !== false ? " checked" : "") + " /></td>" +
         '<td class="grp">' + chk("f-on", !!f) + "</td><td>" + num("f-in f-d", f && f.digits, 'min="1" max="5"') + "</td><td>" + num("f-in f-t", f && f.terms, 'min="2" max="30"') + "</td><td>" + num("f-in f-p", f ? Math.round(f.pace) / 1000 : "", 'min="0.2" max="5" step="0.05"') + "</td>" +
         '<td class="grp ce-row-btns"><button type="button" class="ghost ce-up" title="上へ">↑</button><button type="button" class="ghost ce-down" title="下へ">↓</button><button type="button" class="ghost ce-copy" title="この級を 写して 下に 足す">＋</button><button type="button" class="ghost ce-del" title="この級を 消す">✕</button>' +
-        (special ? '<div class="ce-note">※特別な形（' + esc(SPEC_TXT(m, "mitori")) + "）。桁・口を 変えると ふつうの 形に なります</div>" : "") + "</td></tr>";
+        (special ? '<div class="ce-note">※特別な形（' + esc([m && SPEC_TXT(m, "mitori"), k0 && k0.variants && k0.variants.map((v) => v.a + "×" + v.b).join("/"), w0 && w0.variants && w0.variants.map((v) => v.D + "÷" + v.dv).join("/")].filter(Boolean).join("、")) + "）。数字を 変えると ふつうの 形に なります</div>" : "") + "</td></tr>";
     }).join("");
     const sj = c.subjects || {};
     const subjRow = (k, label) => sj[k] && sj[k].N != null ? '<label>' + label + "：" + num("s-N", sj[k].N, 'data-k="' + k + '" min="1" max="100"') + "問・" + num("s-min", Math.round(sj[k].limit / 60), 'data-k="' + k + '" min="1" max="60"') + "分・合格" + num("s-pass", sj[k].pass, 'data-k="' + k + '" min="0" max="10000"') + "点（1問" + sj[k].per + "点）</label>" : "";
@@ -306,16 +307,19 @@
     box.querySelectorAll("tr[data-i]").forEach((tr) => {
       const i = +tr.dataset.i, g0 = c.grades[i] || {};
       const row = { key: tr.querySelector(".ce-key").value.trim(), band: g0.band || "kyu", n: g0.n || 1 };
-      const keep = (spec, d, t) => {   // 桁・口が 変わっていなければ もとの 形を 残す
+      const keep = (spec, d, t) => {   // 桁・口が 変わっていなければ もとの 形を 残す（変えたら ふつうの 形。級ごとの exam は 引きつぐ）
         const base = spec && spec.variants ? spec.variants[0] : spec;
         if (spec && base && base.digits === d && base.terms === t) return spec;
-        const o = { digits: d, terms: t }; if (spec && spec.sub === false) o.sub = false; if (spec && spec.label && !spec.variants && spec.sumMax == null && spec.sumMin == null) o.label = spec.label; return o;
+        const o = { digits: d, terms: t }; if (spec && spec.sub === false) o.sub = false; if (spec && spec.label && !spec.variants && spec.sumMax == null && spec.sumMin == null) o.label = spec.label; if (spec && spec.exam) o.exam = spec.exam; return o;
       };
+      // かけ算・わり算：数字が 変わっていなければ もとの 形（variants）を 残す
+      const keepKW = (spec, o, keys) => { const base = spec && spec.variants ? spec.variants[0] : spec; if (spec && base && keys.every((k) => (base[k] || null) === (o[k] || null))) return spec; if (spec && spec.exam) o.exam = spec.exam; return o; };
       if (tr.querySelector(".m-on").checked) { const d = val(tr.querySelector(".m-d")), t = val(tr.querySelector(".m-t")); row.mitori = keep(g0.mitori, d, t); row.mitori.sub = tr.querySelector(".m-sub").checked ? undefined : false; if (row.mitori.sub === undefined) delete row.mitori.sub; if (!d || !t) err = row.key + " みとり"; } else row.mitori = null;
-      if (tr.querySelector(".k-on").checked) { row.kake = { a: val(tr.querySelector(".k-a")), b: val(tr.querySelector(".k-b")) }; if (!row.kake.a || !row.kake.b) err = row.key + " かけ算"; } else row.kake = null;
-      if (tr.querySelector(".w-on").checked) { row.wari = { D: val(tr.querySelector(".w-D")), dv: val(tr.querySelector(".w-dv")), qd: val(tr.querySelector(".w-qd")) }; if (!row.wari.D || !row.wari.dv) err = row.key + " わり算"; } else row.wari = null;
+      if (tr.querySelector(".k-on").checked) { const o = { a: val(tr.querySelector(".k-a")), b: val(tr.querySelector(".k-b")) }; if (!o.a || !o.b) err = row.key + " かけ算"; row.kake = keepKW(g0.kake, o, ["a", "b"]); } else row.kake = null;
+      if (tr.querySelector(".w-on").checked) { const o = { D: val(tr.querySelector(".w-D")), dv: val(tr.querySelector(".w-dv")), qd: val(tr.querySelector(".w-qd")) }; if (!o.D || !o.dv) err = row.key + " わり算"; row.wari = keepKW(g0.wari, o, ["D", "dv", "qd"]); } else row.wari = null;
       if (tr.querySelector(".a-on").checked) { const d = val(tr.querySelector(".a-d")), t = val(tr.querySelector(".a-t")); row.anzan = keep(g0.anzan, d, t); row.anzan.sub = tr.querySelector(".a-sub").checked ? undefined : false; if (row.anzan.sub === undefined) delete row.anzan.sub; if (!d || !t) err = row.key + " あんざん"; } else row.anzan = null;
-      if (tr.querySelector(".f-on").checked) { const p = val(tr.querySelector(".f-p")); row.flash = { digits: val(tr.querySelector(".f-d")), terms: val(tr.querySelector(".f-t")), pace: p ? Math.round(p * 1000) : null }; if (!row.flash.digits || !row.flash.terms || !row.flash.pace) err = row.key + " フラッシュ"; } else row.flash = null;
+      if (tr.querySelector(".f-on").checked) { const p = val(tr.querySelector(".f-p")); row.flash = { digits: val(tr.querySelector(".f-d")), terms: val(tr.querySelector(".f-t")), pace: p ? Math.round(p * 1000) : null }; if (g0.flash && g0.flash.exam) row.flash.exam = g0.flash.exam; if (!row.flash.digits || !row.flash.terms || !row.flash.pace) err = row.key + " フラッシュ"; } else row.flash = null;
+      if (row.anzan && g0.anzan && g0.anzan.exam && !row.anzan.exam) row.anzan.exam = g0.anzan.exam;
       if (!row.key) err = (i + 1) + "行目の 級の 名前";
       grades.push(row);
     });
