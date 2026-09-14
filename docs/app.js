@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-397"; // 最新反映の確認用
+const BUILD = "2026-09-14-398"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -870,7 +870,7 @@ function showView(v) {
   if (v === "solomon") renderSolomon();
   if (v === "play") renderBridge();   // 📖 物語の練習のときだけ 橋を 出す（ほかの練習では しまう）
   if (v === "lesson") renderLesson();
-  if (v === "records") renderRecords();
+  if (v === "records") { renderRecords(); renderSkillTree(); }
   if (v === "settings") renderSettings();
   if (v === "today") renderToday();
   if (v === "battle") renderBattle();
@@ -1312,6 +1312,48 @@ function renderWeakDiag() {
   el.innerHTML = T('<div class="wd-h">🔍 弱点しんだん（30日）<span class="wd-all">ぜんぶ {overall}%</span></div>', { overall: d.overall == null ? "—" : d.overall }) +
     '<div class="wd-lead">' + head + " " + sayBtn(head) + "</div>" + weakDiagHTML(d, { max: 4 });
   $$("#weakDiag .wd-go").forEach((b) => { b.onclick = () => startWeakSession(b.dataset.k, 5); });
+}
+/* ============================================================ 🌳 スキルツリー（フェーズB-4）
+   級とは べつの 軸。技ごとの できぐあいを ★1〜5 で 見せる（記録の ft から。直近 半年）。
+   級体系が 国や 教室で ちがっても、技の ものさしは 共通 */
+const SKILL_GROUPS = [
+  { n: T("たし算・ひき算の 技"), keys: ["plain", "five", "ten", "carry2", "sub"] },
+  { n: T("大きな 数"), keys: ["dg1", "dg2", "dg3", "dg4"] },
+  { n: T("口数（たす 数の 数）"), keys: ["tm_s", "tm_m", "tm_l"] },
+  { n: T("かけ算・わり算"), keys: ["kuku", "kk1", "kk2", "wr"] },
+  { n: T("フラッシュ暗算"), keys: ["flash"] },
+];
+// ★の きめ方：10問 未満は「？」。★5 は 95% 以上 かつ 30問 以上
+function starsOf(c, t) {
+  if (!t || t < 10) return 0;
+  const r = c / t;
+  if (r >= 0.95 && t >= 30) return 5;
+  if (r >= 0.85) return 4;
+  if (r >= 0.75) return 3;
+  if (r >= 0.6) return 2;
+  return 1;
+}
+function skillStats(days) {
+  const from = daysAgo(days || 180), tot = {};
+  allSessions().filter((e) => (e.d || "") >= from && e.src !== "battle").forEach((e) => {
+    if (e.subj === "flash") { const t = tot.flash || (tot.flash = [0, 0]); t[0] += e.correct || 0; t[1] += e.N || 0; }
+    if (e.ft) Object.entries(e.ft).forEach(([k, a]) => { if (!FEAT[k]) return; const t = tot[k] || (tot[k] = [0, 0]); t[0] += a[0] || 0; t[1] += a[1] || 0; });
+  });
+  return tot;
+}
+function renderSkillTree() {
+  const el = $("#skillTree"); if (!el) return;
+  const tot = skillStats(180);
+  const node = (k) => {
+    const f = k === "flash" ? { n: T("フラッシュ暗算"), em: "⚡" } : FEAT[k];
+    const a = tot[k] || [0, 0], st = starsOf(a[0], a[1]);
+    const stars = st ? "★".repeat(st) + "☆".repeat(5 - st) : "？";
+    return `<div class="sk-node s${st}"><span class="sk-em">${f.em}</span><span class="sk-n">${f.n}</span><span class="sk-st">${stars}</span>` +
+      (a[1] ? T('<span class="sk-c">{v1}%（{v2}問）</span>', { v1: Math.round((a[0] / a[1]) * 100), v2: a[1] }) : T('<span class="sk-c">まだ</span>')) + "</div>";
+  };
+  const any = Object.values(tot).some((a) => a[1] > 0);
+  el.innerHTML = SKILL_GROUPS.map((g) => `<div class="sk-group"><div class="sk-gh">${g.n}</div><div class="sk-row">${g.keys.map(node).join('<span class="sk-ar">→</span>')}</div></div>`).join("") +
+    (any ? "" : T('<p class="sub">れんしゅうすると ★が ついていくよ（技の 記録は 今日からの 練習で たまります）。</p>'));
 }
 function renderParentTech() {
   const el = $("#parentTech"); if (!el) return;

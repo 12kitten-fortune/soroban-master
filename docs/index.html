@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260914m" />
+    <link rel="stylesheet" href="style.css?v=20260914n" />
   </head>
   <body>
     <div class="app">
@@ -326,6 +326,13 @@
         </div>
 
         <div id="view-records" class="view hidden">
+          <!-- 🌳 スキルツリー：級とは べつの 軸。技ごとの ★（弱点診断と 同じ 記録から） -->
+          <div class="card">
+            <h3>🌳 スキルツリー（技ごとの ★・直近 半年）</h3>
+            <p class="sub">級とは べつに、技ごとに どれだけ できるかを ★で 見せます。「6級だけど 10の友は ★5」のように。<button type="button" class="say-btn" data-say="きゅうとは べつに、わざごとに どれだけ できるかを ほしで みせます。" title="よみあげる" aria-label="よみあげる">🔊</button></p>
+            <div id="skillTree"></div>
+            <p class="sub">★1＝60%未満／★2＝60%〜／★3＝75%〜／★4＝85%〜／★5＝95%以上で 30問以上。10問 やるまでは「？」。</p>
+          </div>
           <div class="card">
             <h3>📊 せいせきの うつりかわり（本日の練習）</h3>
             <div id="routineGraph"></div>
@@ -602,7 +609,7 @@
     <script src="i18n.js?v=20260914j"></script>
     <script src="curriculum/sk.js?v=20260914g"></script>
     <script src="curriculum/presets_jp.js?v=20260914g"></script>
-    <script src="app.js?v=20260914m"></script>
+    <script src="app.js?v=20260914n"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
