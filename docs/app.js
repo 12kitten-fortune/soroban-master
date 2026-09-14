@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-399"; // 最新反映の確認用
+const BUILD = "2026-09-14-400"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -5295,7 +5295,11 @@ async function pushToClass(loud) {
   if (note) note.textContent = T("おくっています…");
   try {
     const S = await loadStore();
-    await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all, hws);
+    // 🎯 進級の めやす（級・合格の めやす%・受けられそうか）も 先生へ（先生画面の「要フォロー／苦戦中／進級候補」に 使う）
+    let extra = {};
+    try { const g = readyTargetGrade(); const tr = g && (examSteps(g, "soroban").length ? "soroban" : examSteps(g, "anzan").length ? "anzan" : ""); const R = tr ? readiness(g, tr) : null;
+      if (R && R.pct != null) extra = { ready: { g: g.key, track: tr, pct: R.pct, ok: !!R.ready, rows: R.rows.map((r) => ({ s: r.subj, none: !!r.none, acc: r.acc || 0, need: r.need || 0, a: !!r.accOk, sp: !!r.speedOk })) } }; } catch (e) { }
+    await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all, hws, extra);
     if (fresh.length) cl.sent = Math.max.apply(null, fresh.map((e) => e.t || 0));
     cl.hwSig = hwSig;
     try { localStorage.setItem(CLASSLINK, JSON.stringify(cl)); } catch (e) { }

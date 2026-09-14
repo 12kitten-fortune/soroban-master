@@ -116,11 +116,11 @@
         const have = db.sessions[key(cid, sid)] || [];
         return { cid, sid, nick: s.nick, latest: have.length ? have[have.length - 1].t : 0 };
       },
-      async pushSessions(cid, sid, list, allList, hws) {
+      async pushSessions(cid, sid, list, allList, hws, extra) {
         const k = key(cid, sid); const have = new Set((db.sessions[k] || []).map((e) => e.t));
         db.sessions[k] = (db.sessions[k] || []).concat(list.filter((e) => !have.has(e.t))).slice(-2000);
         const s = db.students[cid] && db.students[cid][sid];
-        if (s) { s.lastSeen = now(); s.stat = statOf(allList || db.sessions[k], hws || Object.values(db.homework[cid] || {})); }
+        if (s) { s.lastSeen = now(); s.stat = Object.assign(statOf(allList || db.sessions[k], hws || Object.values(db.homework[cid] || {})), extra || {}); }
         save();
       },
       /* ---- 🏆 ランキング（お試しは この端末の 1行だけ） ---- */
@@ -243,7 +243,7 @@
         return { cid, sid, nick: s.data().nick, latest };
       },
       async sendReset(email) { return auth.sendPasswordResetEmail(email); },
-      async pushSessions(cid, sid, list, allList, hws) {
+      async pushSessions(cid, sid, list, allList, hws, extra) {
         await anon();
         const col = sRef(cid, sid).collection("sessions");
         try {
@@ -257,7 +257,7 @@
           for (const e of list) { try { await col.doc(String(e.t)).set(e); sent++; } catch (e2) { } }
           if (!sent && list.length) throw err;
         }
-        await sRef(cid, sid).set({ lastSeen: now(), stat: statOf(allList || list, hws || []) }, { merge: true });
+        await sRef(cid, sid).set({ lastSeen: now(), stat: Object.assign(statOf(allList || list, hws || []), extra || {}) }, { merge: true });   // extra＝進級の めやす など（生徒側で 計算）
       },
       /* ---- 🏆 ランキング：ranking/{YYYY-MM}/rows/{uid}。自分の 行だけ 書ける（ルールで 検査）。読むのは だれでも ---- */
       rankUid() { return auth.currentUser ? auth.currentUser.uid : ""; },

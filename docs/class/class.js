@@ -425,11 +425,58 @@
     if (!confirm("「" + cur.name + T("」を 消します。生徒と 記録も 消えます。よろしいですか？"))) return;
     await S.deleteClass(cur.id); cur = null; await renderClasses(); show("classes");
   });
+  /* ---------- 要フォロー／苦戦中／進級候補（フェーズC-1） ----------
+     生徒30人でも「今日 だれを 見るか」が 数秒で わかるように、生徒の まとめ（stat）から 3つに 分ける。
+       要フォロー：7日 練習なし（または 最後の 練習から 14日以上）／今週の 正答率 60% 未満／宿題が きげんを すぎて 未完
+       進級候補  ：進級の めやすが「受けられそう」（生徒側の 計算）／めやす 90% 以上
+       苦戦中    ：正答率 60〜74%／技の 正答率 60% 未満の ものが ある（5問以上）／今週の まちがい 5回以上
+       それ以外  ：順調 */
+  const CLS = {
+    follow: { n: T("要フォロー"), em: "🔴", cls: "c-follow" },
+    ready:  { n: T("進級候補"),   em: "🟢", cls: "c-ready" },
+    hard:   { n: T("苦戦中"),     em: "🟡", cls: "c-hard" },
+    ok:     { n: T("順調"),       em: "⚪", cls: "c-ok" },
+    none:   { n: T("まだ 記録なし"), em: "⚪", cls: "c-none" },
+  };
+  function classify(s) {
+    const st = s.stat || {}, reasons = [];
+    if (!st.last && !s.lastSeen) return { k: "none", reasons: [] };
+    const ago = daysAgo(st.last || s.lastSeen);
+    if (!st.n7) reasons.push(T("今週 練習なし"));
+    if (ago != null && ago >= 14) reasons.push(T("{v1}日 練習なし", { v1: ago }));
+    if (st.acc7 != null && st.acc7 < 60) reasons.push(T("正答率 {v1}%", { v1: st.acc7 }));
+    const lateHw = curHw.filter((h) => isLate(h) && Math.min(h.sets, (st.hw && st.hw[h.id]) || 0) < h.sets).length;
+    if (lateHw) reasons.push(T("宿題 きげんすぎ {v1}件", { v1: lateHw }));
+    if (reasons.length) return { k: "follow", reasons };
+    if (st.ready && (st.ready.ok || st.ready.pct >= 90)) return { k: "ready", reasons: [T("{g} 合格の めやす {pct}%", { g: st.ready.g, pct: st.ready.pct })] };
+    if (st.acc7 != null && st.acc7 < 75) reasons.push(T("正答率 {v1}%", { v1: st.acc7 }));
+    const weakTech = Object.entries(st.tech || {}).filter(([k, a]) => a[1] >= 5 && a[0] / a[1] < 0.6).map(([k]) => TECH_NAMES[k] || k);
+    if (weakTech.length) reasons.push(T("{v1} が 60% 未満", { v1: weakTech.slice(0, 2).join("・") }));
+    const missN = Object.values(st.miss7 || {}).reduce((a, b) => a + b, 0);
+    if (missN >= 5) reasons.push(T("今週の まちがい {v1}回", { v1: missN }));
+    if (reasons.length) return { k: "hard", reasons };
+    return { k: "ok", reasons: [] };
+  }
+  const TECH_NAMES = { five: T("5の友"), ten: T("10の友"), carry2: T("くり上がり2回"), sub: T("ひき算"), plain: T("たし算"), dg1: T("1桁"), dg2: T("2桁"), dg3: T("3桁"), dg4: T("4桁以上"), tm_s: T("口数2〜3"), tm_m: T("口数4〜6"), tm_l: T("口数7以上"), kuku: T("九九"), kk1: T("かけ算×1桁"), kk2: T("かけ算×2桁"), wr: T("わり算") };
+  function triageHTML(list) {
+    const by = { follow: [], ready: [], hard: [], ok: [], none: [] };
+    list.forEach((s) => { const c = classify(s); by[c.k].push({ s, c }); });
+    const box = (k) => {
+      const K = CLS[k], items = by[k];
+      return '<div class="tri-box ' + K.cls + '"><div class="tri-h">' + K.em + " " + K.n + " <b>" + items.length + T("人") + "</b></div>" +
+        (items.length ? items.map((x) => '<button class="tri-name st-link" data-id="' + x.s.id + '" title="' + esc(x.c.reasons.join(" / ")) + '">' + esc(x.s.nick) + (x.c.reasons.length ? '<small>' + esc(x.c.reasons[0]) + "</small>" : "") + "</button>").join("") : '<span class="tri-none">—</span>') + "</div>";
+    };
+    return '<div class="tri-wrap">' + box("follow") + box("ready") + box("hard") + '<div class="tri-box c-ok"><div class="tri-h">⚪ ' + T("順調") + " <b>" + by.ok.length + T("人") + "</b></div>" + (by.ok.length ? by.ok.map((x) => '<button class="tri-name st-link" data-id="' + x.s.id + '">' + esc(x.s.nick) + "</button>").join("") : '<span class="tri-none">—</span>') + (by.none.length ? '<div class="tri-sub">' + T("まだ 記録なし：") + by.none.map((x) => esc(x.s.nick)).join(T("・")) + "</div>" : "") + "</div></div>" +
+      T('<p class="hint">🔴 要フォロー＝今週 練習なし・14日以上 空いた・正答率 60% 未満・宿題が きげんすぎ。🟢 進級候補＝進級の めやすが「受けられそう」（生徒の 端末が 計算）。🟡 苦戦中＝正答率 60〜74%・技の 正答率 60% 未満・今週 まちがい 5回以上。名前を 押すと その子の 記録へ。</p>');
+  }
   async function renderStudents() {
     curStudents = await S.listStudents(cur.id);
     if (!curStudents.length) { $("#studentTable").innerHTML = T('<p class="cls-empty">まだ 生徒が いません。下の欄に 名前を 入れて 追加してください。</p>'); return; }
-    const rows = curStudents.map((s) => {
-      const st = s.stat || {}, ago = daysAgo(st.last || s.lastSeen);
+    const order = { follow: 0, ready: 1, hard: 2, ok: 3, none: 4 };
+    const sorted = curStudents.slice().sort((a, b) => order[classify(a).k] - order[classify(b).k]);
+    const rows = sorted.map((s) => {
+      const st = s.stat || {}, ago = daysAgo(st.last || s.lastSeen), cl = classify(s), K = CLS[cl.k];
+      const badge = '<span class="cls-badge ' + K.cls + '" title="' + esc(cl.reasons.join(" / ")) + '">' + K.em + " " + K.n + "</span>";
       const last = st.last ? fmtDate(st.last) + (ago >= 3 ? ' <span class="st-warn">' + ago + T("日前</span>") : "") : T('<span class="st-none">まだ</span>');
       const acc = st.acc7 == null ? '<span class="st-none">—</span>' : (st.acc7 >= 80 ? '<span class="st-ok">' : st.acc7 < 60 ? '<span class="st-warn">' : "<span>") + st.acc7 + "%</span>";
       const topMiss = Object.entries(st.miss7 || {}).sort((a, b) => b[1] - a[1])[0];
@@ -438,13 +485,14 @@
         const n = Math.min(h.sets, (st.hw && st.hw[h.id]) || 0), ok = n >= h.sets;
         return '<span class="hw-chip' + (ok ? " ok" : isLate(h) ? " late" : "") + '" title="' + esc(hwLabel(h)) + '">' + (ok ? "✓ " : "") + esc((SUBJ[h.subj] || h.subj).slice(0, 4)) + " " + n + "/" + h.sets + "</span>";
       }).join("") : '<span class="st-none">—</span>';
-      return "<tr><td>" + '<button class="st-link" data-id="' + s.id + '">' + esc(s.nick) + "</button></td>" +
+      return "<tr><td>" + '<button class="st-link" data-id="' + s.id + '">' + esc(s.nick) + "</button></td><td>" + badge + "</td>" +
         '<td class="num">' + (st.n7 || 0) + "</td><td>" + acc + "</td><td>" + last + "</td><td>" + (st.lastG ? esc(st.lastG) : "") + "</td>" +
         "<td>" + hwCell + "</td>" +
         "<td>" + (topMiss ? esc(MISS[topMiss[0]] || topMiss[0]) + " ×" + topMiss[1] : '<span class="st-none">—</span>') + "</td>" +
         '<td><button class="x" data-id="' + s.id + T('" title="消す">✕</button></td></tr>');
     }).join("");
-    $("#studentTable").innerHTML = T('<div class="doc-table"><table class="rec-table"><tr><th>名前</th><th>今週の セット</th><th>正答率</th><th>最後に 練習</th><th>級</th><th>宿題</th><th>いちばん多い まちがい</th><th></th></tr>') + rows + "</table></div>" +
+    $("#studentTable").innerHTML = T("<h2>👀 今日 見る子</h2>") + triageHTML(curStudents) +
+      T('<div class="doc-table"><table class="rec-table"><tr><th>名前</th><th>分類</th><th>今週の セット</th><th>正答率</th><th>最後に 練習</th><th>級</th><th>宿題</th><th>いちばん多い まちがい</th><th></th></tr>') + rows + "</table></div>" +
       T('<p class="sub">「今週」は きょうから 7日間。生徒が アプリで 練習すると、ここに 自動で 入ります。「宿題」は できた数 ／ 出した数。子どもの 端末が 送ってきた ときに 変わります。</p>');
     document.querySelectorAll("#studentTable .st-link").forEach((b) => b.addEventListener("click", () => openStudent(b.dataset.id)));
     document.querySelectorAll("#studentTable .x").forEach((b) => b.addEventListener("click", async () => {
