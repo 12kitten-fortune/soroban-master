@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-395"; // 最新反映の確認用
+const BUILD = "2026-09-14-396"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -1041,9 +1041,13 @@ function renderProfile() {
 function renderGoldPill() { const el = $("#goldPill"); if (el) el.innerHTML = `<img class="ico-coin" src="assets/coin.png" alt="" /> <b>${getGold().toLocaleString()}</b>`; }
 function homeGrade() { const rk = JSON.parse(localStorage.getItem(RANK) || "null"); return rk ? GRADES[rk.idx] : currentGrade(); }
 function routineMenuSummary(grade) {
-  const steps = buildSteps(grade), cnt = {};
-  steps.forEach((s) => { if (s.subj) cnt[s.subj] = (cnt[s.subj] || 0) + s.N; });
-  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => T("<div class=\"menu-row\"><span>{em} {v1}</span><b>{v2}問</b></div>", { em: SUBJ_EM[s] || "", v1: SUBJECT[s].name, v2: cnt[s] })).join("");
+  // 今日の 組み立てを 順番どおりに（まちがい直し → 練習 → にがて特訓 → フラッシュ）
+  const steps = buildSteps(grade).filter((s) => s.rest == null);
+  return steps.map((s) => {
+    const em = s.flash ? "⚡" : (SUBJ_EM[s.subj] || "");
+    const name = s.retry ? T("きのうの まちがい直し") : s.weak ? T("にがて特訓") : s.flash ? T("フラッシュ暗算") : SUBJECT[s.subj].name;
+    return T("<div class=\"menu-row{v4}\"><span>{em} {v1}</span><b>{v2}問</b></div>", { em: s.retry ? "🔁" : s.weak ? "🎯" : em, v1: name, v2: s.N, v4: (s.retry || s.weak) ? " auto" : "" });
+  }).join("");
 }
 /* 1問にかかる時間の うつりかわり。「きのうの じぶん」に 勝つのが いちばん 夢中になる */
 function speedStats() {
@@ -1804,16 +1808,70 @@ const ROUTINE_LEVELS = [
    { subj: "kake", N: 10, timed: false, label: T("かけ算 10もん") }, { rest: 45, next: T("わり算") }, { subj: "wari", N: 10, timed: false, label: T("わり算 10もん") },
    { rest: 60, next: T("みとり算") }, { subj: "mitori", N: 10, timed: false, label: T("みとり算 10もん") }],
 ];
+/* ============================================================ 今日の練習の 自動編成（フェーズB-2）
+   子どもに えらばせない。3日目からは、
+     🔁 きのうの まちがい直し（直近3日の まちがえた 問題を そのまま・5問まで）
+     → 現級の 練習（いままでの メニュー）
+     → 🎯 にがて特訓（弱点診断で いちばん 低い 技の 問題 5問）
+     → ⚡ フラッシュ暗算 5問（5日目から・その級に あれば）
+   ボス戦（たいせん）は 成績発表の ボタンから。 */
+// まちがえた 記録（q＝問題の 文字列）から、同じ 問題を もう一度 作る
+function problemFromMiss(m, subj) {
+  const q = String(m.q || "").trim(); if (!q) return null;
+  if (/[×x]/.test(q)) {
+    const p = q.split(/\s*[×x]\s*/).map((s) => Number(String(s).replace(/,/g, "")));
+    if (p.length !== 2 || !p.every((v) => Number.isFinite(v) && v > 0)) return null;
+    return { subj: "kake", p: { display: `${p[0].toLocaleString()} × ${p[1].toLocaleString()}`, compact: q, answer: p[0] * p[1], fa: p[0], fb: p[1] } };
+  }
+  if (/÷/.test(q)) {
+    const p = q.split(/\s*÷\s*/).map((s) => Number(String(s).replace(/,/g, "")));
+    if (p.length !== 2 || !p.every((v) => Number.isFinite(v) && v > 0) || p[0] % p[1] !== 0) return null;
+    return { subj: "wari", p: { display: `${p[0].toLocaleString()} ÷ ${p[1].toLocaleString()}`, compact: q, answer: p[0] / p[1], dividend: p[0], divisor: p[1], quotient: p[0] / p[1] } };
+  }
+  const parts = q.match(/[+−-]?\d+/g); if (!parts || parts.length < 2) return null;
+  const nums = parts.map((s) => Number(s.replace("−", "-"))); if (nums.some((v) => !Number.isFinite(v))) return null;
+  return { subj: subj === "anzan" ? "anzan" : "mitori", p: mitoriProblem(nums) };
+}
+function retryStep() {
+  const from = daysAgo(3), seen = {}, by = {};
+  allSessions().filter((e) => e.miss && (e.d || "") >= from && e.src !== "battle").reverse().forEach((e) => {
+    e.miss.forEach((m) => { if (!m.q || seen[m.q]) return; seen[m.q] = 1; const r = problemFromMiss(m, e.subj); if (r) (by[r.subj] = by[r.subj] || []).push(r.p); });
+  });
+  const subj = Object.keys(by).sort((a, b) => by[b].length - by[a].length)[0];
+  if (!subj || !SUBJECT[subj]) return null;
+  const queue = by[subj].slice(0, 5);
+  return { subj, N: queue.length, queue, timed: false, retry: true, label: T("🔁 きのうの まちがい直し {n}問", { n: queue.length }) };
+}
+function weakStep() {
+  let kind = "";
+  try { const d = weakDiagnosis(30); kind = (d.rows.find((r) => r.isWeak && r.weak) || {}).weak || ""; } catch (e) { }
+  if (!kind) { const w = weakProfile(14)[0]; if (w && ["five", "ten", "kuku", "skip", "minus", "keta"].includes(w.k)) kind = w.k; }
+  if (!kind) return null;
+  const qs = genWeakSet(kind, 5); if (!qs.length) return null;
+  const K = MISS_KINDS[kind] || MISS_KINDS.other;
+  return { subj: kind === "kuku" ? "kake" : "mitori", N: qs.length, queue: qs, timed: false, weak: kind, label: T("🎯 にがて特訓：{n} {v}問", { n: K.n, v: qs.length }) };
+}
+function flashStep(grade) { return difficulty(grade, "flash") ? { flash: true, N: 5, label: T("⚡ フラッシュ暗算 5問") } : null; }
+// 同じ日は 同じ 組み立て（ホームの 表示と 実際の 練習が ずれないよう、1分ほど 覚える）
+let stepsMemo = null;
 function buildSteps(grade) {
   const lv = routineLevel();
+  if (stepsMemo && stepsMemo.key === grade.key && stepsMemo.lv === lv && Date.now() - stepsMemo.at < 60000) return stepsMemo.steps;
   const base = lv >= 4 ? ROUTINE_TEMPLATE : ROUTINE_LEVELS[lv];
-  const kept = base.filter((s) => s.rest != null || difficulty(grade, s.subj));
+  let list = base.slice();
+  if (lv >= 2) {
+    const retry = retryStep(); if (retry) list = [retry, { rest: 20, next: T("きょうの 練習") }].concat(list);
+    const weak = weakStep(); if (weak) list = list.concat([{ rest: 30, next: T("にがて特訓") }, weak]);
+    if (lv >= 3) { const fl = flashStep(grade); if (fl) list = list.concat([{ rest: 20, next: T("フラッシュ暗算") }, fl]); }
+  }
+  const kept = list.filter((s) => s.rest != null || s.queue || s.flash || difficulty(grade, s.subj));
   const out = [];
   for (let i = 0; i < kept.length; i++) {
     const s = kept[i];
     if (s.rest != null) { const nx = kept[i + 1]; if (out.length === 0 || !nx || nx.rest != null) continue; }
     out.push(s);
   }
+  stepsMemo = { key: grade.key, lv, at: Date.now(), steps: out };
   return out;
 }
 function startRoutine(grade) {
@@ -1829,10 +1887,26 @@ function runStep() {
   if (!step) return finishRoutine();
   if (step.rest != null) showRest(step); else startQuizSection(step);
 }
+/* ⚡ 本日の練習の 中の フラッシュ暗算：ふつうの フラッシュの 画面を 使い、1セット 終わったら つぎの 段へ（finishFlashSet の 中で つなぐ） */
+function startRoutineFlash(step) {
+  const grade = routineState.grade;
+  startFlash(grade);
+  flashExam = { on: false, idx: 0, N: step.N, correct: 0, times: [] };
+  routineState.flashStep = { label: step.label };
+  const total = routineState.steps.filter((s) => s.rest == null).length, done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
+  $("#playGrade").textContent = T("本日の練習 {v1}/{total}：{v3}", { v1: done + 1, total, v3: step.label });
+  $("#flashExamMode").disabled = true; $("#flashCustom").classList.add("hidden");
+  flashIdle(true, T("▶ スタート（{N}問）", { N: step.N }));
+}
 function startQuizSection(step) {
+  if (step.flash) return startRoutineFlash(step);
+  document.body.classList.remove("flashmode");
   const grade = routineState.grade, cf = subjectCfg(grade, step.subj);
   // 採点は最後にまとめて（mode:end）。暗算は入力式（そろばんを出さない）、かけ/わり/みとりはそろばん
   session = { subj: step.subj, grade, cf, N: step.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: !!step.timed, mode: "end", results: [], locking: false, start: performance.now(), cur: null, routine: true, label: step.label, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
+  if (step.queue) session.queue = step.queue.slice();   // まちがい直し・にがて特訓は 用意した 問題を 順に 出す
+  // まちがい直しは その場で ◎× を 見せる（同じ まちがいを くりかえさない）
+  if (step.retry || step.weak) session.mode = "each";
   $("#playMark").classList.add("hidden");
   $("#pauseBtn").classList.remove("hidden"); setPauseUI(false);
   showView("play");
@@ -1873,6 +1947,7 @@ function showRest(step) {
   session = null;
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   hidePauseUI();
+  document.body.classList.remove("flashmode");
   $("#anzanTip").classList.add("hidden"); // 休憩中は消す
   showView("play");
   $("#playProblemWrap").classList.add("hidden");
@@ -1914,6 +1989,7 @@ function finishRoutine() {
   addGold(earned);
   renderProfile(); bigFanfareSnd(); coinSnd(1.4);
   solomonAfterStudy();               // 🐣 本日の練習 完了 → ソロモンの 成長を たしかめる
+  document.body.classList.remove("flashmode");   // 最後が フラッシュでも 成績発表は ふつうの 画面で
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
@@ -1928,8 +2004,9 @@ function finishRoutine() {
   fxCelebrate(3, T("🏁 本日の練習 かんりょう！"), acc >= 90 ? T("正答率 ") + acc + T("%　パーフェクト！") : T("毎日 つづけているのが すごい"));
   const routineHero = T("<div class=\"result-hero\"><img class=\"rh-face\" src=\"assets/king_celebrate.png\" alt=\"レオ王\" /><span class=\"rh-badge\">{routineBadge}</span></div>", { routineBadge });
   const allItems = rs.sections.reduce((a, s) => a.concat(s.items || []), []);   // 本日の練習ぜんぶ分のクセ
-  $("#playResult").innerHTML = T("{routineHero}<div class=\"marks\">正答率 {acc}%（{totalCorrect}/{totalN}）</div>{rows}<div class=\"sub\">合計タイム {v6}</div>{v7}{goldBlock}{v9}{detail}<br><button id=\"toKingdomBtn2\">🧩 パズルへ</button> <button id=\"toRecordsBtn\">📊 グラフを見る</button> <button id=\"routineHomeBtn\" class=\"ghost\">本日の練習へ</button>", { routineHero, acc, totalCorrect, totalN, rows, v6: fmtClock(totalTime), v7: missReportHTML(allItems), goldBlock, v9: maybeDropItem(acc, true), detail });
-  $("#toKingdomBtn2").onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
+  $("#playResult").innerHTML = T("{routineHero}<div class=\"marks\">正答率 {acc}%（{totalCorrect}/{totalN}）</div>{rows}<div class=\"sub\">合計タイム {v6}</div>{v7}{goldBlock}{v9}{detail}<br><button id=\"toBossBtn\">⚔️ ボス戦へ（たいせん）</button> <button id=\"toKingdomBtn2\" class=\"ghost\">🧩 パズルへ</button> <button id=\"toRecordsBtn\" class=\"ghost\">📊 グラフを見る</button> <button id=\"routineHomeBtn\" class=\"ghost\">本日の練習へ</button>", { routineHero, acc, totalCorrect, totalN, rows, v6: fmtClock(totalTime), v7: missReportHTML(allItems), goldBlock, v9: maybeDropItem(acc, true), detail });
+  $("#toBossBtn").onclick = () => { showView("battle"); setActiveNav(document.querySelector('.nav[data-view="asobu"]')); };
+  $("#toKingdomBtn2").onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="asobu"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
   tipOnce("first-result", TIP_RESULT.t, TIP_RESULT.b);
@@ -2616,6 +2693,15 @@ function finishFlashSet(res) {
   renderProfile();
   res.innerHTML = msg; res.className = "result " + (flashExam.on && !pass ? "ng" : "ok");
   $("#flashProgress").textContent = "";
+  // 本日の練習の 中の フラッシュなら、成績を 段に 記録して つぎへ
+  if (routineState && routineState.flashStep) {
+    routineState.sections.push({ label: routineState.flashStep.label, subj: "flash", correct, N, sec: sum, items: [] });
+    routineState.gold = (routineState.gold || 0) + g;
+    routineState.flashStep = null; routineState.stepIdx++;
+    $("#flashExamMode").disabled = false; $("#flashCustom").classList.remove("hidden");
+    res.innerHTML += T('<div class="sub">つぎへ すすみます…</div>');
+    setTimeout(() => { if (routineState) runStep(); }, 2500);
+  }
 }
 
 /* ============================================================ たいせん（CPU対戦ゲーム／レオ王） */

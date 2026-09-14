@@ -1523,3 +1523,5 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 .wd-go { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--ok); color: #fff; border: none; white-space: nowrap; }
 .wd-none { font-size: 13px; color: #7a6a50; }
 @media (max-width: 640px) { .wd-n { min-width: 0; flex: 1 1 100%; } .wd-row { flex-wrap: wrap; row-gap: 2px; } }
+/* 今日の練習の 自動編成：まちがい直し・にがて特訓の 行は 少し 目立たせる */
+.menu-row.auto span { color: #b5651d; font-weight: 800; }
