@@ -557,6 +557,11 @@
                 <option value="3">3枚</option>
                 <option value="5">5枚</option>
               </select></label>
+              <!-- 用紙：日本は A4、アメリカなどは レター。えらんだものを 覚える -->
+              <label>用紙<select id="sheetPaper">
+                <option value="A4">A4</option>
+                <option value="letter">US Letter（レター）</option>
+              </select></label>
             </div>
             <div id="sheetNote" class="sub"></div>
             <div class="btn-row">
@@ -579,10 +584,10 @@
 
     <!-- 級体系（何桁 何口・合格の きまり）は この表。app.js より 先に 読む -->
     <!-- 言葉の しくみ（T()）。ほかの どの script より 先に 読む -->
-    <script src="i18n.js?v=20260914i"></script>
+    <script src="i18n.js?v=20260914j"></script>
     <script src="curriculum/sk.js?v=20260914g"></script>
     <script src="curriculum/presets_jp.js?v=20260914g"></script>
-    <script src="app.js?v=20260914i"></script>
+    <script src="app.js?v=20260914j"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

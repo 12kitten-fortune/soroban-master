@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-393"; // 最新反映の確認用
+const BUILD = "2026-09-14-394"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -4470,7 +4470,21 @@ function sheetBuild() {
   $("#sheetMsg").textContent = T("できました！ 下に 出ています。「印刷する」で 紙に 出せます。");
   $("#sheetOut").scrollIntoView({ behavior: "smooth", block: "start" });
 }
+/* 用紙の 大きさ（A4 ／ US Letter）。@page は CSS の 中でしか きめられないので、印刷の 直前に <style> を 入れかえる。
+   えらんだ 用紙は 覚える。はじめは、ブラウザの 言語が アメリカ英語なら レター、それ以外は A4 */
+const PAPER_KEY = "soroban_paper";
+function sheetPaper() {
+  let v = ""; try { v = localStorage.getItem(PAPER_KEY) || ""; } catch (e) { }
+  if (v !== "A4" && v !== "letter") v = (navigator.language || "").toLowerCase() === "en-us" ? "letter" : "A4";
+  return v;
+}
+function applyPaper(v) {
+  let st = document.getElementById("pageSizeStyle");
+  if (!st) { st = document.createElement("style"); st.id = "pageSizeStyle"; document.head.appendChild(st); }
+  st.textContent = "@media print { @page { size: " + (v === "letter" ? "letter" : "A4") + "; } }";
+}
 function sheetPrint() {
+  const v = sheetPaper(); applyPaper(v);
   document.body.classList.add("print-sheet");
   try { window.print(); } catch (e) { console.error("印刷に失敗", e); }
   setTimeout(() => document.body.classList.remove("print-sheet"), 500);
@@ -4484,6 +4498,8 @@ function sheetPrint() {
   sj.addEventListener("change", sheetUpdateSubj);
   go.addEventListener("click", sheetBuild);
   if (pr) pr.addEventListener("click", sheetPrint);
+  const paper = $("#sheetPaper");
+  if (paper) { paper.value = sheetPaper(); applyPaper(paper.value); paper.addEventListener("change", () => { try { localStorage.setItem(PAPER_KEY, paper.value); } catch (e) { } applyPaper(paper.value); }); }
 })();
 
 
