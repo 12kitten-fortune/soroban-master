@@ -189,14 +189,21 @@
   /* ---------- 級の基準（級体系）：docs/curriculum/sk.js の 表から えらぶ ---------- */
   const CURS = window.SK_CURRICULA || {};
   const CUR_ORDER = (window.SK_CURRICULUM_ORDER || Object.keys(CURS)).filter((k) => CURS[k]);
-  const curOf = (preset) => CURS[preset] || CURS.sk || { name: "標準", grades: [] };
-  const presetOptions = (sel) => CUR_ORDER.map((k) => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + esc(CURS[k].name) + "</option>").join("");
-  $("#ncPreset").innerHTML = presetOptions("sk");
+  const CHECK = window.SK_CURRICULUM_CHECK || ((c) => c);
+  // いまの 教室で 使う 表。custom＝この教室だけの 表（classes.curriculum）。こわれていたら 標準
+  const curOf = (preset) => {
+    if (preset === "custom") return (cur && cur.curriculum && CHECK(cur.curriculum)) || CURS.sk;
+    return CURS[preset] || CURS.sk || { name: "標準", grades: [] };
+  };
+  const presetOptions = (sel, withCustom) => CUR_ORDER.map((k) => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + esc(CURS[k].name) + "</option>").join("") +
+    (withCustom ? '<option value="custom"' + (sel === "custom" ? " selected" : "") + ">✏️ この教室だけの 表（自分で 決める）</option>" : "");
+  $("#ncPreset").innerHTML = presetOptions("sk", false);
   function fillHwGrades(preset) {
     const keys = curOf(preset).grades.map((g) => g.key);
     const def = keys.includes("10級") ? "10級" : keys[0];
-    $("#hwGrade").innerHTML = keys.map((g) => '<option value="' + g + '"' + (g === def ? " selected" : "") + ">" + g + "</option>").join("");
+    $("#hwGrade").innerHTML = keys.map((g) => '<option value="' + esc(g) + '"' + (g === def ? " selected" : "") + ">" + esc(g) + "</option>").join("");
   }
+  const presetNote = (preset) => { const c = curOf(preset); return c.grades.length + "段階（" + c.grades[0].key + "〜" + c.grades.slice(-1)[0].key + "）"; };
   $("#newClassForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#ncName").value.trim(); if (!name) return;
@@ -207,18 +214,128 @@
   $("#clsPreset").addEventListener("change", async () => {
     if (!cur) return;
     const preset = $("#clsPreset").value;
-    await S.updateClass(cur.id, { preset }); cur.preset = preset;
-    fillHwGrades(preset);
-    $("#clsPresetNote").textContent = "保存しました。子どもの アプリは つぎに ひらいたとき「" + curOf(preset).name + "」の 級に なります（" + curOf(preset).grades.length + "段階）";
+    if (preset === "custom") {
+      // はじめて えらんだときは、いまの 表を 写して 出発点に する
+      if (!cur.curriculum || !CHECK(cur.curriculum)) {
+        const base = curOf(cur.preset && cur.preset !== "custom" ? cur.preset : "sk");
+        cur.curriculum = JSON.parse(JSON.stringify(Object.assign({}, base, { id: "custom", name: cur.name + "の 基準", note: "" })));
+      }
+      await S.updateClass(cur.id, { preset: "custom", curriculum: cur.curriculum }); cur.preset = "custom";
+      renderCurEditor();
+    } else {
+      await S.updateClass(cur.id, { preset }); cur.preset = preset;
+      $("#curEditor").classList.add("hidden");
+    }
+    fillHwGrades(cur.preset);
+    $("#clsPresetNote").textContent = "保存しました。子どもの アプリは つぎに ひらいたとき「" + curOf(cur.preset).name + "」の 級に なります（" + curOf(cur.preset).grades.length + "段階）";
   });
+
+  /* ---------- 教室だけの 級の表を 直す（段階3） ----------
+     表は 1行＝1つの 級。しゅもくごとに「あり／なし」と 桁・口 などを 入れる。
+     「保存」で 検査（SK_CURRICULUM_CHECK）して Firestore へ。子どもの アプリは つぎに ひらいたとき その表に なる。 */
+  const SPEC_TXT = (s, kind) => {
+    if (!s) return "";
+    if (kind === "kake") return s.a + "桁×" + s.b + "桁";
+    if (kind === "wari") return s.D + "桁÷" + s.dv + "桁";
+    if (kind === "flash") return s.digits + "桁" + s.terms + "口 " + (s.pace / 1000).toFixed(2) + "秒";
+    if (s.variants) return s.variants.map((v) => v.digits + "桁" + v.terms + "口").join("/");
+    return s.digits + "桁" + s.terms + (s.termsMax ? "〜" + s.termsMax : "") + "口" + (s.sub === false ? "（＋のみ）" : "") + (s.label ? "（" + s.label + "）" : "");
+  };
+  function renderCurEditor() {
+    const box = $("#curEditor"); if (!box) return;
+    const c = cur.curriculum; if (!c) { box.classList.add("hidden"); return; }
+    const num = (cls, v, extra) => '<input type="number" class="' + cls + '" value="' + (v == null ? "" : v) + '" ' + (extra || "") + " />";
+    const chk = (cls, on) => '<input type="checkbox" class="' + cls + '"' + (on ? " checked" : "") + " />";
+    const rows = c.grades.map((g, i) => {
+      const m = g.mitori, k = g.kake, w = g.wari, a = g.anzan, f = g.flash;
+      const mv = m && m.variants ? m.variants[0] : m, av = a && a.variants ? a.variants[0] : a;
+      const special = (m && (m.variants || m.sumMax != null || m.sumMin != null || m.sumExact != null)) || (a && (a.variants || a.sumMax != null || a.sumMin != null || a.sumExact != null));
+      return '<tr data-i="' + i + '" class="' + (m ? "" : "off-mitori ") + (k ? "" : "off-kake ") + (w ? "" : "off-wari ") + (a ? "" : "off-anzan ") + (f ? "" : "off-flash") + '">' +
+        '<td><input type="text" class="ce-key" value="' + esc(g.key) + '" maxlength="12" /></td>' +
+        '<td class="grp">' + chk("m-on", !!m) + "</td><td>" + num("m-in m-d", mv && mv.digits, 'min="1" max="15"') + "</td><td>" + num("m-in m-t", mv && mv.terms, 'min="2" max="30"') + "</td><td>" + '<input type="checkbox" class="m-in m-sub"' + (m && m.sub !== false ? " checked" : "") + " /></td>" +
+        '<td class="grp">' + chk("k-on", !!k) + "</td><td>" + num("k-in k-a", k && k.a, 'min="1" max="12"') + "</td><td>" + num("k-in k-b", k && k.b, 'min="1" max="12"') + "</td>" +
+        '<td class="grp">' + chk("w-on", !!w) + "</td><td>" + num("w-in w-D", w && w.D, 'min="1" max="20"') + "</td><td>" + num("w-in w-dv", w && w.dv, 'min="1" max="12"') + "</td><td>" + num("w-in w-qd", w && w.qd, 'min="1" max="12" placeholder="－"') + "</td>" +
+        '<td class="grp">' + chk("a-on", !!a) + "</td><td>" + num("a-in a-d", av && av.digits, 'min="1" max="15"') + "</td><td>" + num("a-in a-t", av && av.terms, 'min="2" max="30"') + "</td><td>" + '<input type="checkbox" class="a-in a-sub"' + (a && a.sub !== false ? " checked" : "") + " /></td>" +
+        '<td class="grp">' + chk("f-on", !!f) + "</td><td>" + num("f-in f-d", f && f.digits, 'min="1" max="5"') + "</td><td>" + num("f-in f-t", f && f.terms, 'min="2" max="30"') + "</td><td>" + num("f-in f-p", f ? Math.round(f.pace) / 1000 : "", 'min="0.2" max="5" step="0.05"') + "</td>" +
+        '<td class="grp ce-row-btns"><button type="button" class="ghost ce-up" title="上へ">↑</button><button type="button" class="ghost ce-down" title="下へ">↓</button><button type="button" class="ghost ce-copy" title="この級を 写して 下に 足す">＋</button><button type="button" class="ghost ce-del" title="この級を 消す">✕</button>' +
+        (special ? '<div class="ce-note">※特別な形（' + esc(SPEC_TXT(m, "mitori")) + "）。桁・口を 変えると ふつうの 形に なります</div>" : "") + "</td></tr>";
+    }).join("");
+    const sj = c.subjects || {};
+    const subjRow = (k, label) => sj[k] && sj[k].N != null ? '<label>' + label + "：" + num("s-N", sj[k].N, 'data-k="' + k + '" min="1" max="100"') + "問・" + num("s-min", Math.round(sj[k].limit / 60), 'data-k="' + k + '" min="1" max="60"') + "分・合格" + num("s-pass", sj[k].pass, 'data-k="' + k + '" min="0" max="10000"') + "点（1問" + sj[k].per + "点）</label>" : "";
+    box.innerHTML = '<div class="ce-head"><b>✏️ この教室だけの 級の表</b><label>名前 <input type="text" id="ceName" value="' + esc(c.name || "") + '" maxlength="30" /></label>' +
+      '<span class="hint-inline">上が やさしい級・下が むずかしい級。しゅもくが 無い 級は チェックを 外す。数字は 桁と 口（たす数の 個数）。</span></div>' +
+      '<div class="ce-wrap"><table class="ce"><tr><th>級の 名前</th><th class="grp">みとり</th><th>桁</th><th>口</th><th>ひき算</th><th class="grp">かけ</th><th>桁</th><th>×桁</th><th class="grp">わり</th><th>桁</th><th>÷桁</th><th>商の桁</th><th class="grp">あんざん</th><th>桁</th><th>口</th><th>ひき算</th><th class="grp">フラッシュ</th><th>桁</th><th>口</th><th>1個の秒</th><th class="grp"></th></tr>' + rows + "</table></div>" +
+      '<div class="ce-subj"><b>しゅもくの きまり（SK検定・練習の 1セット）</b>' + subjRow("mitori", "みとり算") + subjRow("kake", "かけ算") + subjRow("wari", "わり算") + subjRow("anzan", "あんざん") + "</div>" +
+      '<div class="ce-foot"><button type="button" id="ceSave">💾 表を 保存</button><button type="button" id="ceReset" class="ghost">標準の 表に もどす</button><span id="ceMsg" class="ce-msg"></span></div>';
+    box.classList.remove("hidden");
+    // 行の ボタン：並べかえ・写す・消す（表を 読みとって 直し、描きなおす）
+    box.querySelectorAll("tr[data-i]").forEach((tr) => {
+      const i = +tr.dataset.i;
+      const apply = (fn) => { const read = readCurEditor(); if (!read) return; fn(read.grades); cur.curriculum = read; renderCurEditor(); };
+      tr.querySelector(".ce-up").onclick = () => apply((g) => { if (i > 0) [g[i - 1], g[i]] = [g[i], g[i - 1]]; });
+      tr.querySelector(".ce-down").onclick = () => apply((g) => { if (i < g.length - 1) [g[i + 1], g[i]] = [g[i], g[i + 1]]; });
+      tr.querySelector(".ce-copy").onclick = () => apply((g) => { const cp = JSON.parse(JSON.stringify(g[i])); cp.key = cp.key + "'"; g.splice(i + 1, 0, cp); });
+      tr.querySelector(".ce-del").onclick = () => apply((g) => { if (g.length > 1) g.splice(i, 1); });
+      ["m", "k", "w", "a", "f"].forEach((p) => { const on = tr.querySelector("." + p + "-on"); on.onchange = () => tr.classList.toggle("off-" + { m: "mitori", k: "kake", w: "wari", a: "anzan", f: "flash" }[p], !on.checked); });
+    });
+    $("#ceSave").onclick = async () => {
+      const read = readCurEditor(), msg = $("#ceMsg");
+      const ok = read && CHECK(read);
+      if (!ok) { msg.textContent = "保存できません：数が 範囲外か、級の 名前が 重なっています（" + (readCurEditor.err || "") + "）"; msg.className = "ce-msg ng"; return; }
+      cur.curriculum = ok;
+      await S.updateClass(cur.id, { preset: "custom", curriculum: ok }); cur.preset = "custom";
+      fillHwGrades("custom");
+      msg.textContent = "保存しました（" + ok.grades.length + "段階）。子どもの アプリは つぎに ひらいたとき この表に なります"; msg.className = "ce-msg";
+      $("#clsPresetNote").textContent = presetNote("custom");
+    };
+    $("#ceReset").onclick = async () => {
+      if (!confirm("この教室だけの 表を 消して、標準の 表に もどします。よろしいですか？")) return;
+      cur.curriculum = null; cur.preset = "sk";
+      await S.updateClass(cur.id, { preset: "sk", curriculum: null });
+      $("#clsPreset").innerHTML = presetOptions("sk", true); box.classList.add("hidden"); fillHwGrades("sk");
+      $("#clsPresetNote").textContent = "標準に もどしました。" + presetNote("sk");
+    };
+  }
+  // 表の 画面から 読みとる。特別な形（variants・答えの範囲）は、桁・口を 変えていなければ そのまま 残す
+  function readCurEditor() {
+    const c = cur.curriculum; if (!c) return null;
+    const box = $("#curEditor");
+    const val = (el) => { const v = el.value === "" ? null : Number(el.value); return v == null || isNaN(v) ? null : v; };
+    const grades = [];
+    let err = "";
+    box.querySelectorAll("tr[data-i]").forEach((tr) => {
+      const i = +tr.dataset.i, g0 = c.grades[i] || {};
+      const row = { key: tr.querySelector(".ce-key").value.trim(), band: g0.band || "kyu", n: g0.n || 1 };
+      const keep = (spec, d, t) => {   // 桁・口が 変わっていなければ もとの 形を 残す
+        const base = spec && spec.variants ? spec.variants[0] : spec;
+        if (spec && base && base.digits === d && base.terms === t) return spec;
+        const o = { digits: d, terms: t }; if (spec && spec.sub === false) o.sub = false; if (spec && spec.label && !spec.variants && spec.sumMax == null && spec.sumMin == null) o.label = spec.label; return o;
+      };
+      if (tr.querySelector(".m-on").checked) { const d = val(tr.querySelector(".m-d")), t = val(tr.querySelector(".m-t")); row.mitori = keep(g0.mitori, d, t); row.mitori.sub = tr.querySelector(".m-sub").checked ? undefined : false; if (row.mitori.sub === undefined) delete row.mitori.sub; if (!d || !t) err = row.key + " みとり"; } else row.mitori = null;
+      if (tr.querySelector(".k-on").checked) { row.kake = { a: val(tr.querySelector(".k-a")), b: val(tr.querySelector(".k-b")) }; if (!row.kake.a || !row.kake.b) err = row.key + " かけ算"; } else row.kake = null;
+      if (tr.querySelector(".w-on").checked) { row.wari = { D: val(tr.querySelector(".w-D")), dv: val(tr.querySelector(".w-dv")), qd: val(tr.querySelector(".w-qd")) }; if (!row.wari.D || !row.wari.dv) err = row.key + " わり算"; } else row.wari = null;
+      if (tr.querySelector(".a-on").checked) { const d = val(tr.querySelector(".a-d")), t = val(tr.querySelector(".a-t")); row.anzan = keep(g0.anzan, d, t); row.anzan.sub = tr.querySelector(".a-sub").checked ? undefined : false; if (row.anzan.sub === undefined) delete row.anzan.sub; if (!d || !t) err = row.key + " あんざん"; } else row.anzan = null;
+      if (tr.querySelector(".f-on").checked) { const p = val(tr.querySelector(".f-p")); row.flash = { digits: val(tr.querySelector(".f-d")), terms: val(tr.querySelector(".f-t")), pace: p ? Math.round(p * 1000) : null }; if (!row.flash.digits || !row.flash.terms || !row.flash.pace) err = row.key + " フラッシュ"; } else row.flash = null;
+      if (!row.key) err = (i + 1) + "行目の 級の 名前";
+      grades.push(row);
+    });
+    const subjects = JSON.parse(JSON.stringify(c.subjects || CURS.sk.subjects));
+    box.querySelectorAll(".s-N").forEach((el) => { subjects[el.dataset.k].N = val(el); });
+    box.querySelectorAll(".s-min").forEach((el) => { subjects[el.dataset.k].limit = (val(el) || 1) * 60; });
+    box.querySelectorAll(".s-pass").forEach((el) => { subjects[el.dataset.k].pass = val(el); });
+    readCurEditor.err = err;
+    return { id: "custom", name: ($("#ceName").value || "").trim() || c.name, note: c.note || "", subjects, exams: c.exams, grades };
+  }
 
   /* ---------- 教室 ---------- */
   async function openClass(cid) {
     cur = await S.getClass(cid); if (!cur) return renderClasses();
     $("#clsName").textContent = cur.name;
     $("#clsCode").textContent = cur.code;
-    $("#clsPreset").innerHTML = presetOptions(cur.preset || "sk");
-    $("#clsPresetNote").textContent = curOf(cur.preset || "sk").grades.length + "段階（" + curOf(cur.preset || "sk").grades[0].key + "〜" + curOf(cur.preset || "sk").grades.slice(-1)[0].key + "）";
+    if (cur.preset === "custom" && !CHECK(cur.curriculum)) cur.preset = "sk";   // こわれた 表は 使わない
+    $("#clsPreset").innerHTML = presetOptions(cur.preset || "sk", true);
+    $("#clsPresetNote").textContent = presetNote(cur.preset || "sk");
+    if (cur.preset === "custom") renderCurEditor(); else $("#curEditor").classList.add("hidden");
     fillHwGrades(cur.preset || "sk");
     await renderHomework();          // 生徒の 表に 宿題の 列を 出すので、先に 読む
     await renderStudents();

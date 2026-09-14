@@ -92,7 +92,8 @@ Stripe からの「新しい定期支払い」メールが 合図。全体の �
 ```
 teachers/{uid}                              先生の 名前
 codes/{コード6文字}   → { classId }          コード → 教室
-classes/{cid}                               教室（name, code, teacherUid）
+classes/{cid}                               教室（name, code, teacherUid, preset, curriculum）
+                                            preset＝級の基準（sk／sk10／custom）。custom のとき curriculum に この教室だけの 級の表（先生画面で 直す。子どもは 参加時と 起動時に 受けとる。ルールでは 検査していない＝子ども側で 形を 検査して こわれていたら 標準）
   students/{sid}                            生徒（nick, uids[], stat）
     sessions/{時刻}                          1セットの 記録
   homework/{hid}                            先生が 出した 宿題（subj, g, sets, due, note, createdAt）

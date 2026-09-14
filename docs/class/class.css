@@ -171,3 +171,26 @@ body.cls { font-size: 17px; }
 .cls-preset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; font-size: 15px; }
 .cls-preset-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
 .hint-inline { font-size: 13px; color: #6b5a45; }
+
+/* ---- 教室だけの 級の表（段階3） ---- */
+#curEditor { margin: 8px 0 12px; }
+.ce-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+.ce-head input[type=text] { font-size: 15px; padding: 6px 8px; border: 2px solid #d9cfb8; border-radius: 8px; width: 220px; }
+.ce-wrap { overflow-x: auto; border: 1px solid #e6dcc4; border-radius: 10px; }
+table.ce { border-collapse: collapse; font-size: 13px; min-width: 900px; }
+table.ce th, table.ce td { border-bottom: 1px solid #eee5d0; padding: 4px 6px; text-align: center; white-space: nowrap; }
+table.ce th { background: #f6f0e1; font-weight: 800; color: #16305c; position: sticky; top: 0; }
+table.ce th.grp { border-left: 2px solid #d9cfb8; }
+table.ce td.grp { border-left: 2px solid #d9cfb8; }
+table.ce input[type=number] { width: 52px; font-size: 14px; padding: 4px 4px; border: 1px solid #cfc3a8; border-radius: 6px; text-align: center; }
+table.ce input.ce-key { width: 84px; font-size: 14px; padding: 4px 6px; border: 1px solid #cfc3a8; border-radius: 6px; font-weight: 800; }
+table.ce input[type=checkbox] { transform: scale(1.2); }
+table.ce tr.off-mitori .m-in, table.ce tr.off-kake .k-in, table.ce tr.off-wari .w-in, table.ce tr.off-anzan .a-in, table.ce tr.off-flash .f-in { opacity: .25; pointer-events: none; }
+table.ce .ce-row-btns button { padding: 3px 7px; font-size: 12px; margin: 0 1px; }
+table.ce .ce-note { font-size: 11px; color: #8a7a5c; }
+.ce-subj { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; font-size: 13px; }
+.ce-subj label { display: inline-flex; align-items: center; gap: 4px; }
+.ce-subj input { width: 56px; font-size: 14px; padding: 4px; border: 1px solid #cfc3a8; border-radius: 6px; text-align: center; }
+.ce-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.ce-msg { font-size: 13px; color: #1f8a4c; font-weight: 700; }
+.ce-msg.ng { color: #c0392b; }

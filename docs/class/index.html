@@ -12,15 +12,15 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=385" />
+    <link rel="stylesheet" href="class.css?v=386" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=385"></script>
-    <script src="store.js?v=385"></script>
+    <script src="../firebase-config.js?v=386"></script>
+    <script src="store.js?v=386"></script>
     <!-- 級の基準（級体系）の 表。教室ごとに えらぶ -->
-    <script src="../curriculum/sk.js?v=20260914b"></script>
+    <script src="../curriculum/sk.js?v=20260914c"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -116,6 +116,8 @@
             <label>📘 級の基準 <select id="clsPreset"></select></label>
             <span id="clsPresetNote" class="hint-inline"></span>
           </div>
+          <!-- 「この教室だけの 表」を えらんだとき：級の 表を ここで 直す -->
+          <div id="curEditor" class="hidden"></div>
           <div class="btn-row">
             <button id="cardsBtn">🖨 ログインカードを 印刷</button>
             <button id="noticeBtn" class="ghost">🖨 保護者への 案内を 印刷</button>
@@ -182,6 +184,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=385"></script>
+    <script src="class.js?v=386"></script>
   </body>
 </html>

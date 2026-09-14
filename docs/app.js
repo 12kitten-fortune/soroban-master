@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-386"; // 最新反映の確認用
+const BUILD = "2026-09-14-387"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -34,7 +34,10 @@ function applyCurriculum(c) {
 function pickCurriculum() {
   try {
     const cl = JSON.parse(localStorage.getItem("soroban_classlink") || "null");
-    if (cl && cl.curriculum && Array.isArray(cl.curriculum.grades)) return cl.curriculum;   // 教室だけの 表（段階3）
+    if (cl && cl.preset === "custom" && cl.curriculum) {   // 教室だけの 表（先生が 直したもの）。こわれていたら 標準
+      const ok = window.SK_CURRICULUM_CHECK ? window.SK_CURRICULUM_CHECK(cl.curriculum) : null;
+      if (ok) return ok;
+    }
     if (cl && cl.preset && CURRICULA[cl.preset]) return CURRICULA[cl.preset];
   } catch (e) { }
   return CURRICULA.sk;
@@ -4609,9 +4612,9 @@ async function syncClassPreset(S) {
   const cl = classLink(); if (!cl) return;
   try {
     const c = await S.getClass(cl.cid); if (!c) return;
-    const preset = c.preset || "sk";
-    if (preset === (cl.preset || "sk")) return;
-    cl.preset = preset; localStorage.setItem(CLASSLINK, JSON.stringify(cl));
+    const preset = c.preset || "sk", curr = preset === "custom" ? (c.curriculum || null) : null;
+    if (preset === (cl.preset || "sk") && JSON.stringify(curr) === JSON.stringify(cl.curriculum || null)) return;
+    cl.preset = preset; cl.curriculum = curr; localStorage.setItem(CLASSLINK, JSON.stringify(cl));
     if (!session && !document.body.classList.contains("playing")) location.reload();
   } catch (e) { }
 }
@@ -4817,7 +4820,7 @@ async function joinStep1() {
         try {
           const j = await S.joinClass(c.id, s.id);
           // サーバーに もう ある記録は 送らない（入り直しても 二重に ならない）
-          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, preset: c.preset || "sk", sent: (j && j.latest) || 0 });
+          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, preset: c.preset || "sk", curriculum: c.preset === "custom" ? (c.curriculum || null) : null, sent: (j && j.latest) || 0 });
           fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
           fetchHomework().then(() => pushToClass(false));
           // 教室の 級の基準が いまの 表と ちがえば、読みなおして その表に する

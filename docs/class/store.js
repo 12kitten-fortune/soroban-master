@@ -5,7 +5,7 @@
    データの形（Firebase の Firestore でも 同じ）
      teachers/{uid}                 { name, email, createdAt }
      codes/{code}                   { classId }                       … クラスコード → 教室
-     classes/{cid}                  { name, code, preset, teacherUid, createdAt }
+     classes/{cid}                  { name, code, preset, curriculum?, teacherUid, createdAt }   … preset＝級の基準（sk / sk10 / custom）。custom のとき curriculum に この教室だけの 表
      classes/{cid}/students/{sid}   { nick, createdAt, lastSeen, uids[], stat }
      classes/{cid}/students/{sid}/sessions/{t}   … 1セットの 記録（app.js の logSession と 同じ形）
      classes/{cid}/homework/{hid}   { subj, g, sets, due, note, createdAt }   … 先生が 出した 宿題
@@ -106,7 +106,7 @@
       async removeStudent(cid, sid) { delete db.students[cid][sid]; delete db.sessions[key(cid, sid)]; save(); },
       async listSessions(cid, sid, n) { return (db.sessions[key(cid, sid)] || []).slice(-(n || 300)); },
       /* ---- 生徒側 ---- */
-      async resolveCode(code) { const c = Object.values(db.classes).find((x) => x.code === String(code || "").toUpperCase()); return c ? { id: c.id, name: c.name, preset: c.preset } : null; },
+      async resolveCode(code) { const c = Object.values(db.classes).find((x) => x.code === String(code || "").toUpperCase()); return c ? { id: c.id, name: c.name, preset: c.preset, curriculum: c.curriculum || null } : null; },
       async joinClass(cid, sid) {
         const s = db.students[cid] && db.students[cid][sid]; if (!s) throw new Error("その名前は 教室に ありません");
         s.lastSeen = now(); save();
@@ -229,7 +229,7 @@
         const d = await fs.collection("codes").doc(String(code || "").toUpperCase()).get();
         if (!d.exists) return null;
         const c = await cRef(d.data().classId).get();
-        return c.exists ? { id: c.id, name: c.data().name, preset: c.data().preset } : null;
+        return c.exists ? { id: c.id, name: c.data().name, preset: c.data().preset, curriculum: c.data().curriculum || null } : null;
       },
       async joinClass(cid, sid) {
         const u = await anon();

@@ -400,3 +400,54 @@ window.SK_CURRICULA.sk10 = Object.assign({}, window.SK_CURRICULA.sk, {
 });
 /* 画面の プルダウンに 出す 順番 */
 window.SK_CURRICULUM_ORDER = ["sk", "sk10"];
+
+/* ============================================================
+   教室だけの 表（段階3）の 検査
+   先生画面で 直した 表は Firestore の classes/{cid}.curriculum に 入り、子どもの 端末に 配られる。
+   形が こわれていたら（数が 範囲外・級の 名前が 重複 など）null を 返し、子ども側は 標準に もどす。
+   数は 範囲に おさめ、知らない 項目は 捨てる。しゅもくの 名前・答え方・SK検定の 組み合わせは 標準の まま。
+   ============================================================ */
+window.SK_CURRICULUM_CHECK = function (c) {
+  try {
+    if (!c || typeof c !== "object" || !Array.isArray(c.grades) || !c.grades.length || c.grades.length > 60) return null;
+    const num = (v, lo, hi) => { v = typeof v === "string" ? Number(v) : v; return (typeof v === "number" && isFinite(v) && v >= lo && v <= hi) ? Math.round(v) : null; };
+    const spec = (s, kind) => {
+      if (!s || typeof s !== "object") return null;
+      const o = {};
+      if (kind === "mitori" || kind === "anzan") {
+        if (Array.isArray(s.variants) && s.variants.length) {
+          o.variants = s.variants.slice(0, 4).map((v) => { const d = num(v && v.digits, 1, 15), t = num(v && v.terms, 2, 30); if (!d || !t) return null; const r = { digits: d, terms: t }; const tm = num(v.termsMax, t, 40); if (tm && tm > t) r.termsMax = tm; return r; });
+          if (o.variants.some((v) => !v)) return null;
+        } else {
+          o.digits = num(s.digits, 1, 15); o.terms = num(s.terms, 2, 30); if (!o.digits || !o.terms) return null;
+          const tm = num(s.termsMax, o.terms, 40); if (tm && tm > o.terms) o.termsMax = tm;
+        }
+        if (s.sub === false) o.sub = false;
+        ["sumMin", "sumMax", "sumExact"].forEach((k) => { const v = num(s[k], 0, 999); if (v != null) o[k] = v; });
+        if (typeof s.label === "string" && s.label.trim()) o.label = s.label.trim().slice(0, 40);
+        return o;
+      }
+      if (kind === "kake") { o.a = num(s.a, 1, 12); o.b = num(s.b, 1, 12); return o.a && o.b ? o : null; }
+      if (kind === "wari") { o.D = num(s.D, 1, 20); o.dv = num(s.dv, 1, 12); if (!o.D || !o.dv) return null; o.qd = num(s.qd, 1, 12); return o; }
+      if (kind === "flash") { o.digits = num(s.digits, 1, 5); o.terms = num(s.terms, 2, 30); o.pace = num(s.pace, 200, 5000); if (!o.digits || !o.terms || !o.pace) return null; o.sec = Math.round(o.terms * o.pace / 100) / 10; return o; }
+      return null;
+    };
+    const grades = [];
+    for (const g of c.grades) {
+      if (!g || typeof g.key !== "string" || !g.key.trim() || g.key.trim().length > 12) return null;
+      const row = { key: g.key.trim(), band: g.band === "dan" ? "dan" : "kyu", n: num(g.n, 1, 99) || 1 };
+      ["mitori", "kake", "wari", "anzan", "flash"].forEach((k) => { row[k] = g[k] ? spec(g[k], k) : null; });
+      if (!row.mitori && !row.kake && !row.wari && !row.anzan && !row.flash) return null;
+      grades.push(row);
+    }
+    if (new Set(grades.map((g) => g.key)).size !== grades.length) return null;
+    const base = window.SK_CURRICULA.sk, subjects = {};
+    Object.keys(base.subjects).forEach((k) => {
+      const b = base.subjects[k], src = (c.subjects && c.subjects[k]) || {};
+      subjects[k] = { name: b.name, answer: b.answer };
+      if (b.N != null) { subjects[k].N = num(src.N, 1, 100) || b.N; subjects[k].per = b.per; subjects[k].pass = num(src.pass, 0, 10000) != null ? num(src.pass, 0, 10000) : b.pass; subjects[k].limit = num(src.limit, 10, 3600) || b.limit; }
+    });
+    return { id: "custom", name: String(c.name || "この教室の 基準").trim().slice(0, 30) || "この教室の 基準", note: String(c.note || "").slice(0, 200),
+      subjects, exams: JSON.parse(JSON.stringify(base.exams)), grades };
+  } catch (e) { return null; }
+};
