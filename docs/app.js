@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-391"; // 最新反映の確認用
+const BUILD = "2026-09-14-392"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -67,6 +67,33 @@ function flashPaceMs(g) {
 let gradeIdx = Math.max(0, GRADES.findIndex((g) => g.key === "20級"));   // はじめての子は いちばん やさしい級から
 let subject = "mitori";
 const currentGrade = () => GRADES[gradeIdx];
+
+/* ============================================================ 🔊 読み上げ（文字が まだ 読めない子の ため。ブラウザ内蔵の 読み上げを 使う。外部サービスなし）
+   sayBtn(文) で 🔊 ボタンの HTML を 作り、押すと その文を 読む。読み上げが 使えない ブラウザでは ボタンを 出さない */
+function speakJa(text) {
+  if (!("speechSynthesis" in window)) return false;
+  try {
+    window.speechSynthesis.cancel();
+    const plain = String(text).replace(/<[^>]*>/g, " ").replace(/[▶◎×✓🔊📖]/gu, " ").replace(/\s+/g, " ").trim();   // u＝絵文字を こわさない
+    if (!plain) return false;
+    const u = new SpeechSynthesisUtterance(plain);
+    const lang = (window.SK_I18N && SK_I18N.lang !== "ja") ? SK_I18N.lang : "ja-JP";
+    u.lang = lang; u.rate = 0.92; u.pitch = 1;
+    const v = window.speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith(lang.slice(0, 2)));
+    if (v) u.voice = v;
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch (e) { return false; }
+}
+const canSpeakJa = () => "speechSynthesis" in window;
+const sayBtn = (text, cls) => canSpeakJa()
+  ? '<button type="button" class="say-btn ' + (cls || "") + '" data-say="' + String(text).replace(/<[^>]*>/g, " ").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;") + '" title="' + T("よみあげる") + '" aria-label="' + T("よみあげる") + '">🔊</button>'
+  : "";
+document.addEventListener("click", (e) => {
+  const b = e.target && e.target.closest ? e.target.closest(".say-btn") : null; if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  speakJa(b.dataset.say || (b.parentNode ? b.parentNode.textContent : ""));
+});
 
 /* ============================================================ ジェネレータ */
 function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return Math.floor(Math.random() * (Math.pow(10, d) - 1 - min + 1)) + min; }
@@ -975,12 +1002,13 @@ function updateInfo() {
     subject = first; return updateInfo();
   }
   const cf = subjectCfg(g, subject);
-  let info = T("<b>{v1}／{v2}</b>：{v3}", { v1: g.key, v2: cf.name, v3: specText(g, subject) });
+  let info = T("<b>{v1}／{em}{v2}</b>：{v3}", { v1: g.key, em: (SUBJ_EM[subject] || "") + " ", v2: cf.name, v3: specText(g, subject) });
   if (cf.answer !== "flash") info += T("　｜ {v1}もん・{v2}分いない・{v3}点で ごうかく", { v1: cf.N, v2: cf.limit / 60, v3: cf.pass });
   if (g.band === "dan" || g.kyu > 15) info += T(` <span class="note">※目安</span>`);
+  const say = info;   // 🔊 で 読むのは 級の 説明だけ（ボタンの 文字は 読まない）
   const L = lessonFor(g, subject);
   if (L) info += T(' <button id="lessonBtn" class="ghost lesson-btn">📖 この級の 解きかたを 見る</button>');
-  $("#gradeInfo").innerHTML = info;
+  $("#gradeInfo").innerHTML = info + sayBtn(say);   // 🔊 読み上げ（文字が 読めない子の ため）
   $("#timerToggleWrap").style.display = cf.answer === "flash" ? "none" : "";
   const lb = $("#lessonBtn"); if (lb && L) lb.onclick = () => tipShow(L.t, L.b);
 }
@@ -1007,7 +1035,7 @@ function homeGrade() { const rk = JSON.parse(localStorage.getItem(RANK) || "null
 function routineMenuSummary(grade) {
   const steps = buildSteps(grade), cnt = {};
   steps.forEach((s) => { if (s.subj) cnt[s.subj] = (cnt[s.subj] || 0) + s.N; });
-  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => T("<div class=\"menu-row\"><span>{v1}</span><b>{v2}問</b></div>", { v1: SUBJECT[s].name, v2: cnt[s] })).join("");
+  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => T("<div class=\"menu-row\"><span>{em} {v1}</span><b>{v2}問</b></div>", { em: SUBJ_EM[s] || "", v1: SUBJECT[s].name, v2: cnt[s] })).join("");
 }
 /* 1問にかかる時間の うつりかわり。「きのうの じぶん」に 勝つのが いちばん 夢中になる */
 function speedStats() {
@@ -1443,7 +1471,7 @@ function startSession(subj) {
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", subj !== "anzan"); // あんざんのときだけコツを出す
   $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(subj));
-  $("#playGrade").textContent = session.story ? "📖 " + session.story.label : T("{v1}／{v2}", { v1: grade.key, v2: cf.name }) + (session.timed ? T("（検定）") : T("（記録）"));
+  $("#playGrade").textContent = session.story ? "📖 " + session.story.label : T("{v1}／{em}{v2}", { v1: grade.key, em: (SUBJ_EM[subj] || "") + " ", v2: cf.name }) + (session.timed ? T("（検定）") : T("（記録）"));
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   renderBridge();
   startPlayTimer();
@@ -5195,7 +5223,7 @@ function soloStory(ep, onClose, startIdx) {
       (sc ? '<img class="story-scene-img" src="assets/solomon/scene_' + sc + (String(sc).endsWith("_play") ? ".jpg" : ".png") + SOLO_IMG_VER + '" alt="" onerror="this.parentNode.classList.add(\'noscene\')">' : "") +
       soloPic(L.pose, "story-pic") + "</div>";
     d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
-      scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
+      scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + " " + sayBtn((L.who ? L.who + "。" : "") + L.text, "say-inline") + "</div>" +
       '<button class="tip-ok">' + (P ? T("🧮 はじめる（") + (P.n || 3) + T("問）") : last ? T("とじる") : T("つぎへ ▶")) + "</button>" +
       (P || last ? "" : T('<button class="story-skip-btn hidden">▶▶ とばす</button>')) +
       '<div class="story-skip">' + (i + 1) + " / " + ep.lines.length + "</div></div>";

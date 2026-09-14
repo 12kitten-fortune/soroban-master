@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260913d" />
+    <link rel="stylesheet" href="style.css?v=20260914h" />
   </head>
   <body>
     <div class="app">
@@ -94,7 +94,7 @@
               <div class="hero-top">
                 <div class="hero-avatar" id="homeAvatar"></div>
                 <div class="hero-id"><b id="homeName">そろ太くん</b><br><span class="rank-badge" id="homeRank">未取得</span></div>
-                <div class="hero-speech" id="homeSpeech">きょうもいっしょにがんばろう！</div>
+                <div class="hero-speech" id="homeSpeech">きょうもいっしょにがんばろう！<button type="button" class="say-btn" data-say="きょうも いっしょに がんばろう！" title="よみあげる" aria-label="よみあげる">🔊</button></div>
                 <img class="hero-mascot" src="assets/king.png" alt="レオ王" />
               </div>
               <div class="speed-box" id="speedBox"></div>
@@ -103,7 +103,7 @@
               <div class="today-box">
                 <div class="today-title">今日の練習</div>
                 <div class="today-menu" id="homeMenu"></div>
-                <button id="homeStartBtn" class="big-cta">▶ 今日の練習を始める</button>
+                <button id="homeStartBtn" class="big-cta ic-btn"><span class="ic">▶</span><span class="ic-lb">今日の練習を始める</span></button>
                 <div id="homeStatus" class="today-status"></div>
                 <div id="weakMenu" class="weak-menu"></div>
               </div>
@@ -142,11 +142,12 @@
               </div>
               <div id="gradeGrid" class="grade-grid"></div>
               <div class="options">
-                <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> タイマーを つかう</label>
-                <label class="toggle"><input type="checkbox" id="examMode" /> ぜんぶ こたえてから ◎× を 見る（けんてい方式）</label>
+                <label id="timerToggleWrap" class="toggle"><input type="checkbox" id="timerToggle" checked /> ⏱ タイマーを つかう</label>
+                <label class="toggle"><input type="checkbox" id="examMode" /> 📝 ぜんぶ こたえてから ◎× を 見る（けんてい方式）</label>
                 <label class="toggle"><input type="checkbox" id="mySoroban" /> 🧮 じぶんの そろばんを つかう（画面の そろばんは 出さず、こたえを 数字で 入れる）</label>
                 <div id="gradeInfo" class="sub"></div>
-                <button id="startBtn">▶ はじめる（Enter）</button>
+                <!-- 文字が 読めなくても わかるよう、大きな ▶ が 主役。文字は そえもの -->
+                <button id="startBtn" class="ic-btn"><span class="ic">▶</span><span class="ic-lb">はじめる</span></button>
               </div>
             </div>
 
@@ -274,13 +275,13 @@
         <div id="view-today" class="view hidden">
           <div class="card">
             <h3>🔥 本日の練習メニュー</h3>
-            <p class="sub">じぶんの 級を えらんで「はじめる」。この じゅんばんで すすむよ（きゅうけいは とばしても いい）。</p>
+            <p class="sub">じぶんの 級を えらんで「はじめる」。この じゅんばんで すすむよ（きゅうけいは とばしても いい）。<button type="button" class="say-btn" data-say="じぶんの 級を えらんで、はじめる を おしてね。あんざん、きゅうけい、みとり算の じゅんばんで すすむよ。きゅうけいは とばしても いいよ。" title="よみあげる" aria-label="よみあげる">🔊</button></p>
             <div class="sub" id="todayNote"></div>
             <p class="sub">※ かけ算・わり算が ない級では、そのぶんは とばすよ。</p>
             <div class="row2">
               <label>級・段<select id="todayGrade"></select></label>
             </div>
-            <button id="todayStart">▶ 本日の練習を はじめる</button>
+            <button id="todayStart" class="ic-btn"><span class="ic">▶</span><span class="ic-lb">本日の練習を はじめる</span></button>
           </div>
         </div>
 
@@ -569,10 +570,10 @@
 
     <!-- 級体系（何桁 何口・合格の きまり）は この表。app.js より 先に 読む -->
     <!-- 言葉の しくみ（T()）。ほかの どの script より 先に 読む -->
-    <script src="i18n.js?v=20260914g"></script>
+    <script src="i18n.js?v=20260914h"></script>
     <script src="curriculum/sk.js?v=20260914g"></script>
     <script src="curriculum/presets_jp.js?v=20260914g"></script>
-    <script src="app.js?v=20260914g"></script>
+    <script src="app.js?v=20260914h"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
