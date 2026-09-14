@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-392"; // 最新反映の確認用
+const BUILD = "2026-09-14-393"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -857,7 +857,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: T("ホーム"), solomon: T("ソロモン"), grades: T("級・段を選ぶ"), play: T("れんしゅう"), today: T("本日の練習"), battle: T("たいせん"), puzzle: T("そろばんパズル"), parent: T("保護者"), records: T("記録を見る"), ranking: T("ランキング"), settings: T("設定・プロフィール"), lesson: T("そろばんの きほん"), sheet: T("プリントを 作る"), kentei: T("SK検定"), join: T("教室に 参加") };
+const TITLES = { home: T("ホーム"), solomon: T("ソロモン"), grades: T("級・段を選ぶ"), play: T("れんしゅう"), today: T("本日の練習"), battle: T("たいせん"), puzzle: T("そろばんパズル"), parent: T("保護者"), records: T("記録を見る"), ranking: T("ランキング"), asobu: T("あそぶ"), settings: T("設定・プロフィール"), lesson: T("そろばんの きほん"), sheet: T("プリントを 作る"), kentei: T("SK検定"), join: T("教室に 参加") };
 function showView(v) {
   curView = v;
   bgmForView(v);
@@ -891,7 +891,12 @@ function fitSoroPad() {
   document.body.style.setProperty("--soroPad", (h || 0) + "px");
   if (fitLast) fitProblem(null);
 }
-function setActiveNav(el) { $$(".nav").forEach((n) => n.classList.remove("active")); if (el) el.classList.add("active"); }
+function setActiveNav(el) {
+  $$(".nav").forEach((n) => n.classList.remove("active"));
+  if (el) { el.classList.add("active"); const d = el.closest && el.closest("details.nav-more"); if (d) d.open = true; }   // たたんだ 中の 画面なら ひらく
+}
+/* 🎮 あそぶ：たいせん／パズル を えらぶ 画面（子どもの メニューを 4つに するため） */
+$$(".asobu-btn").forEach((b) => b.addEventListener("click", () => { showView(b.dataset.go); setActiveNav(document.querySelector('.nav[data-view="asobu"]')); }));
 // 画面を離れるときは進行中のものをすべて破棄する（採点・GOLD付与・記録保存はしない）
 function abandonActivity() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
@@ -4681,7 +4686,7 @@ function hwStart(h) {
   subject = h.subj;
   if (!difficulty(currentGrade(), subject)) { alert(T("この級には ") + ((SUBJECT[subject] && SUBJECT[subject].name) || subject) + T(" が ありません。先生に つたえてね。")); return; }
   renderGrid(); updateInfo();
-  setActiveNav(document.querySelector('.nav[data-subj="' + subject + '"]'));
+  setActiveNav(document.querySelector('.nav[data-view="grades"]'));
   startWithTips(subject);
 }
 function renderHomework() {

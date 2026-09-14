@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260914h" />
+    <link rel="stylesheet" href="style.css?v=20260914j" />
   </head>
   <body>
     <div class="app">
@@ -47,30 +47,27 @@
           <!-- スマホのときだけ出る。おしてメニューを開く -->
           <button id="navToggle" class="nav-toggle" aria-label="メニュー" aria-expanded="false">☰</button>
         </div>
+        <!-- 子どもの メニューは 4つだけ（フェーズA-4）。しゅもくは「れんしゅう」の 中で えらぶ。
+             きろく・けんてい・教室は「もっと」、大人向けは「おとなの方へ」に たたむ -->
         <nav class="side-nav" id="sideNav">
-          <button class="nav active" data-view="home">🏠 ホーム</button>
-          <button class="nav" data-view="today">🔥 本日の練習</button>
-          <div class="nav-sec">学習する</div>
-          <button class="nav subj-nav" data-subj="mitori">🧮 みとり算</button>
-          <button class="nav subj-nav" data-subj="kake">✏️ かけ算</button>
-          <button class="nav subj-nav" data-subj="wari">➗ わり算</button>
-          <button class="nav subj-nav" data-subj="flash">⚡ フラッシュ暗算</button>
-          <button class="nav subj-nav" data-subj="anzan">💭 あんざん</button>
-          <button class="nav" data-view="grades">📘 級・段を選ぶ</button>
-          <div class="nav-sec">あそぶ</div>
-          <button class="nav" data-view="battle">⚔️ たいせん</button>
-          <button class="nav" data-view="puzzle">🧩 パズル</button>
-          <div class="nav-sec">きょうしつ</div>
-          <button class="nav" data-view="join">🏫 教室に 参加</button>
-          <div class="nav-sec">けんてい</div>
-          <button class="nav" data-view="kentei">🏅 SK検定</button>
-          <div class="nav-sec">きろく</div>
-          <button class="nav" data-view="records">📊 記録を見る</button>
-          <button class="nav" data-view="ranking">🏆 ランキング</button>
-          <button class="nav" data-view="solomon">🐣 ソロモン図鑑</button>
-          <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
-          <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
-          <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
+          <button class="nav nav-main active" data-view="home"><span class="nav-ic">🏠</span><span class="nav-lb">ホーム</span></button>
+          <button class="nav nav-main" data-view="today"><span class="nav-ic">🔥</span><span class="nav-lb">本日の練習</span></button>
+          <button class="nav nav-main" data-view="grades"><span class="nav-ic">🧮</span><span class="nav-lb">れんしゅう</span></button>
+          <button class="nav nav-main" data-view="asobu"><span class="nav-ic">🎮</span><span class="nav-lb">あそぶ</span></button>
+          <details class="nav-more" id="navMore1">
+            <summary>▸ きろく・けんてい・教室</summary>
+            <button class="nav" data-view="records">📊 記録を見る</button>
+            <button class="nav" data-view="ranking">🏆 ランキング</button>
+            <button class="nav" data-view="solomon">🐣 ソロモン図鑑</button>
+            <button class="nav" data-view="kentei">🏅 SK検定</button>
+            <button class="nav" data-view="join">🏫 教室に 参加</button>
+          </details>
+          <details class="nav-more" id="navMore2">
+            <summary>▸ おとなの方へ</summary>
+            <button class="nav" data-view="sheet">🖨 プリントを 作る</button>
+            <button class="nav" data-view="parent">👨‍👩‍👧 保護者</button>
+            <button class="nav" data-view="settings">⚙️ 設定・プロフィール</button>
+          </details>
         </nav>
       </aside>
 
@@ -118,6 +115,18 @@
               <button id="homeToKingdom" class="wide-btn">🧩 パズルで あそぶ</button>
               <button id="homeToRecords" class="wide-btn ghost">📊 成績を見る</button>
             </aside>
+          </div>
+        </div>
+
+        <!-- 🎮 あそぶ：たいせん と パズル を えらぶ（子どもの メニューを 4つに するため） -->
+        <div id="view-asobu" class="view hidden">
+          <div class="card asobu-card">
+            <h3>🎮 あそぶ</h3>
+            <p class="sub">GOLD は そろばんの れんしゅうで ふえるよ。あそびでは つかうだけ。<button type="button" class="say-btn" data-say="ゴールドは そろばんの れんしゅうで ふえるよ。あそびでは つかうだけ。" title="よみあげる" aria-label="よみあげる">🔊</button></p>
+            <div class="asobu-grid">
+              <button class="asobu-btn" data-go="battle"><span class="asobu-ic">⚔️</span><span>たいせん</span><small>レオ王と いっしょに ミスモンスターを たおす</small></button>
+              <button class="asobu-btn" data-go="puzzle"><span class="asobu-ic">🧩</span><span>パズル</span><small>そろばんの 玉を ならべて 消す</small></button>
+            </div>
           </div>
         </div>
 
@@ -570,10 +579,10 @@
 
     <!-- 級体系（何桁 何口・合格の きまり）は この表。app.js より 先に 読む -->
     <!-- 言葉の しくみ（T()）。ほかの どの script より 先に 読む -->
-    <script src="i18n.js?v=20260914h"></script>
+    <script src="i18n.js?v=20260914i"></script>
     <script src="curriculum/sk.js?v=20260914g"></script>
     <script src="curriculum/presets_jp.js?v=20260914g"></script>
-    <script src="app.js?v=20260914h"></script>
+    <script src="app.js?v=20260914i"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

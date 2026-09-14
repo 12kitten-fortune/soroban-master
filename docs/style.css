@@ -1471,3 +1471,35 @@ summary { cursor: pointer; font-weight: 700; padding: 10px 0; color: var(--frame
 #gradeInfo .say-btn { margin-left: 8px; }
 .hero-speech .say-btn { margin-left: 8px; width: 28px; height: 28px; font-size: 14px; }
 .result .say-btn { margin: 4px 0 0 6px; }
+
+/* ============================================================ 子どもの メニューは 4つ（フェーズA-4）
+   ホーム・本日の練習・れんしゅう・あそぶ を 大きな 絵で。ほかは「▸ もっと」に たたむ */
+.nav.nav-main { display: flex; align-items: center; gap: 12px; padding: 12px 12px; font-size: 16px; font-weight: 800; }
+.nav.nav-main .nav-ic { font-size: 26px; line-height: 1; width: 32px; text-align: center; }
+.nav-more { margin-top: 8px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 6px; }
+.nav-more summary { cursor: pointer; font-size: 12px; opacity: .65; padding: 6px 12px; list-style: none; letter-spacing: .5px; }
+.nav-more summary::-webkit-details-marker { display: none; }
+.nav-more[open] summary { opacity: .9; }
+.nav-more .nav { display: block; width: 100%; font-size: 13px; padding: 8px 12px 8px 20px; }
+.asobu-card { max-width: 720px; }
+.asobu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+.asobu-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px; border-radius: 16px; background: linear-gradient(180deg, #fff8e4, #ffefc4); color: var(--navy); border: 3px solid var(--royal-gold); font-size: 20px; font-weight: 900; box-shadow: 0 4px 0 #b8912a; }
+.asobu-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b8912a; }
+.asobu-btn .asobu-ic { font-size: 56px; line-height: 1; }
+.asobu-btn small { font-size: 12px; font-weight: 500; color: #6b5a45; }
+@media (max-width: 900px) {
+  .side-nav.open .nav-more { grid-column: 1 / -1; border-top: none; margin-top: 4px; padding-top: 0; }
+  .side-nav.open .nav-more summary { text-align: left; }
+  .side-nav.open .nav-more .nav { display: inline-block; width: auto; margin: 3px 4px 3px 0; text-align: left; }
+  .nav.nav-main { justify-content: center; flex-direction: column; gap: 4px; padding: 10px 6px; }
+  .nav.nav-main .nav-ic { font-size: 30px; width: auto; }
+  .nav.nav-main .nav-lb { font-size: 13px; }
+}
+@media (max-width: 640px) { .asobu-grid { grid-template-columns: 1fr; } }
+/* たたむ 部分は サイドバーの 色の まま（ほかの details の 白い 箱の 見た目を 打ち消す） */
+.side-nav details.nav-more, .side-nav.open details.nav-more { background: transparent; border: none; border-top: 1px solid rgba(255,255,255,.12); border-radius: 0; padding: 6px 0 0; margin: 8px 0 0; box-shadow: none; color: #e8e0d2; }
+.side-nav details.nav-more > summary { background: transparent; color: #e8e0d2; border: none; padding: 6px 12px; font-weight: 700; }
+.side-nav details.nav-more .nav { color: #e8e0d2; background: transparent; }
+.side-nav details.nav-more .nav:hover { background: var(--side-hi); }
+.side-nav details.nav-more .nav.active { background: var(--gold); color: #2b2b2b; }
+@media (max-width: 900px) { .side-nav.open details.nav-more .nav { background: rgba(255,255,255,.08); } }
