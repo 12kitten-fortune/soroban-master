@@ -194,3 +194,9 @@ table.ce .ce-note { font-size: 11px; color: #8a7a5c; }
 .ce-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .ce-msg { font-size: 13px; color: #1f8a4c; font-weight: 700; }
 .ce-msg.ng { color: #c0392b; }
+/* ---- 級体系の くらべ表 ---- */
+.cur-compare { margin: 6px 0 10px; border: 1px dashed #d9cfb8; border-radius: 10px; padding: 6px 12px; background: #fffdf7; }
+.cur-compare summary { cursor: pointer; font-weight: 700; color: #16305c; font-size: 14px; }
+table.ce.cmp { min-width: 0; width: 100%; }
+table.ce.cmp td { white-space: normal; font-size: 13px; line-height: 1.5; }
+table.ce.cmp td:first-child { background: #f6f0e1; }

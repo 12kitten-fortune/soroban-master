@@ -12,13 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=389" />
+    <link rel="stylesheet" href="class.css?v=390" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=389"></script>
-    <script src="store.js?v=389"></script>
+    <script src="../firebase-config.js?v=390"></script>
+    <script src="store.js?v=390"></script>
     <!-- 級の基準（級体系）の 表。教室ごとに えらぶ -->
     <script src="../curriculum/sk.js?v=20260914f"></script>
     <script src="../curriculum/presets_jp.js?v=20260914f"></script>
@@ -117,6 +117,8 @@
             <label>📘 級の基準 <select id="clsPreset"></select></label>
             <span id="clsPresetNote" class="hint-inline"></span>
           </div>
+          <!-- 級体系どうしの くらべ表（めやす）。「標準の ○級 ≒ 日商風の ○級」を 一目で -->
+          <details id="curCompare" class="cur-compare"><summary>📊 級体系の くらべ表（どの級が だいたい 同じか・めやす）</summary><div id="curCompareBody"></div></details>
           <!-- 「この教室だけの 表」を えらんだとき：級の 表を ここで 直す -->
           <div id="curEditor" class="hidden"></div>
           <div class="btn-row">

@@ -204,6 +204,46 @@
     $("#hwGrade").innerHTML = keys.map((g) => '<option value="' + esc(g) + '"' + (g === def ? " selected" : "") + ">" + esc(g) + "</option>").join("");
   }
   const presetNote = (preset) => { const c = curOf(preset); return c.grades.length + "段階（" + c.grades[0].key + "〜" + c.grades.slice(-1)[0].key + "）" + (c.note ? "　※ " + c.note : ""); };
+
+  /* ---------- 級体系の くらべ表（めやす） ----------
+     級ごとの「むずかしさの 点数」を 桁・口・かけ算わり算の 桁から 出し、標準の 級の ものさしに 当てはめる。
+     公式の 互換では ない。「標準の 6級 ≒ 日商風の 6級 ≒ UCMAS風の Intermediate B」のような 見当を つけるため。 */
+  // そろばんで 答える しゅもく（珠算）と 頭の中で 計算する しゅもく（暗算）は 別の ものさしで くらべる
+  function gradeScore(c, g) {
+    const isInput = (k) => !!(c.subjects && c.subjects[k] && c.subjects[k].answer === "input");
+    const vs = (s) => (s && s.variants) ? s.variants : (s ? [s] : []);
+    let soro = 0, anz = 0;
+    const put = (k, val) => { if (isInput(k)) anz = Math.max(anz, val); else soro = Math.max(soro, val); };
+    vs(g.mitori).forEach((v) => put("mitori", v.digits * 10 + v.terms));
+    vs(g.anzan).forEach((v) => put("anzan", v.digits * 10 + v.terms));
+    vs(g.kake).forEach((v) => put("kake", (v.a + v.b) * 7));
+    vs(g.wari).forEach((v) => put("wari", (v.dv + (v.qd || 1)) * 7));
+    return { soro, anz };
+  }
+  function renderCompare() {
+    const body = $("#curCompareBody"); if (!body) return;
+    const base = CURS.sk; if (!base) return;
+    // 標準の ものさし（珠算・暗算 それぞれ。上の級ほど 大きく なるよう ならす）
+    let rs = -1, ra = -1;
+    const scale = base.grades.map((g) => { const s = gradeScore(base, g); rs = Math.max(rs + 0.01, s.soro); ra = Math.max(ra + 0.01, s.anz); return { key: g.key, soro: rs, anz: ra }; });
+    const others = CUR_ORDER.filter((k) => k !== "sk" && k !== "sk10").map((k) => CURS[k]);
+    if (cur && cur.preset === "custom" && cur.curriculum && CHECK(cur.curriculum)) others.push(CHECK(cur.curriculum));
+    const cell = {}; others.forEach((c, ci) => {
+      let r = -1, prevRow = -1;
+      c.grades.forEach((g) => {
+        const s = gradeScore(c, g), useSoro = s.soro > 0, v = useSoro ? s.soro : s.anz; r = Math.max(r + 0.01, v);
+        let best = 0; scale.forEach((x, i) => { const xv = useSoro ? x.soro : x.anz; if (Math.abs(xv - r) < Math.abs((useSoro ? scale[best].soro : scale[best].anz) - r)) best = i; });
+        // 同じ 級体系の 中では 上の級ほど 下の行に（桁が 同じで 合格点だけ ちがう 段位などが 1つの 行に かたまらないように）
+        if (best <= prevRow) best = Math.min(scale.length - 1, prevRow + 1);
+        prevRow = best;
+        (cell[best + ":" + ci] = cell[best + ":" + ci] || []).push(g.key);
+      });
+    });
+    body.innerHTML = '<p class="hint-inline">桁・口数・かけ算わり算の 桁から 出した めやすです（そろばんで 答える 級は 標準の 珠算と、頭の中で 計算する 級は 標準の あんざんと くらべる）。公式の 互換では ありません。同じ行＝だいたい 同じ むずかしさ。</p>' +
+      '<div class="ce-wrap"><table class="ce cmp"><tr><th>標準</th>' + others.map((c) => "<th>" + esc(c.name.replace(/（.*?）/g, "")) + "</th>").join("") + "</tr>" +
+      scale.map((s, i) => "<tr><td><b>" + esc(s.key) + "</b></td>" + others.map((c, ci) => "<td>" + (cell[i + ":" + ci] || []).map(esc).join("<br>") + "</td>").join("") + "</tr>").join("") + "</table></div>";
+  }
+  $("#curCompare").addEventListener("toggle", () => { if ($("#curCompare").open) renderCompare(); });
   $("#newClassForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#ncName").value.trim(); if (!name) return;
