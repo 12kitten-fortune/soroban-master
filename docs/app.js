@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-398"; // 最新反映の確認用
+const BUILD = "2026-09-14-399"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -879,7 +879,7 @@ function showView(v) {
   if (v === "sheet") renderSheet();
   if (v === "kentei") renderKentei();
   if (v === "ranking") renderRanking();
-  if (v === "parent") renderParentTech();
+  if (v === "parent") { renderParentTech(); renderParentReady(); }
   if (v === "notes") renderNotes();
   if (v === "join") renderJoin();
   // 練習・たいせん中は スマホの上のバーを しまう（そのぶん 問題とそろばんを 大きく使う）
@@ -1113,6 +1113,7 @@ function renderHome() {
   renderWeakMenu();
   renderWeakDiag();   // 🔍 弱点しんだん（技ごとの 正答率）
   renderNoteHome();   // 📒 まちがいノートの 数
+  renderReadyHome();  // 🎯 進級の めやす
   renderHomework();                  // 教室に 入っている子：先生からの 宿題
   renderSolomonCard();               // 🐣 ソロモン
   renderGoldPill();
@@ -1354,6 +1355,68 @@ function renderSkillTree() {
   const any = Object.values(tot).some((a) => a[1] > 0);
   el.innerHTML = SKILL_GROUPS.map((g) => `<div class="sk-group"><div class="sk-gh">${g.n}</div><div class="sk-row">${g.keys.map(node).join('<span class="sk-ar">→</span>')}</div></div>`).join("") +
     (any ? "" : T('<p class="sub">れんしゅうすると ★が ついていくよ（技の 記録は 今日からの 練習で たまります）。</p>'));
+}
+/* ============================================================ 🎯 進級の めやす（フェーズB-5）
+   直近30日の その級の 練習（最新 5セットまで）から、SK検定に 受かりそうかを しゅもくごとに 見る。
+     正答率 ＝ 合格点 ÷ 満点 と くらべる／速さ ＝ 1問の 秒 × 問題数 が 制限時間に 入るか
+   「めやす」であって 予測では ない（データが 揃うまで AI予測とは 名乗らない）。 */
+function readiness(grade, track) {
+  const steps = examSteps(grade, track); if (!steps.length) return null;
+  const from = daysAgo(30), all = allSessions();
+  const rows = steps.map(({ subj, cf }) => {
+    const ss = all.filter((e) => e.g === grade.key && e.subj === subj && (e.d || "") >= from && e.src !== "battle" && (e.N || 0) >= 3).slice(-5);
+    if (!ss.length) return { subj, name: cf.name, none: true };
+    const N = ss.reduce((a, e) => a + (e.N || 0), 0), C = ss.reduce((a, e) => a + (e.correct || 0), 0), sec = ss.reduce((a, e) => a + (e.sec || 0), 0);
+    const acc = N ? C / N : 0, need = cf.per && cf.N ? cf.pass / (cf.N * cf.per) : 0.7;
+    const perQ = N ? sec / N : 0, needPerQ = cf.limit && cf.N ? cf.limit / cf.N : 0;
+    const accScore = need ? acc / need : 1, spScore = needPerQ && perQ > 0 ? needPerQ / perQ : 1;
+    return { subj, name: cf.name, sessions: ss.length, acc: Math.round(acc * 100), need: Math.round(need * 100), perQ, needPerQ,
+      accOk: acc >= need, speedOk: !needPerQ || perQ <= needPerQ, score: Math.min(1.2, Math.min(accScore, spScore)) };
+  });
+  const have = rows.filter((r) => !r.none);
+  const overall = have.length ? Math.min(...have.map((r) => r.score)) : null;
+  return { grade, track, rows, overall, pct: overall == null ? null : Math.round(Math.min(100, overall * 100)),
+    ready: have.length === rows.length && have.every((r) => r.accOk && r.speedOk && r.sessions >= 2) };
+}
+function readinessHTML(R, opts) {
+  const o = opts || {};
+  if (!R) return "";
+  const chips = R.rows.map((r) => {
+    if (r.none) return T('<span class="rd-chip none">{name}：まだ この級の 記録なし</span>', { name: r.name });
+    const parts = [];
+    parts.push((r.accOk ? "✅ " : "⚠ ") + T("正答率 {acc}%", { acc: r.acc }) + (r.accOk ? "" : T("（合格は {need}%）", { need: r.need })));
+    if (r.needPerQ) parts.push((r.speedOk ? "✅ " : "⚠ ") + T("速さ 1問 {v1}秒", { v1: r.perQ.toFixed(1) }) + (r.speedOk ? "" : T("（{v2}秒 以内に）", { v2: r.needPerQ.toFixed(1) })));
+    return `<span class="rd-chip ${r.accOk && r.speedOk ? "ok" : "ng"}"><b>${r.name}</b> ${parts.join("　")}</span>`;
+  }).join("");
+  const head = R.pct == null ? T("まだ この級の 記録が ありません。れんしゅうすると めやすが 出ます。")
+    : R.ready ? T("いつでも 受けられそう！ 合格の めやす <b>{pct}%</b>", { pct: R.pct })
+    : T("合格の めやす <b>{pct}%</b>", { pct: R.pct });
+  return `<div class="rd-head">🎯 ${T("{g} {t}：", { g: R.grade.key, t: (EXAM_TRACKS[R.track] || {}).name || "" })}${head} ${sayBtn(String(head).replace(/<[^>]*>/g, ""))}</div><div class="rd-chips">${chips}</div>` +
+    (R.ready && !o.noBtn ? T('<button class="rd-go">🏅 SK検定を 受けてみる</button>') : "") +
+    (o.note === false ? "" : T('<div class="rd-note">直近30日の 練習からの めやす（予測では ありません）</div>'));
+}
+// めやすを 出す 級＝直近30日で いちばん 練習している 級（無ければ ホームの 級）
+function readyTargetGrade() {
+  const from = daysAgo(30), cnt = {}, last = {};
+  allSessions().forEach((e) => { if (!e.g || (e.d || "") < from || e.src === "battle") return; cnt[e.g] = (cnt[e.g] || 0) + 1; last[e.g] = e.t || 0; });
+  const key = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || last[b] - last[a])[0];
+  return (key && GRADES.find((g) => g.key === key)) || homeGrade();
+}
+function renderReadyHome() {
+  const el = $("#gradeReady"); if (!el) return;
+  const g = readyTargetGrade(); if (!g) { el.classList.add("hidden"); return; }
+  const track = examSteps(g, "soroban").length ? "soroban" : examSteps(g, "anzan").length ? "anzan" : "";
+  const R = track ? readiness(g, track) : null;
+  if (!R || R.pct == null) { el.classList.add("hidden"); return; }
+  el.classList.remove("hidden");
+  el.innerHTML = readinessHTML(R, {});
+  const b = el.querySelector(".rd-go"); if (b) b.onclick = () => { showView("kentei"); setActiveNav(document.querySelector('.nav[data-view="kentei"]')); const sel = $("#exGrade"); if (sel) { sel.value = String(gradeIdxOf(g)); $("#exTrack").value = track; examUpdateSpec(); } };
+}
+function renderParentReady() {
+  const el = $("#parentReady"); if (!el) return;
+  const g = readyTargetGrade(); if (!g) { el.innerHTML = ""; return; }
+  const parts = ["soroban", "anzan"].map((t) => readiness(g, t)).filter(Boolean).map((R) => readinessHTML(R, { noBtn: true, note: false }));
+  el.innerHTML = parts.length ? parts.join("") + T('<p class="sub">直近30日の その級の 練習（最新5セット）から。正答率は 合格点÷満点、速さは 1問の 秒×問題数 が 制限時間に 入るか、で 見ています。予測では なく めやすです。</p>') : T('<p class="sub">この級の 記録が たまると 出ます。</p>');
 }
 function renderParentTech() {
   const el = $("#parentTech"); if (!el) return;
@@ -4858,6 +4921,9 @@ function examUpdateSpec() {
     steps.map((s) => "<tr><td>" + s.cf.name + "</td><td>" + s.cf.N + T("問</td><td>") + Math.round(s.cf.limit / 60) + T("分</td><td>") + s.cf.pass + T("点／") + (s.cf.N * s.cf.per) + T("点</td></tr>")).join("") +
     '</table><p class="sub">' + (steps.length > 1 ? T("ぜんぶの しゅもくで ごうかく点を とると ") : "") + g.key + " " + EXAM_TRACKS[track].name + T(" 合格。") +
     (steps.length > 1 ? T("しゅもくの あいだに 30秒の 休けいが あります。") : "") + "</p>";
+  // 🎯 進級の めやす：この級の 直近の 練習から 受かりそうかを 出す
+  const R = readiness(g, track);
+  if (R) box.innerHTML += '<div class="rd-box">' + readinessHTML(R, { noBtn: true }) + "</div>";
 }
 function startExam() {
   const g = GRADES[+$("#exGrade").value], track = $("#exTrack").value;

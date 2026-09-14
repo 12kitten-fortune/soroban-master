@@ -36,7 +36,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- 子ども向けの まるいゴシック。読みこめなくても 下の 端末内の書体で きれいに 出る -->
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=20260914n" />
+    <link rel="stylesheet" href="style.css?v=20260914o" />
   </head>
   <body>
     <div class="app">
@@ -96,6 +96,8 @@
                 <img class="hero-mascot" src="assets/king.png" alt="レオ王" />
               </div>
               <div class="speed-box" id="speedBox"></div>
+              <!-- 🎯 進級の めやす（この級の 記録が あるときだけ） -->
+              <div id="gradeReady" class="rd-box home hidden"></div>
               <!-- 教室に 入っている子だけ：先生からの 宿題 -->
               <div id="homeHw" class="hw-box hidden"></div>
               <div class="today-box">
@@ -476,6 +478,7 @@
           <div class="card"><h3>今週の学習量（問題数）</h3><div id="parentWeek"></div></div>
           <div class="card"><h3>得意・苦手（種目別 正答率・直近30日）</h3><div id="parentSubjects"></div></div>
           <div class="card"><h3>🔍 弱点診断（技ごとの 正答率・直近30日）</h3><div id="parentTech"></div></div>
+          <div class="card"><h3>🎯 進級の めやす（いまの 級の SK検定に 受かりそうか）</h3><div id="parentReady"></div></div>
         </div>
 
         <!-- 設定 -->
@@ -609,7 +612,7 @@
     <script src="i18n.js?v=20260914j"></script>
     <script src="curriculum/sk.js?v=20260914g"></script>
     <script src="curriculum/presets_jp.js?v=20260914g"></script>
-    <script src="app.js?v=20260914n"></script>
+    <script src="app.js?v=20260914o"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
