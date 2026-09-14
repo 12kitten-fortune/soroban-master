@@ -164,3 +164,10 @@ body.cls { font-size: 17px; }
 .hw-chip.ok { color: #1f8a4c; background: #e7f5ec; }
 .hw-chip.late { color: #b33; background: #fdecec; }
 @media (max-width: 640px) { .hw-grid { grid-template-columns: 1fr 1fr; } }
+
+/* ---- 級の基準（級体系）の えらぶ 所 ---- */
+.nc-preset { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.nc-preset select, .cls-preset-row select { font-size: 15px; padding: 6px 8px; border: 2px solid #d9cfb8; border-radius: 8px; background: #fff; }
+.cls-preset-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 8px 0; font-size: 15px; }
+.cls-preset-row label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.hint-inline { font-size: 13px; color: #6b5a45; }

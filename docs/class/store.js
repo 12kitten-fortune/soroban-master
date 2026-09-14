@@ -81,9 +81,9 @@
       async countStudents() { return Object.values(db.students).reduce((a, m) => a + Object.keys(m).length, 0); },
       async signOut() { db.teacher = null; save(); fire(); },
       async listClasses() { return Object.values(db.classes).sort((a, b) => a.createdAt - b.createdAt); },
-      async createClass(name) {
+      async createClass(name, preset) {
         let code = code6(); while (Object.values(db.classes).some((c) => c.code === code)) code = code6();
-        const c = { id: newId(), name, code, preset: "sk", createdAt: now() };
+        const c = { id: newId(), name, code, preset: preset || "sk", createdAt: now() };
         db.classes[c.id] = c; db.students[c.id] = {}; save(); return c;
       },
       async getClass(cid) { return db.classes[cid] || null; },
@@ -171,10 +171,10 @@
         for (const c of cs) { const q = await cRef(c.id).collection("students").get(); n += q.size; }
         return n;
       },
-      async createClass(name) {
+      async createClass(name, preset) {
         // クラスコードの 重複を さける：codes/{code} を 同じ トランザクションで 先に 押さえる
         for (let t = 0; t < 6; t++) {
-          const code = code6(), ref = fs.collection("classes").doc(), c = { name, code, preset: "sk", teacherUid: me.uid, createdAt: now() };
+          const code = code6(), ref = fs.collection("classes").doc(), c = { name, code, preset: preset || "sk", teacherUid: me.uid, createdAt: now() };
           try {
             await fs.runTransaction(async (tx) => {
               const cd = fs.collection("codes").doc(code);

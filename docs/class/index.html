@@ -12,13 +12,15 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=383" />
+    <link rel="stylesheet" href="class.css?v=385" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-    <script src="../firebase-config.js?v=383"></script>
-    <script src="store.js?v=383"></script>
+    <script src="../firebase-config.js?v=385"></script>
+    <script src="store.js?v=385"></script>
+    <!-- 級の基準（級体系）の 表。教室ごとに えらぶ -->
+    <script src="../curriculum/sk.js?v=20260914b"></script>
   </head>
   <body class="doc cls">
     <header class="doc-head">
@@ -88,8 +90,10 @@
             教室の 名前を 入れて <b>「＋ 教室を 作る」</b>を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。</p>
           <form id="newClassForm" class="cls-inline">
             <input id="ncName" type="text" placeholder="教室の名前（例：月曜クラス）" required />
+            <label class="nc-preset">級の基準 <select id="ncPreset"></select></label>
             <button type="submit">＋ 教室を 作る</button>
           </form>
+          <p class="hint">「級の基準」＝ この教室で 使う 級の 表（何級が 何桁 何口か）。<b>標準</b>は 20級（入門）〜十段、<b>標準（10級から）</b>は 入門の級を 使いません。あとから 教室の 画面で 変えられます。</p>
         </div>
       </section>
 
@@ -106,6 +110,11 @@
             <p class="hint" data-say="これが この教室の 合いことばです。子どもは アプリを ひらいて、教室に 参加 を 押し、この 6文字を 入れて、自分の 名前を えらぶだけです。パスワードは ありません。この 6文字は 下の ログインカードにも 入ります。">
               これが この教室の <b>合いことば</b>です。子どもは アプリの「🏫 教室に 参加」で この6文字を 入れ、<b>自分の名前を えらぶだけ</b>。パスワードは ありません。<br>
               この6文字は 下の <b>ログインカード</b>にも 入ります。</p>
+          </div>
+          <!-- 級の基準（級体系）。変えると この教室の 子どもの アプリが つぎに ひらいたとき その表に なる -->
+          <div class="cls-preset-row">
+            <label>📘 級の基準 <select id="clsPreset"></select></label>
+            <span id="clsPresetNote" class="hint-inline"></span>
           </div>
           <div class="btn-row">
             <button id="cardsBtn">🖨 ログインカードを 印刷</button>
@@ -173,6 +182,6 @@
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=383"></script>
+    <script src="class.js?v=385"></script>
   </body>
 </html>

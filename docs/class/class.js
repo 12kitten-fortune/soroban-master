@@ -186,12 +186,30 @@
       : '<p class="cls-empty">まだ 教室が ありません。下から 作ってください。</p>';
     document.querySelectorAll(".cls-item").forEach((b) => b.addEventListener("click", () => openClass(b.dataset.id)));
   }
+  /* ---------- 級の基準（級体系）：docs/curriculum/sk.js の 表から えらぶ ---------- */
+  const CURS = window.SK_CURRICULA || {};
+  const CUR_ORDER = (window.SK_CURRICULUM_ORDER || Object.keys(CURS)).filter((k) => CURS[k]);
+  const curOf = (preset) => CURS[preset] || CURS.sk || { name: "標準", grades: [] };
+  const presetOptions = (sel) => CUR_ORDER.map((k) => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + esc(CURS[k].name) + "</option>").join("");
+  $("#ncPreset").innerHTML = presetOptions("sk");
+  function fillHwGrades(preset) {
+    const keys = curOf(preset).grades.map((g) => g.key);
+    const def = keys.includes("10級") ? "10級" : keys[0];
+    $("#hwGrade").innerHTML = keys.map((g) => '<option value="' + g + '"' + (g === def ? " selected" : "") + ">" + g + "</option>").join("");
+  }
   $("#newClassForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $("#ncName").value.trim(); if (!name) return;
     $("#ncName").value = "";
-    const c = await S.createClass(name);
+    const c = await S.createClass(name, $("#ncPreset").value);
     await openClass(c.id);
+  });
+  $("#clsPreset").addEventListener("change", async () => {
+    if (!cur) return;
+    const preset = $("#clsPreset").value;
+    await S.updateClass(cur.id, { preset }); cur.preset = preset;
+    fillHwGrades(preset);
+    $("#clsPresetNote").textContent = "保存しました。子どもの アプリは つぎに ひらいたとき「" + curOf(preset).name + "」の 級に なります（" + curOf(preset).grades.length + "段階）";
   });
 
   /* ---------- 教室 ---------- */
@@ -199,6 +217,9 @@
     cur = await S.getClass(cid); if (!cur) return renderClasses();
     $("#clsName").textContent = cur.name;
     $("#clsCode").textContent = cur.code;
+    $("#clsPreset").innerHTML = presetOptions(cur.preset || "sk");
+    $("#clsPresetNote").textContent = curOf(cur.preset || "sk").grades.length + "段階（" + curOf(cur.preset || "sk").grades[0].key + "〜" + curOf(cur.preset || "sk").grades.slice(-1)[0].key + "）";
+    fillHwGrades(cur.preset || "sk");
     await renderHomework();          // 生徒の 表に 宿題の 列を 出すので、先に 読む
     await renderStudents();
     $("#cardsOut").classList.add("hidden");
@@ -206,10 +227,7 @@
   }
 
   /* ---------- 宿題 ---------- */
-  const GRADE_KEYS = [];
-  for (let k = 20; k >= 1; k--) GRADE_KEYS.push(k + "級");
-  ["初段", "二段", "三段", "四段", "五段", "六段", "七段", "八段", "九段", "十段"].forEach((n) => GRADE_KEYS.push(n));
-  $("#hwGrade").innerHTML = GRADE_KEYS.map((g) => '<option value="' + g + '"' + (g === "10級" ? " selected" : "") + ">" + g + "</option>").join("");
+  fillHwGrades("sk");   // 級の 一覧は 教室の「級の基準」から（openClass で 入れなおす）
   $("#hwSets").innerHTML = [1, 2, 3, 4, 5, 6, 8, 10].map((n) => '<option value="' + n + '"' + (n === 3 ? " selected" : "") + ">" + n + " セット</option>").join("");
   const hwLabel = (h) => (SUBJ[h.subj] || h.subj) + " " + h.g + " を " + h.sets + " セット";
   const fmtDue = (s) => { if (!s) return ""; const m = s.split("-"); return m.length === 3 ? (+m[1]) + "/" + (+m[2]) : s; };

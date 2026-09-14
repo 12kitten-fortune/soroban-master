@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-385"; // 最新反映の確認用
+const BUILD = "2026-09-14-386"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -30,7 +30,16 @@ function applyCurriculum(c) {
   Object.keys(SUBJECT).forEach((k) => delete SUBJECT[k]); Object.assign(SUBJECT, JSON.parse(JSON.stringify(c.subjects || {})));
   Object.keys(EXAM_TRACKS).forEach((k) => delete EXAM_TRACKS[k]); Object.assign(EXAM_TRACKS, JSON.parse(JSON.stringify(c.exams || {})));
 }
-applyCurriculum(CURRICULA.sk);
+// どの 級体系を 使うか：教室に 入っている子は 教室の「級の基準」（参加したとき 端末に 覚える）。それ以外は 標準
+function pickCurriculum() {
+  try {
+    const cl = JSON.parse(localStorage.getItem("soroban_classlink") || "null");
+    if (cl && cl.curriculum && Array.isArray(cl.curriculum.grades)) return cl.curriculum;   // 教室だけの 表（段階3）
+    if (cl && cl.preset && CURRICULA[cl.preset]) return CURRICULA[cl.preset];
+  } catch (e) { }
+  return CURRICULA.sk;
+}
+applyCurriculum(pickCurriculum());
 // その級の その しゅもくの きまり。無い しゅもくは null（例：10級の かけ算）
 function difficulty(g, subj) {
   if (!g || !CUR) return null;
@@ -4593,6 +4602,18 @@ function setClassLink(v) {
   if (!v) { try { localStorage.removeItem(HW_KEY); } catch (e) { } }   // 教室を ぬけたら 宿題も 消す
   renderJoin();
   renderHomework();
+  if (!v && CUR && CUR.id !== "sk") setTimeout(() => location.reload(), 800);   // 教室を ぬけたら 標準の 級に もどす
+}
+/* 教室の「級の基準」が 先生の 画面で 変わっていたら、端末に 覚えなおして 読みなおす（練習中は 待つ） */
+async function syncClassPreset(S) {
+  const cl = classLink(); if (!cl) return;
+  try {
+    const c = await S.getClass(cl.cid); if (!c) return;
+    const preset = c.preset || "sk";
+    if (preset === (cl.preset || "sk")) return;
+    cl.preset = preset; localStorage.setItem(CLASSLINK, JSON.stringify(cl));
+    if (!session && !document.body.classList.contains("playing")) location.reload();
+  } catch (e) { }
 }
 /* ---------- 先生からの 宿題 ----------
    先生画面で 出した 宿題を 読んで、この端末に とっておく（通信できない ときも 見える）。
@@ -4750,7 +4771,7 @@ function renderJoin() {
   const cl = classLink();
   if (cl) {
     box.innerHTML = '<div class="join-on"><div class="join-on-h">🏫 ' + jesc(cl.className) + " に 参加中</div>" +
-      "<p>あなたの 名前：<b>" + jesc(cl.nick) + "</b></p>" +
+      "<p>あなたの 名前：<b>" + jesc(cl.nick) + "</b>　／　級の基準：<b>" + jesc((CUR && CUR.name) || "標準") + "</b>（" + GRADES.length + "段階）</p>" +
       '<p class="sub">れんしゅうの きろくは、先生の 画面に とどきます。まちがえ方の クセも 先生が 見て、つぎの 宿題を 決めます。</p>' +
       '<div id="joinSync" class="sub"></div>' +
       '<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>' +
@@ -4796,9 +4817,11 @@ async function joinStep1() {
         try {
           const j = await S.joinClass(c.id, s.id);
           // サーバーに もう ある記録は 送らない（入り直しても 二重に ならない）
-          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, sent: (j && j.latest) || 0 });
+          setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, preset: c.preset || "sk", sent: (j && j.latest) || 0 });
           fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
           fetchHomework().then(() => pushToClass(false));
+          // 教室の 級の基準が いまの 表と ちがえば、読みなおして その表に する
+          if ((c.preset || "sk") !== (CUR && CUR.id)) setTimeout(() => location.reload(), 2500);
         } catch (e) { msg.textContent = "参加できませんでした：" + ((e && e.message) || e); msg.className = "result ng"; }
       };
     });
@@ -4835,7 +4858,7 @@ function schedulePush() {
 }
 
 /* ---------- 教室に 入っている子は、ひらいたときに 宿題を 読んで、おくり残しを おくる ---------- */
-if (classLink()) setTimeout(function () { fetchHomework().then(() => pushToClass(false)); }, 3000);
+if (classLink()) setTimeout(function () { fetchHomework().then(() => pushToClass(false)).then(() => loadStore().then(syncClassPreset)).catch(() => { }); }, 3000);
 
 /* ============================================================ 🐣 ソロモン（そろばんの 相棒）
    ★ 成長は GOLD ではなく「そろばんの 記録」だけから、ひらくたびに 計算する。
