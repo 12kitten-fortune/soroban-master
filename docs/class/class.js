@@ -252,7 +252,7 @@
       const k = k0 && k0.variants ? k0.variants[0] : k0, w = w0 && w0.variants ? w0.variants[0] : w0;   // かけ・わりの variants は 1つ目を 見せる
       const special = (m && (m.variants || m.sumMax != null || m.sumMin != null || m.sumExact != null)) || (a && (a.variants || a.sumMax != null || a.sumMin != null || a.sumExact != null)) || (k0 && k0.variants) || (w0 && w0.variants);
       return '<tr data-i="' + i + '" class="' + (m ? "" : "off-mitori ") + (k ? "" : "off-kake ") + (w ? "" : "off-wari ") + (a ? "" : "off-anzan ") + (f ? "" : "off-flash") + '">' +
-        '<td><input type="text" class="ce-key" value="' + esc(g.key) + '" maxlength="12" /></td>' +
+        '<td><input type="text" class="ce-key" value="' + esc(g.key) + '" maxlength="20" /></td>' +
         '<td class="grp">' + chk("m-on", !!m) + "</td><td>" + num("m-in m-d", mv && mv.digits, 'min="1" max="15"') + "</td><td>" + num("m-in m-t", mv && mv.terms, 'min="2" max="30"') + "</td><td>" + '<input type="checkbox" class="m-in m-sub"' + (m && m.sub !== false ? " checked" : "") + " /></td>" +
         '<td class="grp">' + chk("k-on", !!k) + "</td><td>" + num("k-in k-a", k && k.a, 'min="1" max="12"') + "</td><td>" + num("k-in k-b", k && k.b, 'min="1" max="12"') + "</td>" +
         '<td class="grp">' + chk("w-on", !!w) + "</td><td>" + num("w-in w-D", w && w.D, 'min="1" max="20"') + "</td><td>" + num("w-in w-dv", w && w.dv, 'min="1" max="12"') + "</td><td>" + num("w-in w-qd", w && w.qd, 'min="1" max="12" placeholder="－"') + "</td>" +

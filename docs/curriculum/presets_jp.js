@@ -109,5 +109,43 @@
     ],
   };
 
-  window.SK_CURRICULUM_ORDER = ["sk", "sk10", "nissho", "zsgr"];
+  /* ------------------------------------------------------------
+     UCMAS 大会 風（Basic 〜 Grand の 9段階・非公式）
+     参考：UCMAS International Competition の 公開されている レベル別の 出題範囲（加減算の 桁と 口数、かけ算・わり算の 桁）。
+     大会は「加減算・かけ算・わり算を 合わせて 200問を 8分」。このアプリは しゅもくごとに 分けるので、
+     同じ 速さ（1問 2.4秒）に なるよう 25問・1分 に してある。
+     Intermediate A から先は 暗算（頭の中で 計算して 数字で 答える）。Basic〜Elementary は そろばんで 答える。
+     フラッシュ暗算は 大会に 別の 種目が あるが、レベルとの 対応が 公開されていないので ここでは 入れていない
+     （教室の 表の 編集で 足せる）。UCMAS とは 無関係・非公式。
+     ------------------------------------------------------------ */
+  const UE = { N: 25, per: 4, pass: 70, limit: 60 };
+  const U = (key, n, mit, anz, kake, wari) => ({ key, band: "kyu", n, flash: null,
+    mitori: mit ? Object.assign(mit, { exam: UE }) : null, anzan: anz ? Object.assign(anz, { exam: UE }) : null,
+    kake: kake ? Object.assign(kake, { exam: UE }) : null, wari: wari ? Object.assign(wari, { exam: UE }) : null });
+  C.ucmas = {
+    id: "ucmas",
+    name: "UCMAS 大会 風（Basic〜Grand・非公式）",
+    note: "UCMAS International Competition の 公開されている 出題範囲を 参考にした、このアプリ独自の 段階。UCMAS とは 無関係・非公式です。Intermediate A から 先は 頭の中で 計算して 数字で 答えます。",
+    subjects: {
+      mitori: { name: "加減算（そろばん）", answer: "soroban", N: 25, per: 4, pass: 70, limit: 60 },
+      kake:   { name: "かけ算（暗算）",   answer: "input",   N: 25, per: 4, pass: 70, limit: 60 },
+      wari:   { name: "わり算（暗算）",   answer: "input",   N: 25, per: 4, pass: 70, limit: 60 },
+      anzan:  { name: "加減算（暗算）",   answer: "input",   N: 25, per: 4, pass: 70, limit: 60 },
+      flash:  { name: "フラッシュ暗算", answer: "flash" },
+    },
+    exams: { soroban: { name: "そろばん", subjs: ["mitori"] }, anzan: { name: "暗算", subjs: ["anzan", "kake", "wari"] } },
+    grades: [
+      U("Basic",          29, { digits: 1, terms: 3, termsMax: 7 }, null, null, null),
+      U("Elementary A",   28, { digits: 2, terms: 3, termsMax: 9 }, null, null, null),
+      U("Elementary B",   27, { digits: 3, terms: 3, termsMax: 5 }, null, null, null),
+      U("Intermediate A", 26, null, { digits: 2, terms: 3, termsMax: 10 }, { a: 2, b: 1 }, null),
+      U("Intermediate B", 25, null, { digits: 2, terms: 5, termsMax: 8 }, KW([[2, 1], [1, 2]]), { D: 3, dv: 1, qd: 2 }),
+      U("Higher A",       24, null, { digits: 2, terms: 6, termsMax: 10 }, KW([[3, 1], [1, 3]]), WV([[1, 2], [1, 3]])),
+      U("Higher B",       23, null, { digits: 2, terms: 8, termsMax: 10 }, KW([[2, 2], [4, 1]]), WV([[1, 3], [2, 2]])),
+      U("Advance",        22, null, { digits: 4, terms: 10 }, KW([[3, 2], [4, 2]]), WV([[2, 2], [2, 3], [3, 2]])),
+      U("Grand",          21, null, { digits: 5, terms: 10 }, KW([[3, 2], [3, 3], [4, 2]]), WV([[2, 2], [3, 2], [3, 3], [4, 2]])),
+    ],
+  };
+
+  window.SK_CURRICULUM_ORDER = ["sk", "sk10", "nissho", "zsgr", "ucmas"];
 })();

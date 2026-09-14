@@ -449,7 +449,7 @@ window.SK_CURRICULUM_CHECK = function (c) {
     };
     const grades = [];
     for (const g of c.grades) {
-      if (!g || typeof g.key !== "string" || !g.key.trim() || g.key.trim().length > 12) return null;
+      if (!g || typeof g.key !== "string" || !g.key.trim() || g.key.trim().length > 20) return null;   // 「Intermediate A」など 英語の 名前も 通す
       const row = { key: g.key.trim(), band: g.band === "dan" ? "dan" : "kyu", n: num(g.n, 1, 99) || 1 };
       ["mitori", "kake", "wari", "anzan", "flash"].forEach((k) => { row[k] = g[k] ? spec(g[k], k) : null; if (row[k] && g[k].exam) { const e = exam(g[k].exam); if (e) row[k].exam = e; } });
       if (!row.mitori && !row.kake && !row.wari && !row.anzan && !row.flash) return null;
