@@ -421,6 +421,7 @@ window.SK_CURRICULUM_CHECK = function (c) {
         } else {
           o.digits = num(s.digits, 1, 15); o.terms = num(s.terms, 2, 30); if (!o.digits || !o.terms) return null;
           const tm = num(s.termsMax, o.terms, 40); if (tm && tm > o.terms) o.termsMax = tm;
+          const md = num(s.minDigits, 1, o.digits); if (md && md > 1) o.minDigits = md;   // 「3〜5桁」の 3
         }
         if (s.sub === false) o.sub = false;
         ["sumMin", "sumMax", "sumExact"].forEach((k) => { const v = num(s[k], 0, 999); if (v != null) o[k] = v; });

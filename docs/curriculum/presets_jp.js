@@ -147,5 +147,43 @@
     ],
   };
 
-  window.SK_CURRICULUM_ORDER = ["sk", "sk10", "nissho", "zsgr", "ucmas"];
+  /* ------------------------------------------------------------
+     全珠連 珠算検定 風（10級〜1級・段位・非公式）
+     参考：公益社団法人 全国珠算教育連盟の 珠算検定の 級別の 出題範囲（かけ算・わり算の 桁の 組み合わせ、見取算の 桁と 口数）。
+     しゅもくごとに 7分。段位は 各30問・1問10点・300点満点。
+     級の 問題数・配点は 資料に 無いので、段位に そろえて 30問・1問5点・150点満点・100点で 合格 に してある（めやす）。
+     段位は「準初段〜十段」を 点数で 分けるが、その 境目は 資料に 無いので、ここでは 1つの「段位」（80点＝準初段の 基準）に してある。
+     見取算の「3〜5桁」は minDigits で 下の桁を 決める。小数の 問題は 写せていない。全珠連とは 無関係・非公式。
+     ------------------------------------------------------------ */
+  const ZE = { N: 30, per: 5, pass: 100, limit: 420 };
+  const Z = (key, n, mit, kake, wari, ex) => ({ key, band: n === "dan" ? "dan" : "kyu", n: n === "dan" ? 1 : n, anzan: null, flash: null,
+    mitori: Object.assign(mit, { exam: ex || ZE }), kake: kake ? Object.assign(kake, { exam: ex || ZE }) : null, wari: wari ? Object.assign(wari, { exam: ex || ZE }) : null });
+  C.zsr = {
+    id: "zsr",
+    name: "全珠連 珠算検定 風（非公式）",
+    note: "公益社団法人 全国珠算教育連盟の 珠算検定の 公開されている 出題範囲を 参考にした、このアプリ独自の 級体系。同連盟とは 無関係・非公式です。しゅもくごとに 7分。",
+    subjects: {
+      mitori: { name: "見取算", answer: "soroban", N: 30, per: 5, pass: 100, limit: 420 },
+      kake:   { name: "かけ算", answer: "soroban", N: 30, per: 5, pass: 100, limit: 420 },
+      wari:   { name: "わり算", answer: "soroban", N: 30, per: 5, pass: 100, limit: 420 },
+      anzan:  { name: "あんざん", answer: "input", N: 10, per: 10, pass: 70, limit: 180 },
+      flash:  { name: "フラッシュ暗算", answer: "flash" },
+    },
+    exams: { soroban: { name: "珠算", subjs: ["mitori", "kake", "wari"] } },
+    grades: [
+      Z("10級", 10, { digits: 1, terms: 5 }, null, null),
+      Z("9級",  9,  { digits: 2, terms: 5 }, { a: 2, b: 1 }, null),
+      Z("8級",  8,  { digits: 2, terms: 5 }, { a: 3, b: 1 }, WV([[1, 2]])),
+      Z("7級",  7,  { digits: 3, minDigits: 2, terms: 5 }, { a: 2, b: 2 }, WV([[1, 3]])),
+      Z("6級",  6,  { digits: 3, minDigits: 2, terms: 7 }, KW([[2, 3], [3, 2]]), WV([[2, 2]])),
+      Z("5級",  5,  { digits: 4, minDigits: 3, terms: 7 }, KW([[2, 4], [3, 3], [4, 2]]), WV([[2, 3], [3, 2]])),
+      Z("4級",  4,  { digits: 5, minDigits: 3, terms: 7 }, KW([[2, 5], [3, 4], [4, 3], [5, 2]]), WV([[2, 4], [3, 3], [4, 2]])),
+      Z("3級",  3,  { digits: 5, minDigits: 3, terms: 8 }, KW([[2, 5], [3, 4], [4, 3], [5, 2]]), WV([[2, 4], [3, 3], [4, 2]])),
+      Z("2級",  2,  { digits: 6, minDigits: 4, terms: 8 }, KW([[3, 5], [4, 4], [5, 3]]), WV([[2, 5], [3, 4], [4, 3], [5, 2]])),
+      Z("1級",  1,  { digits: 7, minDigits: 4, terms: 8 }, KW([[3, 6], [4, 5], [5, 4], [6, 3]]), WV([[3, 5], [4, 4], [5, 3]])),
+      Z("段位", "dan", { digits: 9, minDigits: 3, terms: 8 }, KW([[4, 7], [5, 6], [6, 5]]), WV([[4, 7], [5, 6], [6, 5]]), { N: 30, per: 10, pass: 80, limit: 420 }),
+    ],
+  };
+
+  window.SK_CURRICULUM_ORDER = ["sk", "sk10", "nissho", "zsr", "zsgr", "ucmas"];
 })();

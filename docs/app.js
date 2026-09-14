@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-389"; // 最新反映の確認用
+const BUILD = "2026-09-14-390"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -96,7 +96,7 @@ function genMitori(spec) {
     const r = genBySum(v); if (r) return r;
   }
   const { digits, terms, termsMax, sub } = v;
-  const D = digits, lo = Math.max(1, D - 2); // 各項の桁数を lo〜D で混在（出題例に準拠してやさしめに）
+  const D = digits, lo = v.minDigits ? Math.min(D, Math.max(1, v.minDigits)) : Math.max(1, D - 2); // 各項の桁数を lo〜D で混在。minDigits＝いちばん小さい桁（「3〜5桁」など）
   // 出題例は1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
   const T = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
   // sub:false の級（暗算7〜10級など）は出題例どおり ひき算を出さない
