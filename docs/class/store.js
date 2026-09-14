@@ -37,12 +37,12 @@
   /* プラン：生徒の 人数の 上限。plan は 運営者が Firebase の 画面で 入れる（trial が はじめの 値）
      trial＝おためし（10人・登録から 31日）／pioneer＝先行10教室（1年 無料）／class＝教室／school＝スクール */
   const PLANS = {
-    trial:   { name: "おためし", max: 10, days: 31 },
-    pioneer: { name: "先行教室（1年 無料）", max: 40 },
-    class:   { name: "教室プラン", max: 40 },
-    school:  { name: "スクールプラン", max: 150 },
+    trial:   { name: T("おためし"), max: 10, days: 31 },
+    pioneer: { name: T("先行教室（1年 無料）"), max: 40 },
+    class:   { name: T("教室プラン"), max: 40 },
+    school:  { name: T("スクールプラン"), max: 150 },
     // 家庭プラン＝保護者が 先生画面を おうちで 使う。1人。2人目からは Stripe の「2人目から」の 件数ぶん、運営者が planMax を 2, 3… と 入れる
-    family:  { name: "家庭プラン", max: 1, home: true },
+    family:  { name: T("家庭プラン"), max: 1, home: true },
   };
   function planInfo(t) {
     const key = t && PLANS[t.plan] ? t.plan : "trial", P = PLANS[key];
@@ -76,8 +76,8 @@
     return {
       mode: "local",
       onAuth(cb) { authCbs.push(cb); setTimeout(() => cb(db.teacher), 0); },
-      async signUp(email, pw, name) { db.teacher = { uid: "local", email: email || "", name: name || "先生", plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
-      async signIn(email) { db.teacher = db.teacher || { uid: "local", email: email || "", name: "先生", plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
+      async signUp(email, pw, name) { db.teacher = { uid: "local", email: email || "", name: name || T("先生"), plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
+      async signIn(email) { db.teacher = db.teacher || { uid: "local", email: email || "", name: T("先生"), plan: "trial", createdAt: now() }; save(); fire(); return db.teacher; },
       async countStudents() { return Object.values(db.students).reduce((a, m) => a + Object.keys(m).length, 0); },
       async signOut() { db.teacher = null; save(); fire(); },
       async listClasses() { return Object.values(db.classes).sort((a, b) => a.createdAt - b.createdAt); },
@@ -108,7 +108,7 @@
       /* ---- 生徒側 ---- */
       async resolveCode(code) { const c = Object.values(db.classes).find((x) => x.code === String(code || "").toUpperCase()); return c ? { id: c.id, name: c.name, preset: c.preset, curriculum: c.curriculum || null } : null; },
       async joinClass(cid, sid) {
-        const s = db.students[cid] && db.students[cid][sid]; if (!s) throw new Error("その名前は 教室に ありません");
+        const s = db.students[cid] && db.students[cid][sid]; if (!s) throw new Error(T("その名前は 教室に ありません"));
         s.lastSeen = now(); save();
         const have = db.sessions[key(cid, sid)] || [];
         return { cid, sid, nick: s.nick, latest: have.length ? have[have.length - 1].t : 0 };
@@ -184,7 +184,7 @@
             return Object.assign({ id: ref.id }, c);
           } catch (e) { if (String(e && e.message) !== "dup") throw e; }
         }
-        throw new Error("クラスコードが 作れませんでした。もう一度 おしてください");
+        throw new Error(T("クラスコードが 作れませんでした。もう一度 おしてください"));
       },
       async getClass(cid) { const d = await cRef(cid).get(); return d.exists ? obj(d) : null; },
       async updateClass(cid, patch) { await cRef(cid).update(patch); return this.getClass(cid); },

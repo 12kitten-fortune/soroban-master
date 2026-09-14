@@ -9,7 +9,7 @@ let session = null, playTimer = null;
 // 効果音のON/OFF（localStorageに保存）
 const SOUND_KEY = "soroban_sound";
 let soundOn = localStorage.getItem(SOUND_KEY) !== "off";
-const BUILD = "2026-09-14-390"; // 最新反映の確認用
+const BUILD = "2026-09-14-391"; // 最新反映の確認用
 
 /* ============================================================ 検定基準（級）＝ 級体系（カリキュラム）
    級ごとの「何桁 何口・どの しゅもくが あるか・合格の きまり」は、プログラムの 中には 持たない。
@@ -23,11 +23,12 @@ const EXAM_TRACKS = {};            // SK検定の 組み合わせ（珠算＝み
 const EXAMS = "soroban_exams";
 let examState = null, examTimer = null;
 function applyCurriculum(c) {
-  if (!c || !Array.isArray(c.grades)) { alert("級の表（curriculum/sk.js）が 読みこめませんでした。ページを 更新してください。"); throw new Error("no curriculum"); }
+  if (!c || !Array.isArray(c.grades)) { alert(T("級の表（curriculum/sk.js）が 読みこめませんでした。ページを 更新してください。")); throw new Error("no curriculum"); }
   CUR = c;
   GRADES.length = 0;
   c.grades.forEach((g) => { const row = { key: g.key, band: g.band, n: g.n }; if (g.band === "dan") row.dan = g.n; else row.kyu = g.n; GRADES.push(row); });
   Object.keys(SUBJECT).forEach((k) => delete SUBJECT[k]); Object.assign(SUBJECT, JSON.parse(JSON.stringify(c.subjects || {})));
+  Object.values(SUBJECT).forEach((s) => { if (s && s.name) s.name = T(s.name); });   // しゅもくの 名前は 表に あるが、言葉の しくみを 通す
   Object.keys(EXAM_TRACKS).forEach((k) => delete EXAM_TRACKS[k]); Object.assign(EXAM_TRACKS, JSON.parse(JSON.stringify(c.exams || {})));
 }
 // どの 級体系を 使うか：教室に 入っている子は 教室の「級の基準」（参加したとき 端末に 覚える）。それ以外は 標準
@@ -73,20 +74,20 @@ function randDigits(d) { const min = d === 1 ? 1 : Math.pow(10, d - 1); return M
 const pickVariant = (s) => (s && s.variants ? s.variants[Math.floor(Math.random() * s.variants.length)] : s);
 // 入門級用：答えがいくつになるかを決めて、そこから各項を作る（例：たして5＝1+4, 2+3…）
 function genBySum(sp) {
-  const T = sp.terms, MAX = 9;
-  const lo = sp.sumExact != null ? sp.sumExact : (sp.sumMin != null ? sp.sumMin : T);
-  const hi = sp.sumExact != null ? sp.sumExact : (sp.sumMax != null ? sp.sumMax : T * MAX);
+  const TT = sp.terms, MAX = 9;
+  const lo = sp.sumExact != null ? sp.sumExact : (sp.sumMin != null ? sp.sumMin : TT);
+  const hi = sp.sumExact != null ? sp.sumExact : (sp.sumMax != null ? sp.sumMax : TT * MAX);
   for (let tries = 0; tries < 300; tries++) {
     const S = lo + Math.floor(Math.random() * (hi - lo + 1));
-    if (S < T || S > T * MAX) continue;             // 各項1〜9では作れない合計
+    if (S < TT || S > TT * MAX) continue;             // 各項1〜9では作れない合計
     const cuts = [];
     for (let i = 1; i < S; i++) cuts.push(i);        // Sを T個に分ける切れ目の候補
     for (let i = cuts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cuts[i], cuts[j]] = [cuts[j], cuts[i]]; }
-    const sel = cuts.slice(0, T - 1).sort((a, b) => a - b);
+    const sel = cuts.slice(0, TT - 1).sort((a, b) => a - b);
     const nums = []; let prev = 0;
     for (const c of sel) { nums.push(c - prev); prev = c; }
     nums.push(S - prev);
-    if (nums.length === T && nums.every((v) => v >= 1 && v <= MAX)) return { nums, answer: S };
+    if (nums.length === TT && nums.every((v) => v >= 1 && v <= MAX)) return { nums, answer: S };
   }
   return null;
 }
@@ -98,13 +99,13 @@ function genMitori(spec) {
   const { digits, terms, termsMax, sub } = v;
   const D = digits, lo = v.minDigits ? Math.min(D, Math.max(1, v.minDigits)) : Math.max(1, D - 2); // 各項の桁数を lo〜D で混在。minDigits＝いちばん小さい桁（「3〜5桁」など）
   // 出題例は1枚の中で口数が変わる級があるため terms〜termsMax から選ぶ
-  const T = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
+  const TT = termsMax && termsMax > terms ? terms + Math.floor(Math.random() * (termsMax - terms + 1)) : terms;
   // sub:false の級（暗算7〜10級など）は出題例どおり ひき算を出さない
-  const allowSub = sub !== false && T >= 3; const nums = []; let total = 0;
+  const allowSub = sub !== false && TT >= 3; const nums = []; let total = 0;
   // 出題例は必ずその級の桁数の数が入っているので、1つは必ずD桁にする
   // （これが無いと「4桁10口」のはずが偶然すべて3桁以下になり、級より易しい問題が出てしまう）
-  const forceIdx = Math.floor(Math.random() * T);
-  for (let i = 0; i < T; i++) {
+  const forceIdx = Math.floor(Math.random() * TT);
+  for (let i = 0; i < TT; i++) {
     const dg = i === forceIdx ? D : lo + Math.floor(Math.random() * (D - lo + 1));
     const v = randDigits(dg);
     if (i > 0 && allowSub && Math.random() < 0.35 && total > v) { nums.push(-v); total -= v; }
@@ -179,15 +180,15 @@ function showCert(c) {
   const old = $("#certLayer"); if (old) old.remove();
   const d = document.createElement("div");
   d.id = "certLayer";
-  const dateJa = (() => { const [y, m, dd] = c.d.split("-"); return y + "年" + (+m) + "月" + (+dd) + "日"; })();
+  const dateJa = (() => { const [y, m, dd] = c.d.split("-"); return y + T("年") + (+m) + T("月") + (+dd) + T("日"); })();
   d.innerHTML = '<div class="cert">' +
-    '<div class="cert-top"><img class="cert-crown" src="assets/crown.png" alt=""><div class="cert-title">合 格 証</div></div>' +
-    '<div class="cert-name">' + p.name + '<small>殿</small></div>' +
-    '<div class="cert-body">そろばんキングダム <b>' + c.g + '</b>（' + subjName(c.subj) + '）の けんていに<br>ごうかくしたことを ここに 証します。</div>' +
-    '<div class="cert-date">' + dateJa + '　第 ' + (c.no || 1) + ' 号</div>' +
-    '<div class="cert-king"><img src="assets/king_celebrate.png" alt="レオ王"><span>そろばんキングダム 国王 レオ</span></div>' +
+    T('<div class="cert-top"><img class="cert-crown" src="assets/crown.png" alt=""><div class="cert-title">合 格 証</div></div>') +
+    '<div class="cert-name">' + p.name + T('<small>殿</small></div>') +
+    T('<div class="cert-body">そろばんキングダム <b>') + c.g + T('</b>（') + subjName(c.subj) + T('）の けんていに<br>ごうかくしたことを ここに 証します。</div>') +
+    '<div class="cert-date">' + dateJa + T('　第 ') + (c.no || 1) + T(' 号</div>') +
+    T('<div class="cert-king"><img src="assets/king_celebrate.png" alt="レオ王"><span>そろばんキングダム 国王 レオ</span></div>') +
     '</div>' +
-    '<div class="cert-btns"><button id="certPrint">🖨 いんさつ する</button><button id="certShare">📤 おくる</button><button id="certClose" class="ghost">とじる</button></div>';
+    T('<div class="cert-btns"><button id="certPrint">🖨 いんさつ する</button><button id="certShare">📤 おくる</button><button id="certClose" class="ghost">とじる</button></div>');
   document.body.appendChild(d);
   $("#certClose").onclick = () => d.remove();
   $("#certPrint").onclick = () => {
@@ -196,10 +197,10 @@ function showCert(c) {
     setTimeout(() => document.body.classList.remove("print-cert"), 500);
   };
   $("#certShare").onclick = async () => {
-    const text = p.name + " が そろばんキングダム " + c.g + "（" + subjName(c.subj) + "）の けんていに ごうかくしました！🎓 " + dateJa;
+    const text = p.name + T(" が そろばんキングダム ") + c.g + T("（") + subjName(c.subj) + T("）の けんていに ごうかくしました！🎓 ") + dateJa;
     try {
-      if (navigator.share) await navigator.share({ title: "合格証", text: text, url: location.href.split("#")[0] });
-      else { await navigator.clipboard.writeText(text + " " + location.href.split("#")[0]); alert("文を コピーしたよ。LINE などに はりつけて おくってね"); }
+      if (navigator.share) await navigator.share({ title: T("合格証"), text: text, url: location.href.split("#")[0] });
+      else { await navigator.clipboard.writeText(text + " " + location.href.split("#")[0]); alert(T("文を コピーしたよ。LINE などに はりつけて おくってね")); }
     } catch (e) { }
   };
   try { fxConfetti(40); } catch (e) { }
@@ -208,11 +209,11 @@ function showCert(c) {
 function renderCerts() {
   const box = $("#recCerts"); if (!box) return;
   const list = allCerts().slice().reverse();
-  if (!list.length) { box.innerHTML = '<p class="sub">けんていモード（ぜんぶ こたえてから ◎×）で ごうかくすると、ここに 合格証が ならぶよ。</p>'; return; }
-  box.innerHTML = '<div class="cert-list">' + list.map((c, i) => '<button class="cert-chip" data-i="' + i + '">🎓 ' + c.g + '<small>' + subjName(c.subj) + "・" + c.d + "</small></button>").join("") + "</div>";
+  if (!list.length) { box.innerHTML = T('<p class="sub">けんていモード（ぜんぶ こたえてから ◎×）で ごうかくすると、ここに 合格証が ならぶよ。</p>'); return; }
+  box.innerHTML = '<div class="cert-list">' + list.map((c, i) => '<button class="cert-chip" data-i="' + i + '">🎓 ' + c.g + '<small>' + subjName(c.subj) + T("・") + c.d + "</small></button>").join("") + "</div>";
   $$("#recCerts .cert-chip").forEach((b) => { b.onclick = () => showCert(list[+b.dataset.i]); });
 }
-const rankText = () => { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.key : "未取得"; };
+const rankText = () => { const r = JSON.parse(localStorage.getItem(RANK) || "null"); return r ? r.key : T("未取得"); };
 function saveTime(gradeKey, subj, sec) { const t = JSON.parse(localStorage.getItem(TIMES) || "{}"); const k = `${gradeKey}_${subj}`; const prev = t[k]; const improved = prev == null || sec < prev; if (improved) { t[k] = sec; localStorage.setItem(TIMES, JSON.stringify(t)); } return { improved, prev }; }
 const allTimes = () => JSON.parse(localStorage.getItem(TIMES) || "{}");
 const bestTime = (gradeKey, subj) => allTimes()[`${gradeKey}_${subj}`];
@@ -221,9 +222,9 @@ function fmtClock(sec) { sec = Math.max(0, sec); const m = Math.floor(sec / 60),
 function logStudy(sec) { const l = JSON.parse(localStorage.getItem(LOG) || "[]"); l.push({ d: today(), s: Math.round(sec) }); localStorage.setItem(LOG, JSON.stringify(l.slice(-800))); }
 function monthStats() { const l = JSON.parse(localStorage.getItem(LOG) || "[]"); const ym = today().slice(0, 7); const m = l.filter((e) => e.d.startsWith(ym)); return { days: new Set(m.map((e) => e.d)).size, sec: m.reduce((a, e) => a + e.s, 0) }; }
 function last7() { const l = JSON.parse(localStorage.getItem(LOG) || "[]"); const a = []; for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10); a.push({ d, sec: l.filter((e) => e.d === d).reduce((x, e) => x + e.s, 0) }); } return a; }
-const profile = () => JSON.parse(localStorage.getItem(PROFILE) || '{"name":"そろ太くん","avatar":"🧒"}');
+const profile = () => JSON.parse(localStorage.getItem(PROFILE) || T('{"name":"そろ太くん","avatar":"🧒"}'));
 const saveProfile = (p) => localStorage.setItem(PROFILE, JSON.stringify(p));
-function fmtMin(sec) { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? `${h}時間${m}分` : `${m}分`; }
+function fmtMin(sec) { const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60); return h ? T("{h}時間{m}分", { h, m }) : T("{m}分", { m }); }
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
 // いまの級（合格ずみの いちばん上）の 番号。まだ無ければ -1
@@ -264,11 +265,11 @@ function fitMult(grade) {
   const gi = gradeIdxOf(grade); if (gi < 0) return { m: 1, label: "" };
   const aim = myRankIdx() + 1;                    // つぎに目指す級＝いまの適正
   const d = gi - aim;
-  if (d >= 1) return { m: 1.2, label: "上の級に ちょうせん ×1.2" };
+  if (d >= 1) return { m: 1.2, label: T("上の級に ちょうせん ×1.2") };
   if (d === 0) return { m: 1, label: "" };
-  if (d === -1) return { m: 0.75, label: "合格ずみの級 ×0.75" };
-  if (d === -2) return { m: 0.5, label: "やさしい級 ×0.5" };
-  return { m: 0.15, label: "ずっと下の級 ×0.15" };
+  if (d === -1) return { m: 0.75, label: T("合格ずみの級 ×0.75") };
+  if (d === -2) return { m: 0.5, label: T("やさしい級 ×0.5") };
+  return { m: 0.15, label: T("ずっと下の級 ×0.15") };
 }
 const DAILY_KEY = "soroban_daily";
 function dailyCount(key, add) {
@@ -284,17 +285,17 @@ function repeatMult(subj, grade, count) {
   if (!GOLD_RULES) return { m: 1, label: "" };
   const t = [1, 0.7, 0.5, 0.3];
   const m = t[Math.min(count, t.length - 1)];
-  return { m: m, label: m < 1 ? "きょう " + (count + 1) + "回目 ×" + m : "" };
+  return { m: m, label: m < 1 ? T("きょう ") + (count + 1) + T("回目 ×") + m : "" };
 }
 function goldForSection({ correct, N, bestUpdated, completed, grade, subj, count }) {
-  let g = correct * 2; const lines = [`正解 ${correct}問 ＋${correct * 2}`];
+  let g = correct * 2; const lines = [T("正解 {correct}問 ＋{v2}", { correct, v2: correct * 2 })];
   const acc = N ? correct / N : 0;
-  if (acc >= 0.9) { g += 20; lines.push("高正答率(90%↑) ＋20"); }
-  else if (acc >= 0.7) { g += 10; lines.push("正答率(70%↑) ＋10"); }
-  if (bestUpdated) { g += 30; lines.push("⏱ 自己ベスト更新 ＋30"); }
-  if (completed) { g += 10; lines.push("完走 ＋10"); }
+  if (acc >= 0.9) { g += 20; lines.push(T("高正答率(90%↑) ＋20")); }
+  else if (acc >= 0.7) { g += 10; lines.push(T("正答率(70%↑) ＋10")); }
+  if (bestUpdated) { g += 30; lines.push(T("⏱ 自己ベスト更新 ＋30")); }
+  if (completed) { g += 10; lines.push(T("完走 ＋10")); }
   const m = gradeGoldMult(grade);
-  if (m > 1) { g = Math.round(g * m); lines.push(`${grade.key}ボーナス ×${m}`); }
+  if (m > 1) { g = Math.round(g * m); lines.push(T("{v1}ボーナス ×{m}", { v1: grade.key, m })); }
   const fit = fitMult(grade);
   if (fit.m !== 1) { g = Math.round(g * fit.m); if (fit.label) lines.push(fit.label); }
   const rep = repeatMult(subj, grade, count || 0);
@@ -307,7 +308,7 @@ function dailyBonusOnce() {
   if (s.goldDate === t) return null;
   s.goldDate = t; saveStat(s);
   const streak = Math.max(1, s.streak || 1);
-  return { amt: 5 * Math.min(10, streak), label: `連続学習${streak}日ボーナス` };
+  return { amt: 5 * Math.min(10, streak), label: T("連続学習{streak}日ボーナス", { streak }) };
 }
 /* ---- れんしゅう・たいせんの おわりに、ときどき パズルの道具が もらえる ----
    さいごまで やって 正答率70%以上のとき、35% の確率。1日 3回まで（かんたんな級で 稼ぐのを ふせぐ） */
@@ -323,15 +324,15 @@ function maybeDropItem(acc, completed) {
     const d = pzLoad(); pzGiveItem(d, pick, 1); pzSave(d);
     dailyCount("drop", true);
     setTimeout(function () { try { sfx("star", function () { coinSnd(0); }); } catch (e) { } }, 700);
-    return '<div class="drop-box">🎁 <b>' + it.em + " " + it.n + '</b> を みつけた！<small>パズルの もちものに 入ったよ</small></div>';
+    return '<div class="drop-box">🎁 <b>' + it.em + " " + it.n + T('</b> を みつけた！<small>パズルの もちものに 入ったよ</small></div>');
   } catch (e) { console.error("道具のプレゼントに失敗", e); return ""; }
 }
 // 次に買える建物までの目標（モチベーション表示）
 function nextGoalHint() {
   const gold = getGold();
-  if (gold >= 100) return "🧩 パズルで あそべるよ！（1回 30 GOLD）";
-  if (gold >= 30) return "🧩 あと " + Math.floor(gold / 30) + " 回 パズルが あそべる";
-  return "あと " + (30 - gold) + " GOLD で パズルが 1回 あそべる！";
+  if (gold >= 100) return T("🧩 パズルで あそべるよ！（1回 30 GOLD）");
+  if (gold >= 30) return T("🧩 あと ") + Math.floor(gold / 30) + T(" 回 パズルが あそべる");
+  return T("あと ") + (30 - gold) + T(" GOLD で パズルが 1回 あそべる！");
 }
 
 /* ---------- 学習セッションの記録（保護者画面・成績用） ---------- */
@@ -600,13 +601,13 @@ function bgmAskHide() { const a = $("#bgmAsk"); if (a) a.classList.add("hidden")
 
 /* パズルの曲は ステージごとに 入れかわる（同じ曲ばかり聞かないように） */
 const BGM_LIST = [
-  { f: "bgm1", n: "ファンタジー1" },
-  { f: "bgm2", n: "ファンタジー2" },
-  { f: "bgm3", n: "アコースティック1" },
-  { f: "bgm4", n: "アコースティック2" },
-  { f: "bgm_study", n: "ピアノ" },
+  { f: "bgm1", n: T("ファンタジー1") },
+  { f: "bgm2", n: T("ファンタジー2") },
+  { f: "bgm3", n: T("アコースティック1") },
+  { f: "bgm4", n: T("アコースティック2") },
+  { f: "bgm_study", n: T("ピアノ") },
 ];
-const BGM_BATTLE = { f: "bgm_battle", n: "たいせん（サイバー）" };   // ⚔️たいせん 専用
+const BGM_BATTLE = { f: "bgm_battle", n: T("たいせん（サイバー）") };   // ⚔️たいせん 専用
 const MAIN_KEY = "soroban_bgmmain", TURN_KEY = "soroban_bgmturn";
 let bgmMain = localStorage.getItem(MAIN_KEY) || "bgm2";           // ホームの曲（設定で えらべる）。はじめは ファンタジー2
 const OFF_KEY = "soroban_bgmoff";
@@ -829,7 +830,7 @@ $("#clearSoroban3").addEventListener("click", () => sorobanBattle.clear());
 const currentBattleAnswer = () => (battleParts.fracStr === "" ? Number(battleParts.intStr) : NaN);
 
 /* ============================================================ 画面ルーティング */
-const TITLES = { home: "ホーム", solomon: "ソロモン", grades: "級・段を選ぶ", play: "れんしゅう", today: "本日の練習", battle: "たいせん", puzzle: "そろばんパズル", parent: "保護者", records: "記録を見る", ranking: "ランキング", settings: "設定・プロフィール", lesson: "そろばんの きほん", sheet: "プリントを 作る", kentei: "SK検定", join: "教室に 参加" };
+const TITLES = { home: T("ホーム"), solomon: T("ソロモン"), grades: T("級・段を選ぶ"), play: T("れんしゅう"), today: T("本日の練習"), battle: T("たいせん"), puzzle: T("そろばんパズル"), parent: T("保護者"), records: T("記録を見る"), ranking: T("ランキング"), settings: T("設定・プロフィール"), lesson: T("そろばんの きほん"), sheet: T("プリントを 作る"), kentei: T("SK検定"), join: T("教室に 参加") };
 function showView(v) {
   curView = v;
   bgmForView(v);
@@ -910,14 +911,14 @@ function renderSound() { renderVolSegs(); renderSndMini(); }
 
 /* ---- れんしゅう中・たいせん中の ちいさな音ボタン（上のバーが しまわれていても 切れる） ----
    おすたびに 大 → 中 → 小 → 切 → 大 と まわる。いまの状態は 文字で見えるようにする。 */
-const LV_MARK = ["切", "小", "中", "大"];
+const LV_MARK = [T("切"), T("小"), T("中"), T("大")];
 function renderSndMini() {
   $$(".snd-btn").forEach(function (b) {
     const bgm = b.dataset.kind === "bgm";
     const lv = bgm ? bgmLevel : sfxLevel;
     b.innerHTML = (bgm ? "🎵" : "🔊") + '<i>' + LV_MARK[lv] + "</i>";
     b.classList.toggle("off", lv === 0);
-    b.title = (bgm ? "BGM" : "効果音") + "：" + LV_MARK[lv] + "（おすと かわる）";
+    b.title = (bgm ? "BGM" : T("効果音")) + T("：") + LV_MARK[lv] + T("（おすと かわる）");
   });
 }
 document.addEventListener("click", function (e) {
@@ -955,13 +956,13 @@ function renderGrid() {
 function moveGrade(d) { gradeIdx = clamp(gradeIdx + d, 0, GRADES.length - 1); renderGrid(); updateInfo(); }
 function specText(g, subj) {
   const d = difficulty(g, subj);
-  if (!d) return "（この級にはありません）";
-  if (subj === "flash") return `${d.digits}桁 ${d.terms}口 / 約${(d.terms * flashPaceMs(g) / 1000).toFixed(1)}秒（1個 ${(flashPaceMs(g) / 1000).toFixed(1)}秒）`;
-  if (subj === "kake") return (d.variants || [d]).map((v) => `${v.a}桁 × ${v.b}桁`).join(" ／ ");
-  if (subj === "wari") return (d.variants || [d]).map((v) => `${v.D}桁 ÷ ${v.dv}桁`).join(" ／ ");
+  if (!d) return T("（この級にはありません）");
+  if (subj === "flash") return T("{v1}桁 {v2}口 / 約{v3}秒（1個 {v4}秒）", { v1: d.digits, v2: d.terms, v3: (d.terms * flashPaceMs(g) / 1000).toFixed(1), v4: (flashPaceMs(g) / 1000).toFixed(1) });
+  if (subj === "kake") return (d.variants || [d]).map((v) => T("{v1}桁 × {v2}桁", { v1: v.a, v2: v.b })).join(T(" ／ "));
+  if (subj === "wari") return (d.variants || [d]).map((v) => T("{v1}桁 ÷ {v2}桁", { v1: v.D, v2: v.dv })).join(T(" ／ "));
   const one = (v) => `${v.digits}桁 ${v.termsMax && v.termsMax > v.terms ? `${v.terms}〜${v.termsMax}` : v.terms}口`;
   if (d.label) return `${one(d)}　<b>${d.label}</b>`; // 入門級は「たして5」などの狙いを出す
-  return d.variants ? d.variants.map(one).join(" ／ ") : one(d);
+  return d.variants ? d.variants.map(one).join(T(" ／ ")) : one(d);
 }
 function updateInfo() {
   const g = currentGrade();
@@ -970,15 +971,15 @@ function updateInfo() {
   if (!difficulty(g, subject)) {
     // その級に 無い しゅもくなら、ある しゅもくの 最初のものへ（暗算だけの 級体系では みとり算が 無い）
     const first = ["mitori", "kake", "wari", "anzan", "flash"].find((s) => difficulty(g, s));
-    if (!first) { $("#gradeInfo").innerHTML = `<b>${g.key}</b>：この級には しゅもくが ありません`; return; }
+    if (!first) { $("#gradeInfo").innerHTML = T("<b>{v1}</b>：この級には しゅもくが ありません", { v1: g.key }); return; }
     subject = first; return updateInfo();
   }
   const cf = subjectCfg(g, subject);
-  let info = `<b>${g.key}／${cf.name}</b>：${specText(g, subject)}`;
-  if (cf.answer !== "flash") info += `　｜ ${cf.N}もん・${cf.limit / 60}分いない・${cf.pass}点で ごうかく`;
-  if (g.band === "dan" || g.kyu > 15) info += ` <span class="note">※目安</span>`;
+  let info = T("<b>{v1}／{v2}</b>：{v3}", { v1: g.key, v2: cf.name, v3: specText(g, subject) });
+  if (cf.answer !== "flash") info += T("　｜ {v1}もん・{v2}分いない・{v3}点で ごうかく", { v1: cf.N, v2: cf.limit / 60, v3: cf.pass });
+  if (g.band === "dan" || g.kyu > 15) info += T(` <span class="note">※目安</span>`);
   const L = lessonFor(g, subject);
-  if (L) info += ' <button id="lessonBtn" class="ghost lesson-btn">📖 この級の 解きかたを 見る</button>';
+  if (L) info += T(' <button id="lessonBtn" class="ghost lesson-btn">📖 この級の 解きかたを 見る</button>');
   $("#gradeInfo").innerHTML = info;
   $("#timerToggleWrap").style.display = cf.answer === "flash" ? "none" : "";
   const lb = $("#lessonBtn"); if (lb && L) lb.onclick = () => tipShow(L.t, L.b);
@@ -1006,7 +1007,7 @@ function homeGrade() { const rk = JSON.parse(localStorage.getItem(RANK) || "null
 function routineMenuSummary(grade) {
   const steps = buildSteps(grade), cnt = {};
   steps.forEach((s) => { if (s.subj) cnt[s.subj] = (cnt[s.subj] || 0) + s.N; });
-  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => `<div class="menu-row"><span>${SUBJECT[s].name}</span><b>${cnt[s]}問</b></div>`).join("");
+  return ["anzan", "kake", "wari", "mitori"].filter((s) => cnt[s]).map((s) => T("<div class=\"menu-row\"><span>{v1}</span><b>{v2}問</b></div>", { v1: SUBJECT[s].name, v2: cnt[s] })).join("");
 }
 /* 1問にかかる時間の うつりかわり。「きのうの じぶん」に 勝つのが いちばん 夢中になる */
 function speedStats() {
@@ -1043,30 +1044,30 @@ function sparkSVG(vals) {
 function renderSpeed() {
   const box = $("#speedBox"); if (!box) return;
   const st = speedStats();
-  if (!st) { box.innerHTML = '<div class="sp-h">⚡ 1もんの はやさ</div><div class="sub">れんしゅうすると、ここに「1もんに かかる時間」が 出るよ。きのうの じぶんに 勝とう！</div>'; return; }
+  if (!st) { box.innerHTML = T('<div class="sp-h">⚡ 1もんの はやさ</div><div class="sub">れんしゅうすると、ここに「1もんに かかる時間」が 出るよ。きのうの じぶんに 勝とう！</div>'); return; }
   const name = subjName(st.subj), now = st.todayAvg != null ? st.todayAvg : st.thisWeek;
   let cmp = "";
   if (st.lastWeek != null && now != null) {
     const diff = st.lastWeek - now;
-    cmp = diff > 0.05 ? '<span class="sp-up">先週 ' + st.lastWeek.toFixed(1) + '秒 → <b>' + diff.toFixed(1) + '秒 はやくなった！</b></span>'
-      : diff < -0.05 ? '<span class="sp-dn">先週 ' + st.lastWeek.toFixed(1) + '秒。きょうは ゆっくり ていねいに</span>'
-      : '<span class="sp-eq">先週と 同じくらい。あと 0.1秒！</span>';
-  } else cmp = '<span class="sp-eq">あしたも はかって、きょうの じぶんに 勝とう</span>';
-  box.innerHTML = '<div class="sp-h">⚡ ' + name + "の はやさ</div>" +
-    '<div class="sp-row"><div class="sp-big">1もん <b>' + (now != null ? now.toFixed(1) : "—") + '</b><small>秒</small></div>' + sparkSVG(st.spark) + "</div>" +
-    '<div class="sp-cmp">' + cmp + (st.best != null ? '<span class="sp-best">🏆 じこベスト ' + st.best.toFixed(1) + "秒</span>" : "") + "</div>";
+    cmp = diff > 0.05 ? T('<span class="sp-up">先週 ') + st.lastWeek.toFixed(1) + T('秒 → <b>') + diff.toFixed(1) + T('秒 はやくなった！</b></span>')
+      : diff < -0.05 ? T('<span class="sp-dn">先週 ') + st.lastWeek.toFixed(1) + T('秒。きょうは ゆっくり ていねいに</span>')
+      : T('<span class="sp-eq">先週と 同じくらい。あと 0.1秒！</span>');
+  } else cmp = T('<span class="sp-eq">あしたも はかって、きょうの じぶんに 勝とう</span>');
+  box.innerHTML = '<div class="sp-h">⚡ ' + name + T("の はやさ</div>") +
+    T('<div class="sp-row"><div class="sp-big">1もん <b>') + (now != null ? now.toFixed(1) : "—") + T('</b><small>秒</small></div>') + sparkSVG(st.spark) + "</div>" +
+    '<div class="sp-cmp">' + cmp + (st.best != null ? T('<span class="sp-best">🏆 じこベスト ') + st.best.toFixed(1) + T("秒</span>") : "") + "</div>";
 }
 function renderHome() {
   renderSpeed();
   const p = profile(), k = loadKingdom(), s = loadStat(), ms = monthStats(), g = homeGrade();
   $("#homeAvatar").innerHTML = avatarHTML(p.avatar); $("#homeName").textContent = p.name; $("#homeRank").textContent = rankText();
-  $("#homeMenu").innerHTML = routineMenuSummary(g) || '<div class="sub">この級では暗算・見取りを練習します</div>';
+  $("#homeMenu").innerHTML = routineMenuSummary(g) || T('<div class="sub">この級では暗算・見取りを練習します</div>');
   $("#homeGold").textContent = k.gold.toLocaleString();
   $("#homeKingdomLv").textContent = kingdomLevel(k);
-  $("#homeStreak").textContent = `${s.streak || 0}日`;
-  $("#homeMonth").textContent = `${ms.days}日`;
+  $("#homeStreak").textContent = T("{v1}日", { v1: s.streak || 0 });
+  $("#homeMonth").textContent = T("{v1}日", { v1: ms.days });
   const doneToday = JSON.parse(localStorage.getItem(ROUTINE) || "[]").some((h) => h.date === today());
-  $("#homeStatus").innerHTML = doneToday ? "✅ 今日の練習：<b>完了！</b>　えらい！" : "今日の練習：<b>0 / 1</b>　さあ始めよう！";
+  $("#homeStatus").innerHTML = doneToday ? T("✅ 今日の練習：<b>完了！</b>　えらい！") : T("今日の練習：<b>0 / 1</b>　さあ始めよう！");
   renderWeakMenu();
   renderHomework();                  // 教室に 入っている子：先生からの 宿題
   renderSolomonCard();               // 🐣 ソロモン
@@ -1089,14 +1090,14 @@ function weakProfile(days) {
 function renderWeakMenu() {
   const el = $("#weakMenu"); if (!el) return;
   const w = weakProfile(14);
-  if (!w.length) { el.innerHTML = '<div class="wm-none">まちがえた記録が たまると、ここに <b>にがて克服メニュー</b> が出ます。</div>'; return; }
+  if (!w.length) { el.innerHTML = T('<div class="wm-none">まちがえた記録が たまると、ここに <b>にがて克服メニュー</b> が出ます。</div>'); return; }
   const rows = w.slice(0, 3).map((x) => {
     const K = MISS_KINDS[x.k] || MISS_KINDS.other;
     return `<div class="wm-row"><span class="wm-em">${K.em}</span><span class="wm-n">${K.n}</span>` +
-      `<span class="wm-c">${x.n}回</span><button class="wm-go" data-k="${x.k}">▶ 5問 やる</button></div>`;
+      T("<span class=\"wm-c\">{v1}回</span><button class=\"wm-go\" data-k=\"{v2}\">▶ 5問 やる</button></div>", { v1: x.n, v2: x.k });
   }).join("");
-  el.innerHTML = `<div class="wm-h">🎯 きみの にがて克服メニュー</div>${rows}` +
-    `<div class="sub">まちがえたクセと同じ形の問題だけを 出します。正解すると GOLD ももらえるよ。</div>`;
+  el.innerHTML = T("<div class=\"wm-h\">🎯 きみの にがて克服メニュー</div>{rows}", { rows }) +
+    T(`<div class="sub">まちがえたクセと同じ形の問題だけを 出します。正解すると GOLD ももらえるよ。</div>`);
   $$("#weakMenu .wm-go").forEach((b) => { b.onclick = () => startWeakSession(b.dataset.k, 5); });
 }
 function accBySubject(sessions) {
@@ -1114,17 +1115,17 @@ function renderParent() {
   const timed = thisWeek.filter((e) => e.avg > 0);
   const avgT = timed.length ? sum(timed, (e) => e.avg * e.N) / sum(timed, (e) => e.N) : 0;
   const days = new Set(thisWeek.map((e) => e.d)).size;
-  const diff = tN - lN, diffTxt = lN ? (diff >= 0 ? `先週より +${diff}問 📈` : `先週より ${diff}問`) : "先週の記録はまだありません";
+  const diff = tN - lN, diffTxt = lN ? (diff >= 0 ? T("先週より +{diff}問 📈", { diff }) : T("先週より {diff}問", { diff })) : T("先週の記録はまだありません");
   $("#parentSummary").innerHTML =
     '<div class="pgrid">' +
-    `<div class="pcell"><span>現在の級</span><b>${rk}</b></div>` +
-    `<div class="pcell"><span>連続学習</span><b>${s.streak || 0}日</b></div>` +
-    `<div class="pcell"><span>今週の学習日数</span><b>${days}日</b></div>` +
-    `<div class="pcell"><span>今週の問題数</span><b>${tN}問</b></div>` +
-    `<div class="pcell"><span>今週の正答率</span><b>${acc}%</b></div>` +
-    `<div class="pcell"><span>平均回答時間</span><b>${avgT ? avgT.toFixed(1) + "秒" : "—"}</b></div>` +
+    T("<div class=\"pcell\"><span>現在の級</span><b>{rk}</b></div>", { rk }) +
+    T("<div class=\"pcell\"><span>連続学習</span><b>{v1}日</b></div>", { v1: s.streak || 0 }) +
+    T("<div class=\"pcell\"><span>今週の学習日数</span><b>{days}日</b></div>", { days }) +
+    T("<div class=\"pcell\"><span>今週の問題数</span><b>{tN}問</b></div>", { tN }) +
+    T("<div class=\"pcell\"><span>今週の正答率</span><b>{acc}%</b></div>", { acc }) +
+    T("<div class=\"pcell\"><span>平均回答時間</span><b>{v1}</b></div>", { v1: avgT ? avgT.toFixed(1) + "秒" : "—" }) +
     `</div><div class="sub">${diffTxt}</div>`;
-  const bars = [], wk = ["日", "月", "火", "水", "木", "金", "土"];
+  const bars = [], wk = [T("日"), T("月"), T("火"), T("水"), T("木"), T("金"), T("土")];
   for (let i = 6; i >= 0; i--) { const d = daysAgo(i); bars.push({ d, n: sum(sessionsBetween(d, d), (e) => e.N) }); }
   const maxN = Math.max(10, ...bars.map((b) => b.n));
   $("#parentWeek").innerHTML = '<div class="pbars">' + bars.map((b) => {
@@ -1133,36 +1134,36 @@ function renderParent() {
   }).join("") + "</div>";
   const m = accBySubject(sessionsBetween(daysAgo(29), to));
   const rows = ["mitori", "kake", "wari", "anzan", "flash"].filter((x) => m[x]).map((x) => ({ x, a: Math.round((m[x].correct / m[x].N) * 100), N: m[x].N }));
-  if (!rows.length) { $("#parentSubjects").innerHTML = '<p class="sub">練習を重ねると、得意・苦手が分かります。</p>'; return; }
+  if (!rows.length) { $("#parentSubjects").innerHTML = T('<p class="sub">練習を重ねると、得意・苦手が分かります。</p>'); return; }
   const best = rows.slice().sort((a, b) => b.a - a.a)[0], worst = rows.slice().sort((a, b) => a.a - b.a)[0];
   $("#parentSubjects").innerHTML = rows.map((r) => `<div class="psub"><span>${SUBJECT[r.x].name}</span><div class="psub-bar"><div style="width:${r.a}%"></div></div><b>${r.a}%</b></div>`).join("") +
-    `<div class="sub">得意：<b>${SUBJECT[best.x].name}</b>（${best.a}%）／ これから：<b>${SUBJECT[worst.x].name}</b>（${worst.a}%）</div>`;
+    T("<div class=\"sub\">得意：<b>{v1}</b>（{v2}%）／ これから：<b>{v3}</b>（{v4}%）</div>", { v1: SUBJECT[best.x].name, v2: best.a, v3: SUBJECT[worst.x].name, v4: worst.a });
 }
 function routineGraphSVG(hist) {
-  if (!hist.length) return '<p class="sub">「本日の練習」を さいごまで やると、ここに グラフが 出るよ。</p>';
+  if (!hist.length) return T('<p class="sub">「本日の練習」を さいごまで やると、ここに グラフが 出るよ。</p>');
   const data = hist.slice(-20), n = data.length, W = 560, H = 180, pad = 28;
   const x = (i) => pad + (n === 1 ? (W - 2 * pad) / 2 : (i * (W - 2 * pad)) / (n - 1));
   const y = (v) => H - pad - (v / 100) * (H - 2 * pad);
   const grid = [0, 25, 50, 75, 100].map((v) => `<line x1="${pad}" y1="${y(v)}" x2="${W - pad}" y2="${y(v)}" stroke="#eee"/><text x="4" y="${y(v) + 3}" font-size="9" fill="#999">${v}</text>`).join("");
   const pts = data.map((d, i) => `${x(i).toFixed(1)},${y(d.acc).toFixed(1)}`).join(" ");
   const dots = data.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.acc).toFixed(1)}" r="3.5" fill="#c0392b"><title>${d.date} ${d.grade} ${d.acc}%</title></circle>`).join("");
-  return `<svg viewBox="0 0 ${W} ${H}" class="graph">${grid}<polyline points="${pts}" fill="none" stroke="#c0392b" stroke-width="2"/>${dots}</svg><p class="sub">正答率(%)の推移・直近${n}回</p>`;
+  return T("<svg viewBox=\"0 0 {W} {H}\" class=\"graph\">{grid}<polyline points=\"{pts}\" fill=\"none\" stroke=\"#c0392b\" stroke-width=\"2\"/>{dots}</svg><p class=\"sub\">正答率(%)の推移・直近{n}回</p>", { W, H, grid, pts, dots, n });
 }
 function renderRecords() {
   const ms = monthStats();
-  $("#recEffort").textContent = `学習日数 ${ms.days}日　／　合計 ${fmtMin(ms.sec)}`;
+  $("#recEffort").textContent = T("学習日数 {v1}日　／　合計 {v2}", { v1: ms.days, v2: fmtMin(ms.sec) });
   const hist = JSON.parse(localStorage.getItem(ROUTINE) || "[]");
   $("#routineGraph").innerHTML = routineGraphSVG(hist);
   const hrows = hist.slice(-15).reverse().map((h) => `<tr><td>${h.date}</td><td>${h.grade}</td><td>${h.acc}%</td><td>${h.totalCorrect}/${h.totalN}</td><td>${fmtClock(h.timeSec)}</td></tr>`).join("");
   $("#routineList").innerHTML = hrows
-    ? `<table class="rec-table"><tr><th>日づけ</th><th>級・段</th><th>正答率</th><th>正解</th><th>タイム</th></tr>${hrows}</table>`
+    ? T("<table class=\"rec-table\"><tr><th>日づけ</th><th>級・段</th><th>正答率</th><th>正解</th><th>タイム</th></tr>{hrows}</table>", { hrows })
     : "";
   const t = allTimes(), subs = ["mitori", "kake", "wari", "anzan"];
   const rows = GRADES.filter((g) => subs.some((s) => t[`${g.key}_${s}`] != null))
     .map((g) => `<tr><td>${g.key}</td>${subs.map((s) => `<td>${t[`${g.key}_${s}`] != null ? fmtClock(t[`${g.key}_${s}`]) : "—"}</td>`).join("")}</tr>`).join("");
   $("#recordsTable").innerHTML = rows
-    ? `<table class="rec-table"><tr><th>級・段</th><th>みとり</th><th>かけ</th><th>わり</th><th>あんざん</th></tr>${rows}</table>`
-    : `<p class="sub">まだ きろくが ないよ。れんしゅうを さいごまで やると、タイムが のこるよ。</p>`;
+    ? T("<table class=\"rec-table\"><tr><th>級・段</th><th>みとり</th><th>かけ</th><th>わり</th><th>あんざん</th></tr>{rows}</table>", { rows })
+    : T(`<p class="sub">まだ きろくが ないよ。れんしゅうを さいごまで やると、タイムが のこるよ。</p>`);
   renderWeekRank();
   renderRecLog();
   renderCerts();
@@ -1173,7 +1174,7 @@ function renderRecords() {
    1回ずつ ぜんぶ 見られるようにする。 */
 let recFilter = "all";
 const SUBJ_EM = { mitori: "🧮", kake: "✏️", wari: "➗", anzan: "💭", flash: "⚡" };
-const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : (String(k).startsWith("sk-") && EXAM_TRACKS[k.slice(3)] ? "SK検定・" + EXAM_TRACKS[k.slice(3)].name + "・自宅受験" : k));
+const subjName = (k) => (SUBJECT[k] ? SUBJECT[k].name : (String(k).startsWith("sk-") && EXAM_TRACKS[k.slice(3)] ? T("SK検定・") + EXAM_TRACKS[k.slice(3)].name + T("・自宅受験") : k));
 function renderRecLog() {
   const box = $("#recLog"); if (!box) return;
   const all = allSessions().slice().reverse();          // 新しいものが 上
@@ -1182,21 +1183,21 @@ function renderRecLog() {
   all.forEach((e) => { counts[e.subj] = (counts[e.subj] || 0) + 1; });
   const kinds = ["mitori", "kake", "wari", "anzan", "flash"].filter((k) => counts[k]);
   $("#recFilter").innerHTML =
-    '<button class="chip' + (recFilter === "all" ? " active" : "") + '" data-rf="all">ぜんぶ ' + all.length + "回</button>" +
+    '<button class="chip' + (recFilter === "all" ? " active" : "") + T('" data-rf="all">ぜんぶ ') + all.length + T("回</button>") +
     kinds.map((k) => '<button class="chip' + (recFilter === k ? " active" : "") + '" data-rf="' + k + '">' +
-      SUBJ_EM[k] + " " + subjName(k) + " " + counts[k] + "回</button>").join("");
+      SUBJ_EM[k] + " " + subjName(k) + " " + counts[k] + T("回</button>")).join("");
   $$("#recFilter .chip").forEach((b) => { b.onclick = () => { recFilter = b.dataset.rf; renderRecLog(); }; });
 
   const list = recFilter === "all" ? all : all.filter((e) => e.subj === recFilter);
   // まとめ
   const N = list.reduce((a, e) => a + e.N, 0), C = list.reduce((a, e) => a + e.correct, 0);
-  const T = list.reduce((a, e) => a + (e.sec || 0), 0);
+  const totalSec = list.reduce((a, e) => a + (e.sec || 0), 0);
   $("#recSummary").innerHTML = list.length
-    ? `ぜんぶで <b>${list.length}回</b>　といた問題 <b>${N}問</b>　正解 <b>${C}問</b>（正答率 ${N ? Math.round((C / N) * 100) : 0}%）　合計 <b>${fmtMin(T)}</b>`
-    : "まだ きろくが ないよ。";
+    ? T("ぜんぶで <b>{v1}回</b>　といた問題 <b>{N}問</b>　正解 <b>{C}問</b>（正答率 {v4}%）　合計 <b>{v5}</b>", { v1: list.length, N, C, v4: N ? Math.round((C / N) * 100) : 0, v5: fmtMin(totalSec) })
+    : T("まだ きろくが ないよ。");
   const show = list.slice(0, 80);
   box.innerHTML = recLogTable(show) +
-    (list.length > show.length ? `<p class="sub">新しい ${show.length}回 を出しています（ぜんぶで ${list.length}回）</p>` : "");
+    (list.length > show.length ? T("<p class=\"sub\">新しい {v1}回 を出しています（ぜんぶで {v2}回）</p>", { v1: show.length, v2: list.length }) : "");
 }
 function recLogTable(rows) {
   if (!rows.length) return "";
@@ -1208,7 +1209,7 @@ function recLogTable(rows) {
       `<td>${e.sec ? fmtClock(e.sec) : "—"}</td><td>${e.avg ? e.avg.toFixed(1) + "秒" : "—"}</td>` +
       `<td>${miss ? '<span class="rec-miss">' + miss + "問</span>" : "—"}</td></tr>`;
   }).join("");
-  return `<table class="rec-table"><tr><th>日付</th><th>種目</th><th>級・段</th><th>正解</th><th>正答率</th><th>時間</th><th>1問</th><th>まちがい</th></tr>${trs}</table>`;
+  return T("<table class=\"rec-table\"><tr><th>日付</th><th>種目</th><th>級・段</th><th>正解</th><th>正答率</th><th>時間</th><th>1問</th><th>まちがい</th></tr>{trs}</table>", { trs });
 }
 
 /* ============================================================ 今週のランキング
@@ -1256,41 +1257,41 @@ function skillRank() {
 function renderWeekRank() {
   const box = $("#recRank"); if (!box) return;
   const ws = weekPoints();
-  if (!ws.length) { box.innerHTML = '<p class="sub">練習すると ここに ランキングが 出ます。</p>'; return; }
+  if (!ws.length) { box.innerHTML = T('<p class="sub">練習すると ここに ランキングが 出ます。</p>'); return; }
   const thisWeek = weekKeyOf(today());
   const idx = ws.findIndex((x) => x.k === thisWeek);
   const me = idx >= 0 ? ws[idx] : null;
   const head = me
-    ? `<div class="rank-now">今週は 歴代 <b>${idx + 1}位</b> ／ ${ws.length}週　<span class="rank-pt">${me.pt} ポイント</span></div>` +
-      (idx === 0 ? '<div class="rank-cheer">🏆 じぶんの 最高記録を こうしん中！</div>'
-        : `<div class="rank-cheer">あと <b>${ws[idx - 1].pt - me.pt}</b> ポイントで ${idx}位！</div>`)
-    : '<div class="rank-now">今週は まだ 0ポイント。1セットやると のります。</div>';
+    ? T("<div class=\"rank-now\">今週は 歴代 <b>{v1}位</b> ／ {v2}週　<span class=\"rank-pt\">{v3} ポイント</span></div>", { v1: idx + 1, v2: ws.length, v3: me.pt }) +
+      (idx === 0 ? T('<div class="rank-cheer">🏆 じぶんの 最高記録を こうしん中！</div>')
+        : T("<div class=\"rank-cheer\">あと <b>{v1}</b> ポイントで {idx}位！</div>", { v1: ws[idx - 1].pt - me.pt, idx }))
+    : T('<div class="rank-now">今週は まだ 0ポイント。1セットやると のります。</div>');
   const rows = ws.slice(0, 8).map(function (x, i) {
     const now = x.k === thisWeek;
-    return `<tr class="${now ? "rank-me" : ""}"><td>${i + 1}位</td><td>${x.k} の週${now ? "（今週）" : ""}</td>` +
-      `<td><b>${x.pt}</b></td><td>${x.sets}セット</td><td>${x.N}問</td><td>${x.acc}%</td><td>${x.days}日</td></tr>`;
+    return T("<tr class=\"{v1}\"><td>{v2}位</td><td>{v3} の週{v4}</td>", { v1: now ? "rank-me" : "", v2: i + 1, v3: x.k, v4: now ? "（今週）" : "" }) +
+      T("<td><b>{v1}</b></td><td>{v2}セット</td><td>{v3}問</td><td>{v4}%</td><td>{v5}日</td></tr>", { v1: x.pt, v2: x.sets, v3: x.N, v4: x.acc, v5: x.days });
   }).join("");
   const sk = skillRank();
   const skHTML = sk.length
-    ? '<h4 class="rank-h">🎖 実力ランク（検定の 制限時間と くらべて）</h4>' +
-      '<table class="rec-table"><tr><th>級・段</th><th>種目</th><th>じぶんのタイム</th><th>検定の制限</th><th>ランク</th></tr>' +
+    ? T('<h4 class="rank-h">🎖 実力ランク（検定の 制限時間と くらべて）</h4>') +
+      T('<table class="rec-table"><tr><th>級・段</th><th>種目</th><th>じぶんのタイム</th><th>検定の制限</th><th>ランク</th></tr>') +
       sk.map((x) => `<tr><td>${x.g}</td><td>${subjName(x.sj)}</td><td>${fmtClock(x.best)}</td><td>${fmtClock(x.lim)}</td>` +
         `<td><span class="rk rk-${x.rank}">${x.rank}</span></td></tr>`).join("") + "</table>" +
-      '<p class="sub">S＝制限時間の35%以内　A＝55%以内　B＝80%以内　C＝それ以上。検定は「時間内に とける」ことが 合格の めやすです。</p>'
+      T('<p class="sub">S＝制限時間の35%以内　A＝55%以内　B＝80%以内　C＝それ以上。検定は「時間内に とける」ことが 合格の めやすです。</p>')
     : "";
   box.innerHTML = head +
-    '<table class="rec-table"><tr><th></th><th>週</th><th>ポイント</th><th>セット</th><th>問題</th><th>正答率</th><th>日数</th></tr>' + rows + "</table>" +
-    '<p class="sub">ポイント＝といた数 ＋ 正解×2 ＋ 正答率 ＋ つづけた日数×30</p>' + skHTML;
+    T('<table class="rec-table"><tr><th></th><th>週</th><th>ポイント</th><th>セット</th><th>問題</th><th>正答率</th><th>日数</th></tr>') + rows + "</table>" +
+    T('<p class="sub">ポイント＝といた数 ＋ 正解×2 ＋ 正答率 ＋ つづけた日数×30</p>') + skHTML;
 }
 function renderToday() {
   const sel = $("#todayGrade");
   const lv = routineLevel(), d = practiceDays();
   const steps = buildSteps(homeGrade());
-  const lines = steps.map((st) => st.rest != null ? "きゅうけい " + st.rest + "びょう" : st.label).join(" → ");
+  const lines = steps.map((st) => st.rest != null ? T("きゅうけい ") + st.rest + T("びょう") : st.label).join(" → ");
   const note = $("#todayNote");
-  if (note) note.innerHTML = (lv === 0 ? "はじめての日は <b>3もん</b>だけ。まずは「できた！」で おわろう。"
-    : lv < 4 ? "れんしゅうした日が <b>" + d + "日</b>。少しずつ 長くなるよ（7日で 本番のメニュー）。" : "本番のメニューだよ。") +
-    '<div class="today-flow">' + lines + " → 🎉 せいせき はっぴょう</div>";
+  if (note) note.innerHTML = (lv === 0 ? T("はじめての日は <b>3もん</b>だけ。まずは「できた！」で おわろう。")
+    : lv < 4 ? T("れんしゅうした日が <b>") + d + T("日</b>。少しずつ 長くなるよ（7日で 本番のメニュー）。") : T("本番のメニューだよ。")) +
+    '<div class="today-flow">' + lines + T(" → 🎉 せいせき はっぴょう</div>");
   sel.innerHTML = GRADES.map((g, i) => `<option value="${i}">${g.key}</option>`).join("");
   sel.dataset.filled = "1";
   const rk = JSON.parse(localStorage.getItem(RANK) || "null");
@@ -1299,7 +1300,7 @@ function renderToday() {
 $("#todayStart").addEventListener("click", () => { const g = GRADES[+$("#todayGrade").value]; tipOnce("first-routine", TIP_ROUTINE.t, TIP_ROUTINE.b, () => startRoutine(g)); });
 // アバター。"img:名前" は assets/名前.png の絵、それ以外は 顔文字
 const AVATARS = ["img:hero_1", "img:hero_2", "img:hero_3", "img:hero_4", "img:hero_5", "img:hero_6", "🧒", "👦", "👧", "🦊", "🐼", "🦉"];
-const AVATAR_NAMES = { hero_1: "けんし", hero_2: "まほうつかい", hero_3: "ゆみつかい", hero_4: "おひめさま", hero_5: "けんじゃ", hero_6: "ぶとうか" };
+const AVATAR_NAMES = { hero_1: T("けんし"), hero_2: T("まほうつかい"), hero_3: T("ゆみつかい"), hero_4: T("おひめさま"), hero_5: T("けんじゃ"), hero_6: T("ぶとうか") };
 function avatarHTML(a) {
   if (a && a.indexOf("img:") === 0) { const n = a.slice(4); return '<img class="av-img" src="assets/' + n + '.png" alt="' + (AVATAR_NAMES[n] || "") + '">'; }
   return a || "🧒";
@@ -1311,8 +1312,8 @@ function renderSound2() {
   renderVolSegs(); renderSndMini();
   const sb = $("#studyBgm");
   if (sb) {
-    sb.innerHTML = '<option value="off">鳴らさない</option><option value="rotate">毎回かえる（おすすめ）</option>' +
-      BGM_LIST.map((b) => '<option value="' + b.f + '">' + b.n + " だけ</option>").join("");
+    sb.innerHTML = T('<option value="off">鳴らさない</option><option value="rotate">毎回かえる（おすすめ）</option>') +
+      BGM_LIST.map((b) => '<option value="' + b.f + '">' + b.n + T(" だけ</option>")).join("");
     sb.value = bgmStudy;
     sb.onchange = function () { setBgmStudy(sb.value); renderSound2(); };
   }
@@ -1320,19 +1321,19 @@ function renderSound2() {
   if (songs) {
     songs.innerHTML = BGM_LIST.concat([BGM_BATTLE]).map(function (b) {
       const main = b.f === bgmMain, now = b.f === bgmName, off = !!bgmOff[b.f], batt = b.f === BGM_BATTLE.f;
-      const st = bgmLoaded[b.f] === false ? ' <small class="ng">読めない</small>' : "";
+      const st = bgmLoaded[b.f] === false ? T(' <small class="ng">読めない</small>') : "";
       return '<div class="song' + (main ? " main" : "") + (off ? " off" : "") + '">' +
         '<button class="song-play" data-f="' + b.f + '">▶</button>' +
-        '<span class="song-n">' + b.n + (now ? ' <small>♪いま</small>' : "") + st + "</span>" +
-        (batt ? '<span class="song-badge fixed">たいせん専用</span>'
-          : '<button class="song-use" data-f="' + b.f + '">' + (off ? "つかわない" : "つかう") + "</button>" +
-            (main ? '<span class="song-badge">ホームの曲</span>'
-              : '<button class="song-main" data-f="' + b.f + '">ホームの曲に</button>')) +
+        '<span class="song-n">' + b.n + (now ? T(' <small>♪いま</small>') : "") + st + "</span>" +
+        (batt ? T('<span class="song-badge fixed">たいせん専用</span>')
+          : '<button class="song-use" data-f="' + b.f + '">' + (off ? T("つかわない") : T("つかう")) + "</button>" +
+            (main ? T('<span class="song-badge">ホームの曲</span>')
+              : '<button class="song-main" data-f="' + b.f + T('">ホームの曲に</button>'))) +
         "</div>";
     }).join("");
   }
-  if (n) n.innerHTML = "メインの曲は 練習中に流れ、パズルでは 1ステージおきに かかります。" +
-    "ほかの曲は ステージごとに 順ぐりで 入れかわります。";
+  if (n) n.innerHTML = T("メインの曲は 練習中に流れ、パズルでは 1ステージおきに かかります。") +
+    T("ほかの曲は ステージごとに 順ぐりで 入れかわります。");
 }
 // 曲を ためし聞き／メインに する
 document.addEventListener("click", function (e) {
@@ -1354,11 +1355,11 @@ function renderSettings() {
   $$("#avatarPicker button").forEach((b) => b.addEventListener("click", () => { $$("#avatarPicker button").forEach((x) => x.classList.remove("sel")); b.classList.add("sel"); }));
 }
 $("#saveProfileBtn").addEventListener("click", () => {
-  const name = ($("#nameInput").value || "そろ太くん").trim();
+  const name = ($("#nameInput").value || T("そろ太くん")).trim();
   const sel = $("#avatarPicker button.sel");
   saveProfile({ name, avatar: sel ? sel.dataset.a : "img:hero_1" });
   renderProfile();
-  $("#saveMsg").textContent = "保存しました ✓";
+  $("#saveMsg").textContent = T("保存しました ✓");
   setTimeout(() => ($("#saveMsg").textContent = ""), 1500);
 });
 
@@ -1423,7 +1424,7 @@ function startSession(subj) {
   const grade = currentGrade();
   if (subj === "flash") return startFlash(grade);
   document.body.classList.remove("flashmode");
-  if (!difficulty(grade, subj)) { alert("この級にはこの種目がありません"); return; }
+  if (!difficulty(grade, subj)) { alert(T("この級にはこの種目がありません")); return; }
   const cf = subjectCfg(grade, subj);
   session = { subj, grade, cf, N: cf.N, idx: 0, correct: 0, answerBy: answerModeFor(cf), timed: $("#timerToggle").checked, mode: $("#examMode").checked ? "end" : "each", results: [], locking: false, start: performance.now(), cur: null, paused: false, pausedMs: 0, pauseAt: 0, pauseCount: 0 };
   // 📖 物語の中の 練習（数問だけ・タイマーなし・1問ずつ ◎×）。問題の作り方・採点は ふつうと 同じ
@@ -1442,7 +1443,7 @@ function startSession(subj) {
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.toggle("hidden", subj !== "anzan"); // あんざんのときだけコツを出す
   $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(subj));
-  $("#playGrade").textContent = session.story ? "📖 " + session.story.label : `${grade.key}／${cf.name}` + (session.timed ? "（検定）" : "（記録）");
+  $("#playGrade").textContent = session.story ? "📖 " + session.story.label : T("{v1}／{v2}", { v1: grade.key, v2: cf.name }) + (session.timed ? T("（検定）") : T("（記録）"));
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   renderBridge();
   startPlayTimer();
@@ -1461,7 +1462,7 @@ function tickPlay() {
 /* ---------- 一時停止 / さいかい ---------- */
 function setPauseUI(on) {
   $("#playPause").classList.toggle("hidden", !on);
-  $("#pauseBtn").textContent = on ? "▶ さいかい" : "⏸ 一時停止";
+  $("#pauseBtn").textContent = on ? T("▶ さいかい") : T("⏸ 一時停止");
 }
 function hidePauseUI() { $("#pauseBtn").classList.add("hidden"); $("#playPause").classList.add("hidden"); }
 function pausePlay() {
@@ -1494,7 +1495,7 @@ function nextPlayProblem() {
   $("#playProblem").textContent = session.cur.display;
   fitProblem(session.cur.display);       // 口数が多くても1画面に収める
   $("#playMark").classList.add("hidden");
-  const prog = session.mode === "end" ? `回答 ${Math.min(session.idx + 1, session.N)} / ${session.N}` : `${Math.min(session.idx + 1, session.N)} / ${session.N}　正解 ${session.correct}`;
+  const prog = session.mode === "end" ? T("回答 {v1} / {v2}", { v1: Math.min(session.idx + 1, session.N), v2: session.N }) : T("{v1} / {v2}　正解 {v3}", { v1: Math.min(session.idx + 1, session.N), v2: session.N, v3: session.correct });
   $("#playProgress").textContent = prog;
   $("#steps").classList.add("hidden");
   session.qStart = performance.now(); // 1問ごとの回答時間を計測
@@ -1510,7 +1511,7 @@ function sectionResultHTML(sec) {
     `<div class="qrow"><span class="qn">${i + 1}</span><span class="qq">${it.compact}</span>` +
     `<span class="qa">=${it.user}${it.ok ? "" : ` <s>${it.ans}</s>`}</span>` +
     `<span class="qm ${it.ok ? "ok" : "ng"}">${it.ok ? "◎" : "×"}</span></div>`).join("");
-  return `<div class="section-score">${sec.label}：<b>${sec.correct} / ${sec.N}</b>　タイム ${fmtClock(sec.sec)}</div><div class="qlist">${rows}</div>`;
+  return T("<div class=\"section-score\">{v1}：<b>{v2} / {v3}</b>　タイム {v4}</div><div class=\"qlist\">{rows}</div>", { v1: sec.label, v2: sec.correct, v3: sec.N, v4: fmtClock(sec.sec), rows });
 }
 function currentSorobanAnswer() {
   return sorobanParts.fracStr === "" ? Number(sorobanParts.intStr) : NaN;
@@ -1533,7 +1534,7 @@ function submitAnswer(val) {
     if (session.quest && ok) session.quest.hits++;                       // 🌉 橋が 1つ のびる
     let wait = 850;
     if (session.story) wait = storyOnAnswer(ok);                          // 📖 物語の中では 仲間が 反応する
-    else if (session.quest) renderBridge(ok ? "" : "だいじょうぶ。つぎの 石を 取りに いこう。", ok ? "" : "sad");
+    else if (session.quest) renderBridge(ok ? "" : T("だいじょうぶ。つぎの 石を 取りに いこう。"), ok ? "" : "sad");
     setTimeout(() => { session.locking = false; advance(); }, wait);
   }
 }
@@ -1559,7 +1560,7 @@ function finishSession() {
   if (session.mode === "end" && session.results.length) {
     msg += `<div class="marks">` + session.results.map((r) => `<span class="mk ${r.ok ? "ok" : "ng"}">${r.ok ? "◎" : "×"}</span>`).join("") + `</div>`;
   }
-  msg += `タイム <b>${fmtClock(el)}</b>　正解 ${session.correct} / ${session.N}`;
+  msg += T("タイム <b>{v1}</b>　正解 {v2} / {v3}", { v1: fmtClock(el), v2: session.correct, v3: session.N });
   const report = missReportHTML(session.results);   // 正答率と「まちがえ方のクセ」の図解
   let cls = "ok", bestUpdated = false;
   touchStreak(); // streak更新（GOLD連続ボーナスの前に）
@@ -1568,27 +1569,27 @@ function finishSession() {
     logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
     if (session.story) {
       msg += `<br>📖 <b>${session.story.label}</b>`;
-      if (session.correct === session.N) msg += `　<b class="hl">✨ ぜんぶ せいかい！</b>`;
+      if (session.correct === session.N) msg += T(`　<b class="hl">✨ ぜんぶ せいかい！</b>`);
     } else {
       const K = MISS_KINDS[session.weak] || MISS_KINDS.other;
-      msg += `<br>🎯 <b>${K.n}</b> の 克服れんしゅう`;
-      if (session.correct === session.N) msg += `　<b class="hl">✨ ぜんぶ せいかい！ このクセ、なおってきたよ</b>`;
+      msg += T("<br>🎯 <b>{v1}</b> の 克服れんしゅう", { v1: K.n });
+      if (session.correct === session.N) msg += T(`　<b class="hl">✨ ぜんぶ せいかい！ このクセ、なおってきたよ</b>`);
     }
   } else if (completed) {
     const r = saveTime(session.grade.key, session.subj, el); bestUpdated = r.improved;
     logStudy(el); logSession(session.subj, session.N, session.correct, el, session.pauseCount, session.results);
-    msg += `<br>⏱ 自己ベスト：${fmtClock(bestTime(session.grade.key, session.subj))}`;
-    if (bestUpdated) msg += `　<b class="hl">✨自己ベスト更新！</b>`;
-    else if (r.prev != null && el > r.prev) msg += `　<span class="sub">あと ${(el - r.prev).toFixed(1)}秒で自己ベスト！</span>`;
+    msg += T("<br>⏱ 自己ベスト：{v1}", { v1: fmtClock(bestTime(session.grade.key, session.subj)) });
+    if (bestUpdated) msg += T(`　<b class="hl">✨自己ベスト更新！</b>`);
+    else if (r.prev != null && el > r.prev) msg += T("　<span class=\"sub\">あと {v1}秒で自己ベスト！</span>", { v1: (el - r.prev).toFixed(1) });
     const ts = session.results.map((x) => x.t).filter((x) => x != null);
-    if (ts.length) { const avg = ts.reduce((a, b) => a + b, 0) / ts.length, fast = Math.min(...ts); msg += `<br>平均回答 <b>${avg.toFixed(1)}秒</b> ／ 最速 ${fast.toFixed(1)}秒`; }
-    if (session.pauseCount) msg += `<br><span class="sub">⏸ 一時停止 ${session.pauseCount}回（タイムには含めていません）</span>`;
+    if (ts.length) { const avg = ts.reduce((a, b) => a + b, 0) / ts.length, fast = Math.min(...ts); msg += T("<br>平均回答 <b>{v1}秒</b> ／ 最速 {v2}秒", { v1: avg.toFixed(1), v2: fast.toFixed(1) }); }
+    if (session.pauseCount) msg += T("<br><span class=\"sub\">⏸ 一時停止 {v1}回（タイムには含めていません）</span>", { v1: session.pauseCount });
   }
   if (session.timed) {
     const score = session.correct * cf.per, pass = score >= cf.pass;
-    msg += `<br>${pass ? "🎉 合格！" : "不合格"}（${score} / ${cf.per * session.N}点・合格${cf.pass}）`;
+    msg += T("<br>{v1}（{score} / {v3}点・合格{v4}）", { v1: pass ? "🎉 合格！" : "不合格", score, v3: cf.per * session.N, v4: cf.pass });
     cls = pass ? "ok" : "ng";
-    if (pass) { certify(session.grade.key, session.subj); msg += `<br>🎓 ${session.grade.key} 認定！ 合格証が もらえるよ`; }
+    if (pass) { certify(session.grade.key, session.subj); msg += T("<br>🎓 {v1} 認定！ 合格証が もらえるよ", { v1: session.grade.key }); }
   }
   msg += report;
   if (completed && session.quest && storyOn()) { const q = QUESTS[session.quest.key] || QUESTS.bridge; msg += `<div class="quest-done">${q.em || "🌉"} ${q.name}　${q.done}</div>`; }
@@ -1599,9 +1600,9 @@ function finishSession() {
     const { g, lines } = goldForSection({ correct: session.correct, N: session.N, bestUpdated, completed,
       grade: session.grade, subj: session.subj, count: dailyCount(dkey) });
     dailyCount(dkey, true);
-    let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+    let earned = g; const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(T("🔥 {v1} ＋{v2}", { v1: daily.label, v2: daily.amt })); }
     addGold(earned);
-    msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+    msg += T("<div class=\"gold-earn\"><img class=\"ico-coin\" src=\"assets/coin.png\" alt=\"\" /> <b>＋{earned} GOLD</b><div class=\"gold-lines\">{v2}</div><div class=\"goal\">{v3}</div></div>", { earned, v2: lines.join("・"), v3: nextGoalHint() });
   }
   renderProfile();
   if (completed) { if (session.story) storyResume(session.story); else solomonAfterStudy(); }   // 🐣 練習を やりきった → 物語の つづき／ソロモンの 成長
@@ -1609,26 +1610,26 @@ function finishSession() {
   const acc100 = session.N ? Math.round(session.correct / session.N * 100) : 0;
   if (session.timed) {
     const pass2 = session.correct * cf.per >= cf.pass;
-    if (pass2) fxCelebrate(3, "🎓 " + session.grade.key + " ごうかく！", "おめでとう！ よく がんばったね");
-    else fxCheer("あと すこし…", "合格は " + cf.pass + "点。もう一度 いこう！");
+    if (pass2) fxCelebrate(3, "🎓 " + session.grade.key + T(" ごうかく！"), T("おめでとう！ よく がんばったね"));
+    else fxCheer(T("あと すこし…"), T("合格は ") + cf.pass + T("点。もう一度 いこう！"));
   } else if (completed) {
-    if (bestUpdated) fxCelebrate(3, "⏱ 自己ベスト こうしん！", "いままでで いちばん 速かった！");
-    else if (acc100 === 100) fxCelebrate(3, "💯 ぜんもん せいかい！", "パーフェクト！");
-    else if (acc100 >= 80) fxCelebrate(2, "よくできました！", "正答率 " + acc100 + "%");
-    else fxCelebrate(1, "おつかれさま！", "さいごまで やりきったね");
+    if (bestUpdated) fxCelebrate(3, T("⏱ 自己ベスト こうしん！"), T("いままでで いちばん 速かった！"));
+    else if (acc100 === 100) fxCelebrate(3, T("💯 ぜんもん せいかい！"), T("パーフェクト！"));
+    else if (acc100 >= 80) fxCelebrate(2, T("よくできました！"), T("正答率 ") + acc100 + "%");
+    else fxCelebrate(1, T("おつかれさま！"), T("さいごまで やりきったね"));
   } else {
-    fxCheer("とちゅうまで やったね", "つづきは いつでも できるよ");
+    fxCheer(T("とちゅうまで やったね"), T("つづきは いつでも できるよ"));
   }
   if (completed) coinSnd(1.0); // GOLD獲得の「チャリーン」はファンファーレの後に
   msg += maybeDropItem(acc100, completed);
-  msg += `<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🧩 パズルへ</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`;
+  msg += T(`<br><button id="againBtn">もう一度</button> <button id="toKingdomBtn">🧩 パズルへ</button> <button id="homeBtn" class="ghost">級・段選択へ</button>`);
   const passed = session.timed ? (session.correct * cf.per >= cf.pass) : completed;
   const face = passed ? "king_celebrate.png" : "king_wave.png";
-  const badge = bestUpdated ? '<span class="badge-chip best">⏱ 自己ベスト更新！</span>'
-    : (session.timed && passed ? '<span class="badge-chip perfect">🎓 ごうかく！</span>' : "");
+  const badge = bestUpdated ? T('<span class="badge-chip best">⏱ 自己ベスト更新！</span>')
+    : (session.timed && passed ? T('<span class="badge-chip perfect">🎓 ごうかく！</span>') : "");
   msg = `<div class="result-hero"><img class="rh-face" src="assets/${face}" alt="レオ王" />${badge ? `<span class="rh-badge">${badge}</span>` : ""}</div>` + msg;
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + cls;
-  $("#playProblem").textContent = "おつかれさま！";
+  $("#playProblem").textContent = T("おつかれさま！");
   const subj = session.subj, weak = session.weak, weakN = session.weakN; session = null;
   $("#againBtn").onclick = () => (weak ? startWeakSession(weak, weakN) : startSession(subj));
   const tk = $("#toKingdomBtn"); if (tk) tk.onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
@@ -1651,17 +1652,17 @@ function quitSession() {
 const ROUTINE = "soroban_routine";
 let routineState = null, restTimer = null, routineActive = false;
 const ROUTINE_TEMPLATE = [
-  { subj: "anzan", N: 15, timed: true, label: "暗算 ①（3分）" },
-  { rest: 60, next: "暗算 ②" },
-  { subj: "anzan", N: 15, timed: true, label: "暗算 ②（3分）" },
-  { rest: 60, next: "暗算 ③" },
-  { subj: "anzan", N: 15, timed: true, label: "暗算 ③（3分）" },
-  { rest: 120, next: "かけ算" },
-  { subj: "kake", N: 15, timed: false, label: "かけ算 15問" },
-  { rest: 60, next: "わり算" },
-  { subj: "wari", N: 15, timed: false, label: "わり算 15問" },
-  { rest: 60, next: "みとり算" },
-  { subj: "mitori", N: 10, timed: false, label: "みとり算 10問" },
+  { subj: "anzan", N: 15, timed: true, label: T("暗算 ①（3分）") },
+  { rest: 60, next: T("暗算 ②") },
+  { subj: "anzan", N: 15, timed: true, label: T("暗算 ②（3分）") },
+  { rest: 60, next: T("暗算 ③") },
+  { subj: "anzan", N: 15, timed: true, label: T("暗算 ③（3分）") },
+  { rest: 120, next: T("かけ算") },
+  { subj: "kake", N: 15, timed: false, label: T("かけ算 15問") },
+  { rest: 60, next: T("わり算") },
+  { subj: "wari", N: 15, timed: false, label: T("わり算 15問") },
+  { rest: 60, next: T("みとり算") },
+  { subj: "mitori", N: 10, timed: false, label: T("みとり算 10問") },
 ];
 /* 練習した日数（きょうを ふくまない）。はじめの数日は 短いメニューにして「続く」ことを 最優先にする */
 function practiceDays() {
@@ -1671,17 +1672,17 @@ function practiceDays() {
 function routineLevel() { const d = practiceDays(); return d <= 0 ? 0 : d <= 1 ? 1 : d <= 3 ? 2 : d <= 6 ? 3 : 4; }
 const ROUTINE_LEVELS = [
   // 0：はじめての日は 3問だけ。「できた！」で 終わる
-  [{ subj: "anzan", N: 3, timed: false, label: "きょうの 3もん" }],
+  [{ subj: "anzan", N: 3, timed: false, label: T("きょうの 3もん") }],
   // 1：2日目
-  [{ subj: "anzan", N: 5, timed: false, label: "あんざん 5もん" }, { rest: 30, next: "みとり算" }, { subj: "mitori", N: 3, timed: false, label: "みとり算 3もん" }],
+  [{ subj: "anzan", N: 5, timed: false, label: T("あんざん 5もん") }, { rest: 30, next: T("みとり算") }, { subj: "mitori", N: 3, timed: false, label: T("みとり算 3もん") }],
   // 2：3〜4日目
-  [{ subj: "anzan", N: 10, timed: true, label: "あんざん 10もん（3分）" }, { rest: 45, next: "かけ算" },
-   { subj: "kake", N: 5, timed: false, label: "かけ算 5もん" }, { rest: 30, next: "わり算" }, { subj: "wari", N: 5, timed: false, label: "わり算 5もん" },
-   { rest: 45, next: "みとり算" }, { subj: "mitori", N: 5, timed: false, label: "みとり算 5もん" }],
+  [{ subj: "anzan", N: 10, timed: true, label: T("あんざん 10もん（3分）") }, { rest: 45, next: T("かけ算") },
+   { subj: "kake", N: 5, timed: false, label: T("かけ算 5もん") }, { rest: 30, next: T("わり算") }, { subj: "wari", N: 5, timed: false, label: T("わり算 5もん") },
+   { rest: 45, next: T("みとり算") }, { subj: "mitori", N: 5, timed: false, label: T("みとり算 5もん") }],
   // 3：5〜7日目
-  [{ subj: "anzan", N: 15, timed: true, label: "あんざん 15もん（3分）" }, { rest: 60, next: "かけ算" },
-   { subj: "kake", N: 10, timed: false, label: "かけ算 10もん" }, { rest: 45, next: "わり算" }, { subj: "wari", N: 10, timed: false, label: "わり算 10もん" },
-   { rest: 60, next: "みとり算" }, { subj: "mitori", N: 10, timed: false, label: "みとり算 10もん" }],
+  [{ subj: "anzan", N: 15, timed: true, label: T("あんざん 15もん（3分）") }, { rest: 60, next: T("かけ算") },
+   { subj: "kake", N: 10, timed: false, label: T("かけ算 10もん") }, { rest: 45, next: T("わり算") }, { subj: "wari", N: 10, timed: false, label: T("わり算 10もん") },
+   { rest: 60, next: T("みとり算") }, { subj: "mitori", N: 10, timed: false, label: T("みとり算 10もん") }],
 ];
 function buildSteps(grade) {
   const lv = routineLevel();
@@ -1697,7 +1698,7 @@ function buildSteps(grade) {
 }
 function startRoutine(grade) {
   const steps = buildSteps(grade);
-  if (!steps.length) { alert("この級では本日の練習を実施できません"); return; }
+  if (!steps.length) { alert(T("この級では本日の練習を実施できません")); return; }
   routineState = { grade, steps, stepIdx: 0, sections: [], gold: 0 };
   routineActive = true;
   runStep();
@@ -1725,7 +1726,7 @@ function startQuizSection(step) {
   $("#stepsRow").classList.toggle("hidden", !["mitori", "kake", "wari"].includes(step.subj));
   const total = routineState.steps.filter((s) => s.rest == null).length;
   const done = routineState.steps.slice(0, routineState.stepIdx).filter((s) => s.rest == null).length;
-  $("#playGrade").textContent = `本日の練習 ${done + 1}/${total}：${step.label}`;
+  $("#playGrade").textContent = T("本日の練習 {v1}/{total}：{v3}", { v1: done + 1, total, v3: step.label });
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   startPlayTimer();
   nextPlayProblem();
@@ -1758,11 +1759,11 @@ function showRest(step) {
   $("#playSorobanWrap").classList.add("hidden");
   $("#playInputWrap").classList.add("hidden");
   $("#playFlashWrap").classList.add("hidden");
-  $("#playResult").textContent = ""; $("#playGrade").textContent = "本日の練習：休憩"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  $("#playResult").textContent = ""; $("#playGrade").textContent = T("本日の練習：休憩"); $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
   $("#playRest").classList.remove("hidden");
   const last = routineState.sections[routineState.sections.length - 1];
   $("#restResult").innerHTML = last ? missReportHTML(last.items) + sectionResultHTML(last) : "";
-  $("#restNext").textContent = step.next ? `つぎは：${step.next}（自動で始まります）` : "";
+  $("#restNext").textContent = step.next ? T("つぎは：{v1}（自動で始まります）", { v1: step.next }) : "";
   let left = step.rest;
   const render = () => ($("#restTimer").textContent = fmtClock(left));
   render();
@@ -1787,27 +1788,27 @@ function finishRoutine() {
   logStudy(totalTime); touchStreak();
   const sectionsGold = rs.gold || 0, completeBonus = [20, 35, 60, 80, 100][Math.min(4, routineLevel())];   // 短いメニューの日は ひかえめ
   const routineBonus = Math.round(60 * gradeGoldMult(rs.grade));   // 本日の練習を やりきったごほうび
-  const goldLines = [`練習でためた ＋${sectionsGold}`, `本日の練習 完了 ＋${completeBonus}`, `🏁 やりきった ＋${routineBonus}`];
+  const goldLines = [T("練習でためた ＋{sectionsGold}", { sectionsGold }), T("本日の練習 完了 ＋{completeBonus}", { completeBonus }), T("🏁 やりきった ＋{routineBonus}", { routineBonus })];
   let earned = sectionsGold + completeBonus + routineBonus;
-  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; goldLines.push(T("🔥 {v1} ＋{v2}", { v1: daily.label, v2: daily.amt })); }
   addGold(earned);
   renderProfile(); bigFanfareSnd(); coinSnd(1.4);
   solomonAfterStudy();               // 🐣 本日の練習 完了 → ソロモンの 成長を たしかめる
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.add("hidden");
-  $("#playProblem").textContent = "🎉 本日の練習 完了！";
-  $("#playGrade").textContent = `成績発表（${rs.grade.key}）`; $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
+  $("#playProblem").textContent = T("🎉 本日の練習 完了！");
+  $("#playGrade").textContent = T("成績発表（{v1}）", { v1: rs.grade.key }); $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
   const rows = rs.sections.map((s) => `<div class="brow"><span>${s.label}</span><b>${s.correct}/${s.N}　${fmtClock(s.sec)}</b></div>`).join("");
   const last = rs.sections[rs.sections.length - 1];
   const detail = last ? sectionResultHTML(last) : "";
   $("#playResult").className = "result ok";
-  const goldBlock = `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${goldLines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
-  const routineBadge = acc >= 90 ? '<span class="badge-chip perfect">★ パーフェクト！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
-  fxCelebrate(3, "🏁 本日の練習 かんりょう！", acc >= 90 ? "正答率 " + acc + "%　パーフェクト！" : "毎日 つづけているのが すごい");
-  const routineHero = `<div class="result-hero"><img class="rh-face" src="assets/king_celebrate.png" alt="レオ王" /><span class="rh-badge">${routineBadge}</span></div>`;
+  const goldBlock = T("<div class=\"gold-earn\"><img class=\"ico-coin\" src=\"assets/coin.png\" alt=\"\" /> <b>＋{earned} GOLD</b><div class=\"gold-lines\">{v2}</div><div class=\"goal\">{v3}</div></div>", { earned, v2: goldLines.join("・"), v3: nextGoalHint() });
+  const routineBadge = acc >= 90 ? T('<span class="badge-chip perfect">★ パーフェクト！</span>') : T('<span class="badge-chip">🏁 コンプリート！</span>');
+  fxCelebrate(3, T("🏁 本日の練習 かんりょう！"), acc >= 90 ? T("正答率 ") + acc + T("%　パーフェクト！") : T("毎日 つづけているのが すごい"));
+  const routineHero = T("<div class=\"result-hero\"><img class=\"rh-face\" src=\"assets/king_celebrate.png\" alt=\"レオ王\" /><span class=\"rh-badge\">{routineBadge}</span></div>", { routineBadge });
   const allItems = rs.sections.reduce((a, s) => a.concat(s.items || []), []);   // 本日の練習ぜんぶ分のクセ
-  $("#playResult").innerHTML = `${routineHero}<div class="marks">正答率 ${acc}%（${totalCorrect}/${totalN}）</div>${rows}<div class="sub">合計タイム ${fmtClock(totalTime)}</div>${missReportHTML(allItems)}${goldBlock}${maybeDropItem(acc, true)}${detail}<br><button id="toKingdomBtn2">🧩 パズルへ</button> <button id="toRecordsBtn">📊 グラフを見る</button> <button id="routineHomeBtn" class="ghost">本日の練習へ</button>`;
+  $("#playResult").innerHTML = T("{routineHero}<div class=\"marks\">正答率 {acc}%（{totalCorrect}/{totalN}）</div>{rows}<div class=\"sub\">合計タイム {v6}</div>{v7}{goldBlock}{v9}{detail}<br><button id=\"toKingdomBtn2\">🧩 パズルへ</button> <button id=\"toRecordsBtn\">📊 グラフを見る</button> <button id=\"routineHomeBtn\" class=\"ghost\">本日の練習へ</button>", { routineHero, acc, totalCorrect, totalN, rows, v6: fmtClock(totalTime), v7: missReportHTML(allItems), goldBlock, v9: maybeDropItem(acc, true), detail });
   $("#toKingdomBtn2").onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
   $("#toRecordsBtn").onclick = () => { showView("records"); setActiveNav(document.querySelector('.nav[data-view="records"]')); };
   $("#routineHomeBtn").onclick = () => { showView("today"); setActiveNav(document.querySelector('.nav[data-view="today"]')); };
@@ -1815,22 +1816,22 @@ function finishRoutine() {
 }
 
 /* ---------- 解き方（みとり算） ---------- */
-const PLACE = ["一の位", "十の位", "百の位", "千の位", "万の位", "十万の位", "百万の位"];
-const placeName = (p) => PLACE[p] || `${p + 1}桁目`;
+const PLACE = [T("一の位"), T("十の位"), T("百の位"), T("千の位"), T("万の位"), T("十万の位"), T("百万の位")];
+const placeName = (p) => PLACE[p] || T("{v1}桁目", { v1: p + 1 });
 function addToPlace(board, place, d, out) {
   if (d === 0) return; const v = board[place] || 0;
-  if (v + d <= 9) { if (d <= 4 && (v % 5) + d <= 4) out.push(`${placeName(place)}に一玉を${d}個入れる`); else if (d === 5) out.push(`${placeName(place)}に五玉を入れる`); else if (d < 5) out.push(`${placeName(place)}で五玉を入れて${5 - d}を払う（5の友：${d}は${5 - d}）`); else out.push(`${placeName(place)}に五玉と一玉で${d}を入れる`); board[place] = v + d; }
-  else { const comp = 10 - d; out.push(`<span class="hint">くり上がり</span>：${placeName(place + 1)}に1を入れて、${placeName(place)}から${comp}を払う（10の友：${d}は${comp}）`); board[place] = v - comp; addToPlace(board, place + 1, 1, out); }
+  if (v + d <= 9) { if (d <= 4 && (v % 5) + d <= 4) out.push(T("{v1}に一玉を{d}個入れる", { v1: placeName(place), d })); else if (d === 5) out.push(T("{v1}に五玉を入れる", { v1: placeName(place) })); else if (d < 5) out.push(T("{v1}で五玉を入れて{v2}を払う（5の友：{d}は{v4}）", { v1: placeName(place), v2: 5 - d, d, v4: 5 - d })); else out.push(T("{v1}に五玉と一玉で{d}を入れる", { v1: placeName(place), d })); board[place] = v + d; }
+  else { const comp = 10 - d; out.push(T("<span class=\"hint\">くり上がり</span>：{v1}に1を入れて、{v2}から{comp}を払う（10の友：{d}は{comp_}）", { v1: placeName(place + 1), v2: placeName(place), comp, d, comp_: comp })); board[place] = v - comp; addToPlace(board, place + 1, 1, out); }
 }
 function subToPlace(board, place, d, out) {
   if (d === 0) return; const v = board[place] || 0;
-  if (v - d >= 0) { if (d <= 4 && v % 5 >= d) out.push(`${placeName(place)}の一玉を${d}個払う`); else if (d === 5) out.push(`${placeName(place)}の五玉を払う`); else if (d < 5) out.push(`${placeName(place)}で五玉を払って${5 - d}を入れる（5の友：${d}は${5 - d}）`); else out.push(`${placeName(place)}から五玉と一玉で${d}を払う`); board[place] = v - d; }
-  else { const comp = 10 - d; out.push(`<span class="hint">くり下がり</span>：${placeName(place + 1)}から1を払って、${placeName(place)}に${comp}を入れる（10の友：${d}は${comp}）`); board[place] = v + comp; subToPlace(board, place + 1, 1, out); }
+  if (v - d >= 0) { if (d <= 4 && v % 5 >= d) out.push(T("{v1}の一玉を{d}個払う", { v1: placeName(place), d })); else if (d === 5) out.push(T("{v1}の五玉を払う", { v1: placeName(place) })); else if (d < 5) out.push(T("{v1}で五玉を払って{v2}を入れる（5の友：{d}は{v4}）", { v1: placeName(place), v2: 5 - d, d, v4: 5 - d })); else out.push(T("{v1}から五玉と一玉で{d}を払う", { v1: placeName(place), d })); board[place] = v - d; }
+  else { const comp = 10 - d; out.push(T("<span class=\"hint\">くり下がり</span>：{v1}から1を払って、{v2}に{comp}を入れる（10の友：{d}は{comp_}）", { v1: placeName(place + 1), v2: placeName(place), comp, d, comp_: comp })); board[place] = v + comp; subToPlace(board, place + 1, 1, out); }
 }
 function boardValue(board) { let n = 0; for (let p = board.length - 1; p >= 0; p--) n = n * 10 + (board[p] || 0); return n; }
 function solveSteps(nums) {
   const board = new Array(14).fill(0), terms = [];
-  nums.forEach((v, i) => { const abs = Math.abs(v), digits = String(abs).split("").reverse().map(Number), out = []; for (let p = 0; p < digits.length; p++) v < 0 ? subToPlace(board, p, digits[p], out) : addToPlace(board, p, digits[p], out); terms.push({ label: i === 0 ? `${abs.toLocaleString()} を置く` : `${v < 0 ? "ひく" : "たす"} ${abs.toLocaleString()}`, moves: out, running: boardValue(board) }); });
+  nums.forEach((v, i) => { const abs = Math.abs(v), digits = String(abs).split("").reverse().map(Number), out = []; for (let p = 0; p < digits.length; p++) v < 0 ? subToPlace(board, p, digits[p], out) : addToPlace(board, p, digits[p], out); terms.push({ label: i === 0 ? T("{v1} を置く", { v1: abs.toLocaleString() }) : `${v < 0 ? "ひく" : "たす"} ${abs.toLocaleString()}`, moves: out, running: boardValue(board) }); });
   return terms;
 }
 let stepCtx = null;
@@ -1874,19 +1875,19 @@ function mitoriStepsHTML(nums) {
       t.moves.map((m) => `<div class="move">${m}</div>`).join("") +
       `<div class="soro-wrap">${sorobanSVG(t.running, cols, changed)}<span class="soro-val">= ${t.running.toLocaleString()}</span></div></div>`;
   }).join("");
-  return `<div class="soro-legend">🟠 入っている玉　🟡 この手で動いた位（ここが違えばそこで間違い）</div>` + body;
+  return T(`<div class="soro-legend">🟠 入っている玉　🟡 この手で動いた位（ここが違えばそこで間違い）</div>`) + body;
 }
 /* ============================================================ まちがえ方のクセを見つける
    1問ごとの「出した数・答えた数・正解」から、そろばんのどの技でつまずいたのかを判定する。
    言い方は解き方の説明（solveSteps）と同じ「5の友」「10の友」でそろえる。 */
 const MISS_KINDS = {
-  five: { n: "五玉（5の友）", em: "🖐", tip: "5の友は 1と4 ／ 2と3。<b>4をたす</b>ときは 一玉が たりないので〈<b>五玉を入れて 1を払う</b>〉。", ex: [3, 4] },
-  ten: { n: "くり上がり・くり下がり（10の友）", em: "🔟", tip: "10の友は 1と9 ／ 2と8 ／ 3と7 ／ 4と6。<b>となりの位に 1を入れて</b>、この位から 友だちの数を 払う。", ex: [8, 5] },
-  keta: { n: "位（くらい）の ずれ", em: "📏", tip: "答えが 10倍 や 10分の1 になっているよ。<b>一の位を どこに 置いたか</b>を たしかめよう。", ex: null },
-  skip: { n: "数を 1つ とばした", em: "👀", tip: "読む数を 1つ 飛ばしたみたい。<b>ゆびで おさえながら</b> 上から順に 読もう。", ex: null },
-  minus: { n: "たす・ひく の とりちがえ", em: "➕", tip: "たすところを ひいてしまったみたい。<b>＋と − を 声に出して</b> 読もう。", ex: null },
-  kuku: { n: "九九の おぼえまちがい", em: "✖", tip: "答えが 九九ひとつぶん ずれているよ。その段を もう一度 声に出そう。", ex: null },
-  other: { n: "そのほか", em: "🤔", tip: "もう一度 ゆっくり 計算してみよう。どこまで 合っていたかを たしかめると 見つかるよ。", ex: null },
+  five: { n: T("五玉（5の友）"), em: "🖐", tip: T("5の友は 1と4 ／ 2と3。<b>4をたす</b>ときは 一玉が たりないので〈<b>五玉を入れて 1を払う</b>〉。"), ex: [3, 4] },
+  ten: { n: T("くり上がり・くり下がり（10の友）"), em: "🔟", tip: T("10の友は 1と9 ／ 2と8 ／ 3と7 ／ 4と6。<b>となりの位に 1を入れて</b>、この位から 友だちの数を 払う。"), ex: [8, 5] },
+  keta: { n: T("位（くらい）の ずれ"), em: "📏", tip: T("答えが 10倍 や 10分の1 になっているよ。<b>一の位を どこに 置いたか</b>を たしかめよう。"), ex: null },
+  skip: { n: T("数を 1つ とばした"), em: "👀", tip: T("読む数を 1つ 飛ばしたみたい。<b>ゆびで おさえながら</b> 上から順に 読もう。"), ex: null },
+  minus: { n: T("たす・ひく の とりちがえ"), em: "➕", tip: T("たすところを ひいてしまったみたい。<b>＋と − を 声に出して</b> 読もう。"), ex: null },
+  kuku: { n: T("九九の おぼえまちがい"), em: "✖", tip: T("答えが 九九ひとつぶん ずれているよ。その段を もう一度 声に出そう。"), ex: null },
+  other: { n: T("そのほか"), em: "🤔", tip: T("もう一度 ゆっくり 計算してみよう。どこまで 合っていたかを たしかめると 見つかるよ。"), ex: null },
 };
 // その問題を解くのに「5の友」「10の友」が必要だったかを、解き方の手順から調べる
 function needsTech(nums, needle) {
@@ -1901,19 +1902,19 @@ function missKind(r) {
   if (nums) { const dg = diagnose(nums, u); if (dg && dg.kind !== "other") return dg.kind; }
   if (a !== 0 && (u === a * 10 || a === u * 10)) return "keta";                 // 桁ずれ
   // ちょうど10ずれていて、その問題にくり上がりがあるなら、まず「くり上がり忘れ」を疑う
-  if (Math.abs(diff) % 10 === 0 && needsTech(nums, "10の友")) return "ten";
+  if (Math.abs(diff) % 10 === 0 && needsTech(nums, T("10の友"))) return "ten";
   if (nums) {
     for (const v of nums) if (v !== 0 && a - u === v) return "skip";            // 1つ とばした
     for (const v of nums) if (v !== 0 && a - u === 2 * v) return "minus";       // たすところを ひいた
   }
   if (r.subj === "kake" || r.subj === "wari") return Math.abs(diff) < a * 0.5 ? "kuku" : "other";
-  if (Math.abs(diff) <= 6 && needsTech(nums, "5の友")) return "five";
+  if (Math.abs(diff) <= 6 && needsTech(nums, T("5の友"))) return "five";
   if (Math.abs(diff) % 10 === 0) return "ten";
   return "other";
 }
 // クセの図解：その子が実際にまちがえた問題の中から、つまずいた1手を取り出して そろばんの絵で見せる
 function techFigHTML(kind, nums) {
-  const K = MISS_KINDS[kind], needle = kind === "five" ? "5の友" : "10の友";
+  const K = MISS_KINDS[kind], needle = kind === "five" ? T("5の友") : T("10の友");
   let use = needsTech(nums, needle) ? nums : (K.ex || null);
   if (!use) return "";
   let prev = 0, hit = null;
@@ -1965,28 +1966,28 @@ const placeUnit = (p) => Math.pow(10, p);
 function stepMistakes(t, s) {
   const u = placeUnit(s.place), pn = placeName(s.place), d = s.d, out = [];
   if (s.tech === "five" && s.op === "+") {
-    const comp = 5 - d, right = `${pn}で 五玉を 入れて ${comp} を 払う（5の友：${d}は${comp}）`;
-    out.push({ kind: "five", delta: -5 * u, wrong: `${pn}で <b>五玉を 入れないで</b>、${comp} を 払ってしまった`, right });
-    out.push({ kind: "five", delta: comp * u, wrong: `${pn}で 五玉は 入れたけど、<b>${comp} を 払いわすれた</b>`, right });
+    const comp = 5 - d, right = T("{pn}で 五玉を 入れて {comp} を 払う（5の友：{d}は{comp_}）", { pn, comp, d, comp_: comp });
+    out.push({ kind: "five", delta: -5 * u, wrong: T("{pn}で <b>五玉を 入れないで</b>、{comp} を 払ってしまった", { pn, comp }), right });
+    out.push({ kind: "five", delta: comp * u, wrong: T("{pn}で 五玉は 入れたけど、<b>{comp} を 払いわすれた</b>", { pn, comp }), right });
     // 友だちの数をまちがえる（4の友は1なのに2を払う、など）
-    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (comp - c) * u, wrong: `<b>5の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}で ${c} を 払ってしまった`, right });
+    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (comp - c) * u, wrong: T("<b>5の友を まちがえた</b>：{d} の友は {comp} なのに、{pn}で {c} を 払ってしまった", { d, comp, pn, c }), right });
   } else if (s.tech === "five" && s.op === "-") {
-    const comp = 5 - d, right = `${pn}で 五玉を 払って ${comp} を 入れる（5の友：${d}は${comp}）`;
-    out.push({ kind: "five", delta: 5 * u, wrong: `${pn}で <b>五玉を 払わないで</b>、${comp} を 入れてしまった`, right });
-    out.push({ kind: "five", delta: -comp * u, wrong: `${pn}で 五玉は 払ったけど、<b>${comp} を 入れわすれた</b>`, right });
-    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (c - comp) * u, wrong: `<b>5の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}に ${c} を 入れてしまった`, right });
+    const comp = 5 - d, right = T("{pn}で 五玉を 払って {comp} を 入れる（5の友：{d}は{comp_}）", { pn, comp, d, comp_: comp });
+    out.push({ kind: "five", delta: 5 * u, wrong: T("{pn}で <b>五玉を 払わないで</b>、{comp} を 入れてしまった", { pn, comp }), right });
+    out.push({ kind: "five", delta: -comp * u, wrong: T("{pn}で 五玉は 払ったけど、<b>{comp} を 入れわすれた</b>", { pn, comp }), right });
+    for (let c = 1; c <= 4; c++) if (c !== comp) out.push({ kind: "five", rank: 2.5, delta: (c - comp) * u, wrong: T("<b>5の友を まちがえた</b>：{d} の友は {comp} なのに、{pn}に {c} を 入れてしまった", { d, comp, pn, c }), right });
   } else if (s.tech === "carry" && s.op === "+") {
-    const comp = 10 - d, nx = placeName(s.place + 1), right = `${nx}に 1を 入れて、${pn}から ${comp} を 払う（10の友：${d}は${comp}）`;
-    out.push({ kind: "ten", delta: -10 * u, wrong: `<b>となりの ${nx}に 1を 入れわすれた</b>（くり上がり忘れ）`, right });
-    out.push({ kind: "ten", delta: comp * u, wrong: `となりに 1は 入れたけど、<b>${pn}の ${comp} を 払いわすれた</b>`, right });
-    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (comp - c) * u, wrong: `<b>10の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}で ${c} を 払ってしまった`, right });
+    const comp = 10 - d, nx = placeName(s.place + 1), right = T("{nx}に 1を 入れて、{pn}から {comp} を 払う（10の友：{d}は{comp_}）", { nx, pn, comp, d, comp_: comp });
+    out.push({ kind: "ten", delta: -10 * u, wrong: T("<b>となりの {nx}に 1を 入れわすれた</b>（くり上がり忘れ）", { nx }), right });
+    out.push({ kind: "ten", delta: comp * u, wrong: T("となりに 1は 入れたけど、<b>{pn}の {comp} を 払いわすれた</b>", { pn, comp }), right });
+    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (comp - c) * u, wrong: T("<b>10の友を まちがえた</b>：{d} の友は {comp} なのに、{pn}で {c} を 払ってしまった", { d, comp, pn, c }), right });
   } else if (s.tech === "carry" && s.op === "-") {
-    const comp = 10 - d, nx = placeName(s.place + 1), right = `${nx}から 1を 払って、${pn}に ${comp} を 入れる（10の友：${d}は${comp}）`;
-    out.push({ kind: "ten", delta: 10 * u, wrong: `<b>となりの ${nx}から 1を 借りわすれた</b>（くり下がり忘れ）`, right });
-    out.push({ kind: "ten", delta: -comp * u, wrong: `1は 借りたけど、<b>${pn}に ${comp} を 入れわすれた</b>`, right });
-    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (c - comp) * u, wrong: `<b>10の友を まちがえた</b>：${d} の友は ${comp} なのに、${pn}に ${c} を 入れてしまった`, right });
+    const comp = 10 - d, nx = placeName(s.place + 1), right = T("{nx}から 1を 払って、{pn}に {comp} を 入れる（10の友：{d}は{comp_}）", { nx, pn, comp, d, comp_: comp });
+    out.push({ kind: "ten", delta: 10 * u, wrong: T("<b>となりの {nx}から 1を 借りわすれた</b>（くり下がり忘れ）", { nx }), right });
+    out.push({ kind: "ten", delta: -comp * u, wrong: T("1は 借りたけど、<b>{pn}に {comp} を 入れわすれた</b>", { pn, comp }), right });
+    for (let c = 1; c <= 9; c++) if (c !== comp) out.push({ kind: "ten", rank: 2.5, delta: (c - comp) * u, wrong: T("<b>10の友を まちがえた</b>：{d} の友は {comp} なのに、{pn}に {c} を 入れてしまった", { d, comp, pn, c }), right });
   } else {
-    out.push({ kind: "other", delta: -d * u, wrong: `${pn}の ${d} を <b>動かしわすれた</b>`, right: `${pn}に ${d} を ${s.op === "+" ? "入れる" : "払う"}` });
+    out.push({ kind: "other", delta: -d * u, wrong: T("{pn}の {d} を <b>動かしわすれた</b>", { pn, d }), right: T("{pn}に {d} を {v3}", { pn, d, v3: s.op === "+" ? "入れる" : "払う" }) });
   }
   return out;
 }
@@ -2006,10 +2007,10 @@ function diagnose(nums, userAns) {
       });
     });
     // 項まるごとのまちがい
-    if (-t.v === need) cands.push({ t, s: null, kind: "skip", rank: 2, wrong: `この <b>${Math.abs(t.v)}</b> を まるごと たしわすれた（読みとばし）`, right: `${Math.abs(t.v)} を ${t.v < 0 ? "ひく" : "たす"}` });
+    if (-t.v === need) cands.push({ t, s: null, kind: "skip", rank: 2, wrong: T("この <b>{v1}</b> を まるごと たしわすれた（読みとばし）", { v1: Math.abs(t.v) }), right: T("{v1} を {v2}", { v1: Math.abs(t.v), v2: t.v < 0 ? "ひく" : "たす" }) });
     // 1つめは「置く」なので、たす・ひくの取りちがえは2つめ以降だけ。盤面がマイナスになる動きも除く
-    if (t.i > 0 && -2 * t.v === need && t.before - t.v >= 0) cands.push({ t, s: null, kind: "minus", rank: 2, wrong: `<b>${t.v < 0 ? "ひくところを たして" : "たすところを ひいて"}</b> しまった`, right: `${Math.abs(t.v)} を ${t.v < 0 ? "ひく" : "たす"}` });
-    if (9 * t.v === need) cands.push({ t, s: null, kind: "keta", rank: 2, wrong: `<b>${Math.abs(t.v)} を ひとつ上の位に 置いてしまった</b>（位のずれ）`, right: `${Math.abs(t.v)} の 一の位を 定位点に そろえて 置く` });
+    if (t.i > 0 && -2 * t.v === need && t.before - t.v >= 0) cands.push({ t, s: null, kind: "minus", rank: 2, wrong: T("<b>{v1}</b> しまった", { v1: t.v < 0 ? "ひくところを たして" : "たすところを ひいて" }), right: T("{v1} を {v2}", { v1: Math.abs(t.v), v2: t.v < 0 ? "ひく" : "たす" }) });
+    if (9 * t.v === need) cands.push({ t, s: null, kind: "keta", rank: 2, wrong: T("<b>{v1} を ひとつ上の位に 置いてしまった</b>（位のずれ）", { v1: Math.abs(t.v) }), right: T("{v1} の 一の位を 定位点に そろえて 置く", { v1: Math.abs(t.v) }) });
   });
   if (!cands.length) return null;
   cands.sort((a, b) => (a.rank - b.rank) || (a.t.i - b.t.i));
@@ -2022,28 +2023,28 @@ function diagnose(nums, userAns) {
 function twoBoards(before, right, wrong) {
   const cols = Math.max(2, String(Math.abs(right)).length, String(Math.abs(wrong)).length);
   const fig = (v, base) => `<div class="tb-1"><div class="tb-cap">${v.toLocaleString()}</div>${sorobanSVG(v, cols, changedCols(base, v, cols))}</div>`;
-  return `<div class="tb"><div class="tb-side ok"><div class="tb-h">◎ 正しい 玉の動き</div><div class="tb-row">` +
+  return T(`<div class="tb"><div class="tb-side ok"><div class="tb-h">◎ 正しい 玉の動き</div><div class="tb-row">`) +
     `<div class="tb-1"><div class="tb-cap">${before.toLocaleString()}</div>${sorobanSVG(before, cols)}</div><span class="tb-ar">▶</span>${fig(right, before)}</div></div>` +
-    `<div class="tb-side ng"><div class="tb-h">✗ きみの 玉の動き（たぶん）</div><div class="tb-row">` +
+    T(`<div class="tb-side ng"><div class="tb-h">✗ きみの 玉の動き（たぶん）</div><div class="tb-row">`) +
     `<div class="tb-1"><div class="tb-cap">${before.toLocaleString()}</div>${sorobanSVG(before, cols)}</div><span class="tb-ar">▶</span>${fig(wrong, before)}</div></div></div>`;
 }
 function explainOneHTML(r, no) {
   const K = MISS_KINDS[r.k || missKind(r)] || MISS_KINDS.other;
-  const head = `<div class="ex-head"><span class="ex-no">${no}問目</span><span class="ex-q">${r.compact}</span>` +
-    `<span class="ex-a">きみの答え <b class="ng">${r.user}</b> ／ 正解 <b class="ok">${r.ans}</b></span></div>`;
-  if (!r.nums) return `<div class="ex-card">${head}<div class="ex-diag">${K.em} ${K.n}：${K.tip}</div></div>`;
+  const head = T("<div class=\"ex-head\"><span class=\"ex-no\">{no}問目</span><span class=\"ex-q\">{v2}</span>", { no, v2: r.compact }) +
+    T("<span class=\"ex-a\">きみの答え <b class=\"ng\">{v1}</b> ／ 正解 <b class=\"ok\">{v2}</b></span></div>", { v1: r.user, v2: r.ans });
+  if (!r.nums) return T("<div class=\"ex-card\">{head}<div class=\"ex-diag\">{v2} {v3}：{v4}</div></div>", { head, v2: K.em, v3: K.n, v4: K.tip });
   const dg = diagnose(r.nums, Number(r.user));
   let body = "";
   if (dg) {
-    body += `<div class="ex-diag">🔍 <b>${dg.termNo}つめの「${dg.term < 0 ? "−" : "+"}${Math.abs(dg.term)}」</b> で つまずいたよ<br>` +
+    body += T("<div class=\"ex-diag\">🔍 <b>{v1}つめの「{v2}{v3}」</b> で つまずいたよ<br>", { v1: dg.termNo, v2: dg.term < 0 ? "−" : "+", v3: Math.abs(dg.term) }) +
       `<span class="ex-wrong">✗ ${dg.wrongText}</span><br><span class="ex-right">◎ ${dg.rightText}</span></div>` +
       twoBoards(dg.before, dg.right, dg.wrong) +
       `<div class="ex-fix">💡 ${(MISS_KINDS[dg.kind] || MISS_KINDS.other).tip}</div>`;
   } else {
-    body += `<div class="ex-diag">🔍 どの1手で ずれたかは 見つけられなかったよ。下の 手順を 上から 声に出して たしかめよう。<br>` +
-      `<span class="ex-wrong">答えの ちがい：${Number(r.user) - Number(r.ans) > 0 ? "＋" : "−"}${Math.abs(Number(r.user) - Number(r.ans))}</span></div>`;
+    body += T(`<div class="ex-diag">🔍 どの1手で ずれたかは 見つけられなかったよ。下の 手順を 上から 声に出して たしかめよう。<br>`) +
+      T("<span class=\"ex-wrong\">答えの ちがい：{v1}{v2}</span></div>", { v1: Number(r.user) - Number(r.ans) > 0 ? "＋" : "−", v2: Math.abs(Number(r.user) - Number(r.ans)) });
   }
-  body += `<div class="ex-all"><div class="ex-all-h">この問題の 玉の動き（ぜんぶ）</div><div class="steps">${mitoriStepsHTML(r.nums)}</div></div>`;
+  body += T("<div class=\"ex-all\"><div class=\"ex-all-h\">この問題の 玉の動き（ぜんぶ）</div><div class=\"steps\">{v1}</div></div>", { v1: mitoriStepsHTML(r.nums) });
   return `<div class="ex-card">${head}${body}</div>`;
 }
 /* まとめの見立て（アセスメント）と、次にやることの提案 */
@@ -2053,20 +2054,20 @@ function assessmentHTML(items) {
   const wt = avg(wrong), rt = avg(right);
   const tally = {}; wrong.forEach((r) => { const k = r.k || missKind(r); tally[k] = (tally[k] || 0) + 1; });
   const order = Object.keys(tally).sort((a, b) => tally[b] - tally[a]);
-  const rows = order.map((k) => { const K = MISS_KINDS[k] || MISS_KINDS.other; return `<li>${K.em} <b>${K.n}</b> … ${tally[k]}回</li>`; }).join("");
+  const rows = order.map((k) => { const K = MISS_KINDS[k] || MISS_KINDS.other; return T("<li>{v1} <b>{v2}</b> … {v3}回</li>", { v1: K.em, v2: K.n, v3: tally[k] }); }).join("");
   const tips = [];
   const top = order[0];
-  if (top && top !== "other") tips.push(`いちばん多いのは <b>${(MISS_KINDS[top] || MISS_KINDS.other).n}</b>。下の 🎯ボタンで、この技だけの問題を 5問 やろう。`);
+  if (top && top !== "other") tips.push(T("いちばん多いのは <b>{v1}</b>。下の 🎯ボタンで、この技だけの問題を 5問 やろう。", { v1: (MISS_KINDS[top] || MISS_KINDS.other).n }));
   if (wt != null && rt != null) {
-    if (wt > rt * 1.6) tips.push(`まちがえた問題は 正解した問題より <b>${(wt / rt).toFixed(1)}倍 時間が かかっている</b>。手が止まる＝技を 思い出せていないサイン。あわてず、口に出して 玉を動かそう。`);
-    else if (wt < rt * 0.7) tips.push(`まちがえた問題の方が <b>速い</b>。あわてて 手が先に 動いているかも。1つ 息を ついてから 始めよう。`);
+    if (wt > rt * 1.6) tips.push(T("まちがえた問題は 正解した問題より <b>{v1}倍 時間が かかっている</b>。手が止まる＝技を 思い出せていないサイン。あわてず、口に出して 玉を動かそう。", { v1: (wt / rt).toFixed(1) }));
+    else if (wt < rt * 0.7) tips.push(T(`まちがえた問題の方が <b>速い</b>。あわてて 手が先に 動いているかも。1つ 息を ついてから 始めよう。`));
   }
   const one = wrong.filter((r) => { const d = diagnose(r.nums, Number(r.user)); return d && d.termNo === 1; }).length;
-  if (one >= 2) tips.push(`さいしょの 数で つまずくことが ${one}回。<b>始める前に 0（ご破算）</b>に なっているか たしかめよう。`);
-  if (!tips.length) tips.push(`まちがえ方が バラバラだよ。まずは ゆっくり、1手ずつ 声に出して やってみよう。`);
-  return `<div class="as-box"><div class="as-h">📋 きょうの 見立て</div>` +
+  if (one >= 2) tips.push(T("さいしょの 数で つまずくことが {one}回。<b>始める前に 0（ご破算）</b>に なっているか たしかめよう。", { one }));
+  if (!tips.length) tips.push(T(`まちがえ方が バラバラだよ。まずは ゆっくり、1手ずつ 声に出して やってみよう。`));
+  return T(`<div class="as-box"><div class="as-h">📋 きょうの 見立て</div>`) +
     `<ul class="as-list">${rows}</ul>` +
-    `<div class="as-time">1問の 平均：正解 ${rt != null ? rt.toFixed(1) + "秒" : "—"} ／ まちがい ${wt != null ? wt.toFixed(1) + "秒" : "—"}</div>` +
+    T("<div class=\"as-time\">1問の 平均：正解 {v1} ／ まちがい {v2}</div>", { v1: rt != null ? rt.toFixed(1) + "秒" : "—", v2: wt != null ? wt.toFixed(1) + "秒" : "—" }) +
     `<div class="as-h2">つぎに やること</div><ol class="as-tips">${tips.map((t) => `<li>${t}</li>`).join("")}</ol></div>`;
 }
 /* 1セット終わったときに出す「正答率＋クセの図解」 */
@@ -2074,24 +2075,24 @@ function missReportHTML(items) {
   const list = (items || []).filter((x) => x && !x.ok);
   const N = (items || []).length, ok = N - list.length;
   const acc = N ? Math.round(ok / N * 100) : 0;
-  const head = `<div class="mr-acc">正答率 <b>${acc}%</b>　<span class="sub">(${ok} / ${N})</span></div>`;
-  if (!list.length) return `<div class="miss-report all-ok">${head}<div class="mr-top">🎉 <b>全問せいかい！</b> まちがえた クセは ありません。</div></div>`;
+  const head = T("<div class=\"mr-acc\">正答率 <b>{acc}%</b>　<span class=\"sub\">({ok} / {N})</span></div>", { acc, ok, N });
+  if (!list.length) return T("<div class=\"miss-report all-ok\">{head}<div class=\"mr-top\">🎉 <b>全問せいかい！</b> まちがえた クセは ありません。</div></div>", { head });
   const tally = {};
   list.forEach((r) => { const k = r.k || missKind(r); (tally[k] = tally[k] || []).push(r); });
   const order = Object.keys(tally).sort((a, b) => tally[b].length - tally[a].length);
   const top = order[0], K = MISS_KINDS[top] || MISS_KINDS.other, sample = tally[top][0];
-  const others = order.slice(1).map((k) => `${(MISS_KINDS[k] || MISS_KINDS.other).n} ${tally[k].length}回`).join("　");
+  const others = order.slice(1).map((k) => T("{v1} {v2}回", { v1: (MISS_KINDS[k] || MISS_KINDS.other).n, v2: tally[k].length })).join("　");
   // まちがえた問題は「全問」ていねいに解説する（1問ずつ、正しい動きと きみの動きを並べて）
   const details = list.map((r, i) => explainOneHTML(r, r.no || (i + 1))).join("");
   return `<div class="miss-report">${head}` +
-    `<div class="mr-h">🔍 きみの まちがえ方の クセ</div>` +
-    `<div class="mr-top">${K.em} <b>${K.n}</b> で <b>${tally[top].length}回</b> まちがえたよ</div>` +
+    T(`<div class="mr-h">🔍 きみの まちがえ方の クセ</div>`) +
+    T("<div class=\"mr-top\">{v1} <b>{v2}</b> で <b>{v3}回</b> まちがえたよ</div>", { v1: K.em, v2: K.n, v3: tally[top].length }) +
     `<div class="mr-tip">${K.tip}</div>` +
     techFigHTML(top, sample.nums) +
-    (others ? `<div class="mr-others">ほかに：${others}</div>` : "") +
+    (others ? T("<div class=\"mr-others\">ほかに：{others}</div>", { others }) : "") +
     assessmentHTML(items) +
-    `<button type="button" class="mr-drill" data-k="${top}">🎯 この クセの もんだいを 5問 やる</button>` +
-    `<div class="ex-h">📖 まちがえた ${list.length}問の 解説（ぜんぶ）</div>${details}` +
+    T("<button type=\"button\" class=\"mr-drill\" data-k=\"{top}\">🎯 この クセの もんだいを 5問 やる</button>", { top }) +
+    T("<div class=\"ex-h\">📖 まちがえた {v1}問の 解説（ぜんぶ）</div>{details}", { v1: list.length, details }) +
     `</div>`;
 }
 /* ============================================================ にがて克服の問題づくり
@@ -2126,8 +2127,8 @@ function genWeakSet(kind, n) {
     let run = 0, ok = true;
     for (const v of nums) { run += v; if (run < 0) ok = false; }           // 途中で0より小さくならない
     if (!ok) continue;
-    if (kind === "five" && (!needsTech(nums, "5の友") || needsTech(nums, "10の友"))) continue;
-    if (kind === "ten" && !needsTech(nums, "10の友")) continue;
+    if (kind === "five" && (!needsTech(nums, T("5の友")) || needsTech(nums, T("10の友")))) continue;
+    if (kind === "ten" && !needsTech(nums, T("10の友"))) continue;
     const p = mitoriProblem(nums);
     if (seen[p.compact]) continue; seen[p.compact] = 1;
     out.push(p);
@@ -2138,7 +2139,7 @@ function genWeakSet(kind, n) {
 function startWeakSession(kind, n) {
   const K = MISS_KINDS[kind] || MISS_KINDS.other;
   const qs = genWeakSet(kind, n || 5);
-  if (!qs.length) { alert("この にがての問題を うまく作れませんでした"); return; }
+  if (!qs.length) { alert(T("この にがての問題を うまく作れませんでした")); return; }
   const subj = kind === "kuku" ? "kake" : "mitori", cf = SUBJECT[subj];
   session = {
     subj, grade: currentGrade(), cf, N: qs.length, idx: 0, correct: 0, answerBy: cf.answer,
@@ -2156,7 +2157,7 @@ function startWeakSession(kind, n) {
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.add("hidden");
   $("#stepsRow").classList.remove("hidden");
-  $("#playGrade").textContent = `🎯 にがて克服：${K.n}`;
+  $("#playGrade").textContent = T("🎯 にがて克服：{v1}", { v1: K.n });
   $("#playTimer").textContent = ""; $("#playProgress").textContent = "";
   $("#playResult").innerHTML = `<div class="mr-tip">${K.em} ${K.tip}</div>`; $("#playResult").className = "result";
   $("#steps").classList.add("hidden");
@@ -2171,7 +2172,7 @@ document.addEventListener("click", function (e) {
   const b = e.target.closest(".mr-more"); if (!b) return;
   const box = b.parentNode.querySelector(".mr-steps"); if (!box) return;
   box.classList.toggle("hidden");
-  b.textContent = box.classList.contains("hidden") ? "この問題の 解き方を ぜんぶ見る" : "解き方を とじる";
+  b.textContent = box.classList.contains("hidden") ? T("この問題の 解き方を ぜんぶ見る") : T("解き方を とじる");
 });
 function kakeStepsHTML(a, b, ans) {
   const bs = String(b).split("").reverse();
@@ -2181,12 +2182,12 @@ function kakeStepsHTML(a, b, ans) {
     const pp = a * dig * Math.pow(10, i);
     moves.push(`${a.toLocaleString()} × ${dig}${i ? "（" + "0".repeat(i) + "をつける）" : ""} = ${pp.toLocaleString()}`);
   });
-  return `<div class="term"><div class="term-head">部分積をたして計算</div>` + moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${ans.toLocaleString()}</div></div>`;
+  return T(`<div class="term"><div class="term-head">部分積をたして計算</div>`) + moves.map((m) => `<div class="move">${m}</div>`).join("") + `<div class="move run">→ ${ans.toLocaleString()}</div></div>`;
 }
 function wariStepsHTML(dividend, divisor, q) {
-  return `<div class="term"><div class="term-head">わり算の考え方</div>` +
-    `<div class="move">${dividend.toLocaleString()} ÷ ${divisor.toLocaleString()} を、上の位から順に計算します。</div>` +
-    `<div class="move">たしかめ：答え × わる数 ＝ ${q.toLocaleString()} × ${divisor.toLocaleString()} = ${(q * divisor).toLocaleString()}</div>` +
+  return T(`<div class="term"><div class="term-head">わり算の考え方</div>`) +
+    T("<div class=\"move\">{v1} ÷ {v2} を、上の位から順に計算します。</div>", { v1: dividend.toLocaleString(), v2: divisor.toLocaleString() }) +
+    T("<div class=\"move\">たしかめ：答え × わる数 ＝ {v1} × {v2} = {v3}</div>", { v1: q.toLocaleString(), v2: divisor.toLocaleString(), v3: (q * divisor).toLocaleString() }) +
     `<div class="move run">→ ${q.toLocaleString()}</div></div>`;
 }
 $("#showSteps").addEventListener("click", () => {
@@ -2243,8 +2244,8 @@ const fcRead = () => ({ digits: +$("#fcDigits").value, terms: +$("#fcTerms").val
 function fcShowLevel() {
   const c = fcRead(); const lv = flashLevelOf(c.digits, c.terms, c.pace);
   const spec = difficulty(lv.g, "flash");
-  $("#fcLevel").innerHTML = (lv.exact ? `＝ <b>${lv.g.key}</b> と 同じ設定` : `だいたい <b>${lv.g.key}</b> 相当`) +
-    `<span class="sub">（${lv.g.key}は ${spec.digits}けた ${spec.terms}口・1個 ${(flashPaceMs(lv.g) / 1000).toFixed(2)}秒）</span>`;
+  $("#fcLevel").innerHTML = (lv.exact ? T("＝ <b>{v1}</b> と 同じ設定", { v1: lv.g.key }) : T("だいたい <b>{v1}</b> 相当", { v1: lv.g.key })) +
+    T("<span class=\"sub\">（{v1}は {v2}けた {v3}口・1個 {v4}秒）</span>", { v1: lv.g.key, v2: spec.digits, v3: spec.terms, v4: (flashPaceMs(lv.g) / 1000).toFixed(2) });
   return lv;
 }
 // 級の設定を セレクトに 入れる（級を かえたとき）
@@ -2269,7 +2270,7 @@ $("#fcStart").addEventListener("click", () => {
   flashSpec = { digits: c.digits, terms: c.terms };
   $("#flashExamMode").checked = false; $("#flashExamMode").disabled = true;   // じぶんで きめた練習は 検定に ならない
   $("#fcReset").classList.remove("hidden");
-  $("#flashInfo").textContent = `⚙ じぶんで きめた：${c.digits}けた ${c.terms}口 / 1個 ${c.pace}秒ずつ（${lv.exact ? "＝" : "だいたい "}${lv.g.key}${lv.exact ? " と同じ" : " 相当"}）`;
+  $("#flashInfo").textContent = T("⚙ じぶんで きめた：{v1}けた {v2}口 / 1個 {v3}秒ずつ（{v4}{v5}{v6}）", { v1: c.digits, v2: c.terms, v3: c.pace, v4: lv.exact ? "＝" : "だいたい ", v5: lv.g.key, v6: lv.exact ? " と同じ" : " 相当" });
   flashExam = { on: false, idx: 0, N: c.N, correct: 0, times: [] };
   $("#flashCustom").open = false;
   runFlash();
@@ -2290,12 +2291,12 @@ function startFlash(grade) {
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden"); $("#playFlashWrap").classList.remove("hidden");
   $("#anzanTip").classList.remove("hidden"); // フラッシュ暗算でもコツを出す（ボタンより下に置いてある）
   $("#stepsRow").classList.add("hidden"); $("#steps").classList.add("hidden");
-  $("#playGrade").textContent = `${grade.key}／フラッシュ暗算`; $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
+  $("#playGrade").textContent = T("{v1}／フラッシュ暗算", { v1: grade.key }); $("#playTimer").textContent = ""; $("#playProgress").textContent = ""; $("#playProblem").textContent = "";
   $("#playResult").textContent = ""; $("#playResult").className = "result";
-  $("#flashInfo").textContent = `${grade.key}：${flashSpec.digits}桁 ${flashSpec.terms}口 / 1個 ${(flashPaceMs(grade) / 1000).toFixed(1)}秒ずつ`;
+  $("#flashInfo").textContent = T("{v1}：{v2}桁 {v3}口 / 1個 {v4}秒ずつ", { v1: grade.key, v2: flashSpec.digits, v3: flashSpec.terms, v4: (flashPaceMs(grade) / 1000).toFixed(1) });
   $("#flashMeasure").textContent = ""; $("#flashSignal").classList.add("hidden"); $("#flashDots").innerHTML = "";
   // 数字ではなく 言葉を出すときは 小さめの字にする（大きいままだと 画面からはみ出す）
-  flashIdle(true, "▶ スタート"); $("#flashForm").classList.add("hidden");
+  flashIdle(true, T("▶ スタート")); $("#flashForm").classList.add("hidden");
   document.body.classList.add("flashmode");   // スマホで 画面を 詰める（そろばんの帯の すきま・ネコの説明を しまう）
   const ex = $("#flashExamMode").checked;
   flashExam = { on: ex, idx: 0, N: ex ? 20 : FLASH_SET, correct: 0, times: [] };
@@ -2304,7 +2305,7 @@ function startFlash(grade) {
    左上に 小さな ボタンを 置くと、スマホで スクロールして もどる間に 数字が 出おわってしまうため */
 function flashIdle(on, text) {
   const d = $("#flashDisplay");
-  if (on) { d.textContent = text || "▶ スタート"; d.className = "flash-display msg btn"; }
+  if (on) { d.textContent = text || T("▶ スタート"); d.className = "flash-display msg btn"; }
   else d.classList.remove("btn");
 }
 function flashStartClick() {
@@ -2331,7 +2332,7 @@ function flashScheduleTone(ctx, t0, freq, dur = 0.1, type = "triangle", vol = 0.
 async function runFlash() {
   if (flashBusy || !flashSpec) return; flashBusy = true;
   flashIdle(false); $("#flashForm").classList.add("hidden"); $("#playResult").textContent = ""; $("#playResult").className = "result";
-  $("#flashProgress").textContent = `${flashExam.on ? "検定" : "れんしゅう"} ${Math.min(flashExam.idx + 1, flashExam.N)} / ${flashExam.N}　正解 ${flashExam.correct}`;
+  $("#flashProgress").textContent = T("{v1} {v2} / {v3}　正解 {v4}", { v1: flashExam.on ? "検定" : "れんしゅう", v2: Math.min(flashExam.idx + 1, flashExam.N), v3: flashExam.N, v4: flashExam.correct });
 
   const ctx = ensureAudio();
   try { if (ctx.state !== "running") await ctx.resume(); } catch {}
@@ -2397,14 +2398,14 @@ async function runFlash() {
     requestAnimationFrame(draw);
   });
   document.removeEventListener("visibilitychange", onHide);
-  if (myRun !== flashRun || !flashSpec) { flashBusy = false; if (flashSpec) flashIdle(true, "▶ もう一回"); return; }   // 途中で 画面を離れた
+  if (myRun !== flashRun || !flashSpec) { flashBusy = false; if (flashSpec) flashIdle(true, T("▶ もう一回")); return; }   // 途中で 画面を離れた
   $("#flashDots").innerHTML = ""; sigBox.classList.add("hidden");
 
   // 実測の間隔を別欄に表示（「何桁何口」の欄は消さない）
   if (onsets.length >= 2) {
     const g = onsets.slice(1).map((t, i) => t - onsets[i]);
     const mn = Math.min(...g), mx = Math.max(...g), avg = g.reduce((a, b) => a + b, 0) / g.length;
-    $("#flashMeasure").textContent = `実測間隔：平均${(avg / 1000).toFixed(2)}秒（最短${(mn / 1000).toFixed(2)}〜最長${(mx / 1000).toFixed(2)}秒）／ build ${BUILD}`;
+    $("#flashMeasure").textContent = T("実測間隔：平均{v1}秒（最短{v2}〜最長{v3}秒）／ build {BUILD}", { v1: (avg / 1000).toFixed(2), v2: (mn / 1000).toFixed(2), v3: (mx / 1000).toFixed(2), BUILD });
   }
   $("#flashForm").classList.remove("hidden"); $("#flashInput").value = ""; $("#flashInput").focus();
   flashAskAt = performance.now();   // ここから「考えている時間」
@@ -2423,7 +2424,7 @@ $("#flashForm").addEventListener("submit", (e) => {
   if (ok) flashExam.correct++;
   flashExam.idx++;
   if (flashExam.idx < flashExam.N) {
-    res.innerHTML = (ok ? "正解！" : `おしい（答え: ${flashAnswer.toLocaleString()}）`) +
+    res.innerHTML = (ok ? T("正解！") : T("おしい（答え: {v1}）", { v1: flashAnswer.toLocaleString() })) +
       `<span class="sub">　${th != null ? th.toFixed(1) + "秒" : ""}</span>`;
     res.className = "result " + (ok ? "ok" : "ng");
     setTimeout(runFlash, 900);
@@ -2450,23 +2451,23 @@ function finishFlashSet(res) {
   const gradeFor = flashCustom ? flashCustom.eq : flashGrade;
   let msg = "";
   if (flashExam.on) {
-    msg += `検定結果：${correct}/${N} 正解　<b>${correct * 10}点 / 200点</b><br>${pass ? "🎉 合格！" : "不合格（140点以上で合格）"}`;
-    if (pass) { certify(flashGrade.key, "flash"); msg += `<br>🎓 ${flashGrade.key} 認定！ 合格証が もらえるよ`; }
+    msg += T("検定結果：{correct}/{N} 正解　<b>{v3}点 / 200点</b><br>{v4}", { correct, N, v3: correct * 10, v4: pass ? "🎉 合格！" : "不合格（140点以上で合格）" });
+    if (pass) { certify(flashGrade.key, "flash"); msg += T("<br>🎓 {v1} 認定！ 合格証が もらえるよ", { v1: flashGrade.key }); }
   } else if (flashCustom) {
-    msg += `⚙ ${flashCustom.digits}けた ${flashCustom.terms}口・1個 ${flashCustom.pace}秒（${flashCustom.exact ? "＝" : "だいたい "}${gradeFor.key}${flashCustom.exact ? "" : " 相当"}）${N}問 おわり！`;
+    msg += T("⚙ {v1}けた {v2}口・1個 {v3}秒（{v4}{v5}{v6}）{N}問 おわり！", { v1: flashCustom.digits, v2: flashCustom.terms, v3: flashCustom.pace, v4: flashCustom.exact ? "＝" : "だいたい ", v5: gradeFor.key, v6: flashCustom.exact ? "" : " 相当", N });
   } else {
-    msg += `⚡ ${N}問 おわり！`;
+    msg += T("⚡ {N}問 おわり！", { N });
   }
   touchStreak();
-  msg += `<div class="fs-stats"><div class="fs-acc">正答率 <b>${acc}%</b> <span class="sub">(${correct} / ${N})</span></div>` +
-    `<div class="fs-row"><span>1問の 平均</span><b>${avg.toFixed(1)}秒</b></div>` +
-    `<div class="fs-row"><span>いちばん速かった</span><b>${fast.toFixed(1)}秒</b></div>` +
-    (okTs.length ? `<div class="fs-row"><span>正解できた問題の平均</span><b>${okAvg.toFixed(1)}秒</b></div>` : "") +
-    `<div class="fs-row"><span>合計の 考えた時間</span><b>${sum.toFixed(1)}秒</b></div>` +
-    (r.improved ? `<div class="fs-best">✨ 1問の平均で 自己ベスト更新！（${flashGrade.key}）</div>`
-      : flashCustom ? `<div class="fs-best sub">じぶんで きめた練習は 自己ベストに 入らないよ</div>`
-      : (r.prev != null ? `<div class="fs-best sub">${flashGrade.key}の 自己ベスト ${r.prev.toFixed(1)}秒／問　あと ${(avg - r.prev).toFixed(1)}秒 はやく</div>`
-        : `<div class="fs-best sub">正答率70%以上で 自己ベストに 記録されるよ</div>`)) +
+  msg += T("<div class=\"fs-stats\"><div class=\"fs-acc\">正答率 <b>{acc}%</b> <span class=\"sub\">({correct} / {N})</span></div>", { acc, correct, N }) +
+    T("<div class=\"fs-row\"><span>1問の 平均</span><b>{v1}秒</b></div>", { v1: avg.toFixed(1) }) +
+    T("<div class=\"fs-row\"><span>いちばん速かった</span><b>{v1}秒</b></div>", { v1: fast.toFixed(1) }) +
+    (okTs.length ? T("<div class=\"fs-row\"><span>正解できた問題の平均</span><b>{v1}秒</b></div>", { v1: okAvg.toFixed(1) }) : "") +
+    T("<div class=\"fs-row\"><span>合計の 考えた時間</span><b>{v1}秒</b></div>", { v1: sum.toFixed(1) }) +
+    (r.improved ? T("<div class=\"fs-best\">✨ 1問の平均で 自己ベスト更新！（{v1}）</div>", { v1: flashGrade.key })
+      : flashCustom ? T(`<div class="fs-best sub">じぶんで きめた練習は 自己ベストに 入らないよ</div>`)
+      : (r.prev != null ? T("<div class=\"fs-best sub\">{v1}の 自己ベスト {v2}秒／問　あと {v3}秒 はやく</div>", { v1: flashGrade.key, v2: r.prev.toFixed(1), v3: (avg - r.prev).toFixed(1) })
+        : T(`<div class="fs-best sub">正答率70%以上で 自己ベストに 記録されるよ</div>`))) +
     `</div>`;
   // 報酬は他の種目とまったく同じ計算（正解・正答率・自己ベスト・完走 × 級の倍率）
   const fkey = (gradeIdxOf(gradeFor) <= myRankIdx() ? gradeFor.key + "_low" : gradeFor.key + "_flash") + (flashCustom ? "_c" : "");
@@ -2474,23 +2475,23 @@ function finishFlashSet(res) {
     grade: gradeFor, subj: "flash", count: dailyCount(fkey) });
   dailyCount(fkey, true);
   let earned = g;
-  if (pass) { earned += 50; lines.push("🎓 検定合格 ＋50"); }
-  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(`🔥 ${daily.label} ＋${daily.amt}`); }
+  if (pass) { earned += 50; lines.push(T("🎓 検定合格 ＋50")); }
+  const daily = dailyBonusOnce(); if (daily) { earned += daily.amt; lines.push(T("🔥 {v1} ＋{v2}", { v1: daily.label, v2: daily.amt })); }
   addGold(earned);
   logSession("flash", N, correct, sum, 0);   // 記録に残す（保護者画面のグラフに乗る）
   solomonAfterStudy();               // 🐣 フラッシュ暗算も 練習のうち
-  msg += `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${lines.join("・")}</div><div class="goal">${nextGoalHint()}</div></div>`;
+  msg += T("<div class=\"gold-earn\"><img class=\"ico-coin\" src=\"assets/coin.png\" alt=\"\" /> <b>＋{earned} GOLD</b><div class=\"gold-lines\">{v2}</div><div class=\"goal\">{v3}</div></div>", { earned, v2: lines.join("・"), v3: nextGoalHint() });
   msg += maybeDropItem(acc, true);
   // ⭕❌ を 見せたあと、まん中を「▶ つぎ」の ボタンに もどす
-  const nextLabel = flashExam.on ? "▶ つぎの 検定" : `▶ つぎの ${N}問`;
+  const nextLabel = flashExam.on ? T("▶ つぎの 検定") : T("▶ つぎの {N}問", { N });
   setTimeout(() => { if (flashSpec && !flashBusy && $("#flashForm").classList.contains("hidden")) flashIdle(true, nextLabel); }, 1200);
   if (flashExam.on) {
-    if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + " ごうかく！", correct + " / " + N + " 正解");
-    else fxCheer("あと すこし…", "合格は 140点。もう一度 いこう！");
-  } else if (r.improved) fxCelebrate(3, "⏱ 自己ベスト こうしん！", "1問 " + avg.toFixed(1) + "秒");
-  else if (acc === 100) fxCelebrate(3, "💯 ぜんもん せいかい！", "1問 " + avg.toFixed(1) + "秒");
-  else if (acc >= 80) fxCelebrate(2, "よくできました！", "正答率 " + acc + "%");
-  else fxCelebrate(1, "おつかれさま！", "正答率 " + acc + "%");
+    if (pass) fxCelebrate(3, "🎓 " + flashGrade.key + T(" ごうかく！"), correct + " / " + N + T(" 正解"));
+    else fxCheer(T("あと すこし…"), T("合格は 140点。もう一度 いこう！"));
+  } else if (r.improved) fxCelebrate(3, T("⏱ 自己ベスト こうしん！"), T("1問 ") + avg.toFixed(1) + T("秒"));
+  else if (acc === 100) fxCelebrate(3, T("💯 ぜんもん せいかい！"), T("1問 ") + avg.toFixed(1) + T("秒"));
+  else if (acc >= 80) fxCelebrate(2, T("よくできました！"), T("正答率 ") + acc + "%");
+  else fxCelebrate(1, T("おつかれさま！"), T("正答率 ") + acc + "%");
   coinSnd(1.0);
   renderProfile();
   res.innerHTML = msg; res.className = "result " + (flashExam.on && !pass ? "ng" : "ok");
@@ -2508,12 +2509,12 @@ const PLAYER_HP = 4; // まちがえると♥が1つへる。0になったらア
 /* 敵は「ミスモンスター」＝王国に「数の乱れ」を起こす いたずらもの。
    それぞれ 子どもの まちがえ方（MISS_KINDS）と 対応している。絵は いまのものを そのまま使う */
 const ENEMIES = [
-  { file: "miss_1.png", name: "ケタズレ", d: "桁を まちがえさせる いたずらっ子" },
-  { file: "miss_2.png", name: "オクリマチガイ", d: "くり上がりを こんらんさせる" },
-  { file: "miss_3.png", name: "アセリーヌ", d: "いそがせて ミスを さそう" },
-  { file: "miss_4.png", name: "ボーットン", d: "しゅうちゅうを うばう のんびり屋" },
-  { file: "miss_5.png", name: "ミスラ", d: "計算の とちゅうで まちがえさせる" },
-  { file: "miss_6.png", name: "フリーズン", d: "頭を まっ白に する 冷たい 敵" },
+  { file: "miss_1.png", name: T("ケタズレ"), d: T("桁を まちがえさせる いたずらっ子") },
+  { file: "miss_2.png", name: T("オクリマチガイ"), d: T("くり上がりを こんらんさせる") },
+  { file: "miss_3.png", name: T("アセリーヌ"), d: T("いそがせて ミスを さそう") },
+  { file: "miss_4.png", name: T("ボーットン"), d: T("しゅうちゅうを うばう のんびり屋") },
+  { file: "miss_5.png", name: T("ミスラ"), d: T("計算の とちゅうで まちがえさせる") },
+  { file: "miss_6.png", name: T("フリーズン"), d: T("頭を まっ白に する 冷たい 敵") },
 ];
 const GOLD_PER_KILL = 8; // 3正解＝1匹。旧「正解×2＋勝敗ボーナス」とほぼ同水準になる額
 function renderBattle() {
@@ -2596,22 +2597,22 @@ function battleAnswer(val) {
     battle.you++; battle.hp--;
     if (battle.hp <= 0) {                       // たおした → たおれてから次の敵が登場
       battle.kills++; battle.hp = ENEMY_HP;
-      battleFx(`たおした！ ＋${Math.round(GOLD_PER_KILL * gradeGoldMult(battle.grade))} GOLD`, "kill");
+      battleFx(T("たおした！ ＋{v1} GOLD", { v1: Math.round(GOLD_PER_KILL * gradeGoldMult(battle.grade)) }), "kill");
       enemyDownSnd();                 // 敵の やられ声（毎回ちがう）
       coinSnd(0.55);                  // GOLDの音は 声のあとに
       if (battle.kills % 3 === 0) setTimeout(function () { sfx("praise"); }, 1000);   // 3匹ごとに ほめてくれる
       const img = $("#enemyImg"); img.className = "down";
       setTimeout(() => { if (!battle || !battle.running) return; img.className = "appear"; setEnemyIdentity(); }, 650);
     } else {                                    // こうげき命中
-      battleFx("こうげき！ HP−1", "ok");
+      battleFx(T("こうげき！ HP−1"), "ok");
       enemyAnim("hit", 300); clickSnd();
     }
     renderEnemy();
   } else {
     battle.life--;                                   // まちがえたら自分もダメージ
     renderEnemy();
-    if (battle.life <= 0) { battleFx("♥がなくなった！", "miss"); wrongSnd(); return finishBattle("out"); }
-    battleFx(`はずれた！ ♥ のこり ${battle.life}`, "miss"); // 責めない言い方にする
+    if (battle.life <= 0) { battleFx(T("♥がなくなった！"), "miss"); wrongSnd(); return finishBattle("out"); }
+    battleFx(T("はずれた！ ♥ のこり {v1}", { v1: battle.life }), "miss"); // 責めない言い方にする
     neutralSnd();
   }
   battleProblem();
@@ -2627,20 +2628,20 @@ function finishBattle(reason) {
   if (battle.you > 0) { touchStreak(); addGold(earned); }
   (kills > 0 && !isOut) ? bigFanfareSnd() : neutralSnd();
   if (battle.you > 0 && earned > 0) coinSnd(kills > 0 && !isOut ? 1.4 : 0.2);
-  const badge = (kills > 0 && !isOut) ? '<span class="badge-chip win">WIN！</span>' : '<span class="badge-chip">🏁 コンプリート！</span>';
+  const badge = (kills > 0 && !isOut) ? T('<span class="badge-chip win">WIN！</span>') : T('<span class="badge-chip">🏁 コンプリート！</span>');
   const face = (kills > 0 && !isOut) ? "king_celebrate.png" : "king_wave.png";
   const verdict = isOut
-    ? `💫 アウト！ ${kills}ぴき たおしたよ`
-    : (kills > 0 ? `🎉 ${kills}ぴき たおした！` : "つぎは1ぴき たおそう！");
-  const outNote = isOut ? '<p class="sub">4回まちがえたので おしまい。ゆっくり たしかめて こたえると ♥ がへらないよ。</p>' : "";
+    ? T("💫 アウト！ {kills}ぴき たおしたよ", { kills })
+    : (kills > 0 ? T("🎉 {kills}ぴき たおした！", { kills }) : T("つぎは1ぴき たおそう！"));
+  const outNote = isOut ? T('<p class="sub">4回まちがえたので おしまい。ゆっくり たしかめて こたえると ♥ がへらないよ。</p>') : "";
   $("#battleArena").classList.add("hidden");
   const rbox = $("#battleResult"); rbox.classList.remove("hidden");
   rbox.innerHTML =
     `<div class="battle-verdict"><img class="bv-face" src="assets/${face}" alt="" /><div><span class="bv-badge">${badge}</span><h3>${verdict}</h3></div></div>` +
-    `<div class="battle-score-final">たおした数 <b>${kills}</b><span class="bs-sub">せいかい ${battle.you} / ${battle.atts}問　♥のこり ${Math.max(0, battle.life)}</span></div>` + outNote +
-    (battle.you > 0 ? `<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋${earned} GOLD</b><div class="gold-lines">${kills}ぴき × ${perKill} GOLD（${battle.grade.key} ×${gm}）</div><div class="goal">${nextGoalHint()}</div></div>` : '<p class="sub">3回せいかいすると てきを たおせるよ！</p>') +
+    T("<div class=\"battle-score-final\">たおした数 <b>{kills}</b><span class=\"bs-sub\">せいかい {v2} / {v3}問　♥のこり {v4}</span></div>", { kills, v2: battle.you, v3: battle.atts, v4: Math.max(0, battle.life) }) + outNote +
+    (battle.you > 0 ? T("<div class=\"gold-earn\"><img class=\"ico-coin\" src=\"assets/coin.png\" alt=\"\" /> <b>＋{earned} GOLD</b><div class=\"gold-lines\">{kills}ぴき × {perKill} GOLD（{v4} ×{gm}）</div><div class=\"goal\">{v6}</div></div>", { earned, kills, perKill, v4: battle.grade.key, gm, v6: nextGoalHint() }) : T('<p class="sub">3回せいかいすると てきを たおせるよ！</p>')) +
     maybeDropItem(battle.atts ? Math.round((battle.you / battle.atts) * 100) : 0, !isOut && battle.atts >= 5) +
-    `<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🧩 パズルへ</button>`;
+    T(`<br><button id="battleAgain">もう一度</button> <button id="battleToKingdom" class="ghost">🧩 パズルへ</button>`);
   renderProfile();
   $("#battleAgain").onclick = () => renderBattle();
   $("#battleToKingdom").onclick = () => { showView("puzzle"); setActiveNav(document.querySelector('.nav[data-view="puzzle"]')); };
@@ -2728,9 +2729,9 @@ function fxConfetti(n) {
 }
 /* できたとき：大きさを 3段階で選ぶ（1=よくできた 2=すごい 3=大成功） */
 const FX_PRAISE = [
-  ["よくできました！", "その調子だよ"],
-  ["すごい！", "よく がんばったね"],
-  ["だいせいこう！", "レオ王も おどろいてる"],
+  [T("よくできました！"), T("その調子だよ")],
+  [T("すごい！"), T("よく がんばったね")],
+  [T("だいせいこう！"), T("レオ王も おどろいてる")],
 ];
 function fxCelebrate(level, main, sub) {
   const L = Math.max(1, Math.min(3, level || 1));
@@ -2742,9 +2743,9 @@ function fxCelebrate(level, main, sub) {
 }
 /* できなかったとき：責めずに ねぎらう */
 const FX_CHEER = [
-  ["おしい！", "あと ちょっとだったね"],
-  ["ドンマイ！", "つぎは いけるよ"],
-  ["よく ちょうせんした！", "やめずに つづけたのが えらい"],
+  [T("おしい！"), T("あと ちょっとだったね")],
+  [T("ドンマイ！"), T("つぎは いけるよ")],
+  [T("よく ちょうせんした！"), T("やめずに つづけたのが えらい")],
 ];
 function fxCheer(main, sub) {
   const c = FX_CHEER[(Math.random() * FX_CHEER.length) | 0];
@@ -2768,7 +2769,7 @@ function tipShow(title, bodyHTML, onClose) {
   d.className = "tip-back";
   d.innerHTML = '<div class="tip-card"><div class="tip-title">' + title + "</div>" +
     '<div class="tip-body">' + bodyHTML + "</div>" +
-    '<button class="tip-ok">わかった！</button></div>';
+    T('<button class="tip-ok">わかった！</button></div>');
   el.appendChild(d);
   d.querySelector(".tip-ok").onclick = function () { d.remove(); if (onClose) onClose(); };
   return d;
@@ -2788,15 +2789,15 @@ const PZ_KINDS = [
   { k: "heart", s: "♥", c: "#d0342c", g: "#e8695f" },
   { k: "dia", s: "♦", c: "#2b6fd0", g: "#5d9ae8" },
   { k: "club", s: "♣", c: "#2e7d5b", g: "#54a97f" },
-  { k: "bead", s: "そろばん玉", c: "#d99a2b", g: "#f0c364" },
+  { k: "bead", s: T("そろばん玉"), c: "#d99a2b", g: "#f0c364" },
 ];
 // アイテム（GOLDで買って、はじめから盤に置く）
 const PZ_ITEMS = [
   // 盤に置かず、はじめの手数を ふやすもの（手数が たりないときの たすけ）
-  { id: "moves5", n: "手数 ＋5", em: "⏱", moves: 5, cost: 30, tip: "はじめから 手数が 5 多い（かさねて 買える）" },
-  { id: "rocket", n: "ロケット", em: "🚀", sp: "rh", cost: 40, tip: "はじめから 盤にある。となりと 入れかえると たて か よこ 1れつ 消す" },
-  { id: "prop", n: "プロペラ", em: "🚁", sp: "prop", cost: 50, tip: "はじめから 盤にある。入れかえると 目あての玉へ とんでいって 消す" },
-  { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: "はじめから 盤にある。入れかえると まわり 3×3 を ばくはつ" },
+  { id: "moves5", n: T("手数 ＋5"), em: "⏱", moves: 5, cost: 30, tip: T("はじめから 手数が 5 多い（かさねて 買える）") },
+  { id: "rocket", n: T("ロケット"), em: "🚀", sp: "rh", cost: 40, tip: T("はじめから 盤にある。となりと 入れかえると たて か よこ 1れつ 消す") },
+  { id: "prop", n: T("プロペラ"), em: "🚁", sp: "prop", cost: 50, tip: T("はじめから 盤にある。入れかえると 目あての玉へ とんでいって 消す") },
+  { id: "tnt", n: "TNT", em: "💣", sp: "tnt", cost: 60, tip: T("はじめから 盤にある。入れかえると まわり 3×3 を ばくはつ") },
 ];
 // レベル（目あて と 手数）。だんだん むずかしくなる
 function pzLevel(n) {
@@ -2824,7 +2825,7 @@ function pzLevel(n) {
 /* ---- 仕掛け（障害物）----
    草：玉が その上で消えると はがれる（動きは じゃましない）
    木箱：となりで そろうと こわれる（1回）。石の箱は 2回いる。玉は通りぬけられない */
-const PZ_BLOCK = { box: { n: "木箱", hp: 1 }, stone: { n: "石の箱", hp: 2 } };
+const PZ_BLOCK = { box: { n: T("木箱"), hp: 1 }, stone: { n: T("石の箱"), hp: 2 } };
 function pzMakeStage(lv) {
   const floor = new Array(PZ_W * PZ_H).fill(0), block = new Array(PZ_W * PZ_H).fill(null);
   if (lv.grass) {
@@ -3018,7 +3019,7 @@ function pzCombo(c, a, b, out) {
   if (!sa && !sb) return false;
   const isR = (s) => s === "rh" || s === "rv";
   const fired = new Set();
-  if (sa === "disco" && sb === "disco") { for (let j = 0; j < c.length; j++) out.add(j); return "全部 消えた！"; }
+  if (sa === "disco" && sb === "disco") { for (let j = 0; j < c.length; j++) out.add(j); return T("全部 消えた！"); }
   if (sa === "disco" || sb === "disco") {
     const other = sa === "disco" ? B : A, at = sa === "disco" ? a : b;
     if (other.sp) {                                   // 光の玉 × 特殊 → 同じ色が ぜんぶ その特殊になって 一斉発動
@@ -3026,15 +3027,15 @@ function pzCombo(c, a, b, out) {
       const list = pzTargetsOf(c, kind);
       out.add(at); out.add(sa === "disco" ? b : a);
       list.forEach((j) => { if (c[j]) pzBlast(c, j, out, fired, { as: other.sp, force: true }); });
-      return "光の玉 × " + (other.sp === "tnt" ? "TNT" : other.sp === "prop" ? "プロペラ" : "ロケット") + "！";
+      return T("光の玉 × ") + (other.sp === "tnt" ? "TNT" : other.sp === "prop" ? T("プロペラ") : T("ロケット")) + T("！");
     }
     pzBlast(c, at, out, fired, { as: "disco", color: other.k });      // 光の玉 × ふつう → その色 ぜんぶ
     out.add(sa === "disco" ? b : a);
-    return "同じ色を ぜんぶ 消した！";
+    return T("同じ色を ぜんぶ 消した！");
   }
-  if (isR(sa) && isR(sb)) { pzBlast(c, b, out, fired, { as: "cross", force: true }); out.add(a); return "ロケット × ロケット！"; }
-  if (sa === "tnt" && sb === "tnt") { pzBlast(c, b, out, fired, { as: "tnt", big: true, force: true }); out.add(a); return "TNT × TNT！"; }
-  if (sa === "prop" && sb === "prop") { pzBlast(c, b, out, fired, { as: "prop", count: 3, force: true }); out.add(a); return "プロペラが 3機！"; }
+  if (isR(sa) && isR(sb)) { pzBlast(c, b, out, fired, { as: "cross", force: true }); out.add(a); return T("ロケット × ロケット！"); }
+  if (sa === "tnt" && sb === "tnt") { pzBlast(c, b, out, fired, { as: "tnt", big: true, force: true }); out.add(a); return T("TNT × TNT！"); }
+  if (sa === "prop" && sb === "prop") { pzBlast(c, b, out, fired, { as: "prop", count: 3, force: true }); out.add(a); return T("プロペラが 3機！"); }
   if ((isR(sa) && sb === "tnt") || (sa === "tnt" && isR(sb))) {        // ロケット × TNT → 3れつ ＋ 3ぎょう
     const x = b % PZ_W, y = (b / PZ_W) | 0;
     for (let d = -1; d <= 1; d++) {
@@ -3042,7 +3043,7 @@ function pzCombo(c, a, b, out) {
       for (let k = 0; k < PZ_H; k++) if (pzIn(x + d, k)) out.add(pzIdx(x + d, k));
     }
     out.add(a);
-    return "ロケット × TNT！";
+    return T("ロケット × TNT！");
   }
   // 片方だけ特殊 → ふつうに発動
   [a, b].forEach((i) => { if (c[i] && c[i].sp) pzBlast(c, i, out, fired, {}); });
@@ -3102,10 +3103,10 @@ function pzApply(c, r) {
 }
 /* はじめて生まれた特殊な玉は、その手が終わったあとに つかい方を 1回だけ 説明する */
 const PZ_SP_TIPS = {
-  rh: ["🚀 ロケットが できた！", "<p><b>4つ ならべる</b>と ロケットが できるよ。</p><p>ロケットを <b>となりの玉と 入れかえる</b>と、<b>たて か よこ 1れつ</b>を ぜんぶ 消す！</p><p>ロケットどうしを 入れかえると <b>十字</b>に 消えるよ。</p>"],
-  tnt: ["💣 TNTが できた！", "<p><b>T字 か L字</b>に ならべると TNTが できるよ。</p><p>TNTを <b>となりの玉と 入れかえる</b>と、<b>まわり 3×3</b> が ばくはつ！</p><p>TNTどうしなら もっと 大きく ばくはつするよ。</p>"],
-  prop: ["🚁 プロペラが できた！", "<p><b>2×2 の四角</b>に ならべると プロペラが できるよ。</p><p>プロペラを <b>となりの玉と 入れかえる</b>と、<b>目あての玉</b>へ とんでいって 消す！</p><p>草や 箱が のこっているときにも べんり。</p>"],
-  disco: ["✨ 光の玉が できた！", "<p><b>5つ ならべる</b>と 光の玉が できるよ。</p><p>光の玉を <b>どれかの玉と 入れかえる</b>と、<b>その色の玉を ぜんぶ</b> 消す！</p><p>ロケットや TNTと 入れかえると、その色が ぜんぶ ロケット／TNTに なるよ。</p>"],
+  rh: [T("🚀 ロケットが できた！"), T("<p><b>4つ ならべる</b>と ロケットが できるよ。</p><p>ロケットを <b>となりの玉と 入れかえる</b>と、<b>たて か よこ 1れつ</b>を ぜんぶ 消す！</p><p>ロケットどうしを 入れかえると <b>十字</b>に 消えるよ。</p>")],
+  tnt: [T("💣 TNTが できた！"), T("<p><b>T字 か L字</b>に ならべると TNTが できるよ。</p><p>TNTを <b>となりの玉と 入れかえる</b>と、<b>まわり 3×3</b> が ばくはつ！</p><p>TNTどうしなら もっと 大きく ばくはつするよ。</p>")],
+  prop: [T("🚁 プロペラが できた！"), T("<p><b>2×2 の四角</b>に ならべると プロペラが できるよ。</p><p>プロペラを <b>となりの玉と 入れかえる</b>と、<b>目あての玉</b>へ とんでいって 消す！</p><p>草や 箱が のこっているときにも べんり。</p>")],
+  disco: [T("✨ 光の玉が できた！"), T("<p><b>5つ ならべる</b>と 光の玉が できるよ。</p><p>光の玉を <b>どれかの玉と 入れかえる</b>と、<b>その色の玉を ぜんぶ</b> 消す！</p><p>ロケットや TNTと 入れかえると、その色が ぜんぶ ロケット／TNTに なるよ。</p>")],
 };
 PZ_SP_TIPS.rv = PZ_SP_TIPS.rh;
 function pzFlushSpTips() {
@@ -3188,8 +3189,8 @@ function pzStart(lvNo, items) {
 function pzBeginSwap(a, b) {
   if (!pz || pz.busy || pz.done) return { ok: false };
   const ax = a % PZ_W, ay = Math.floor(a / PZ_W), bx = b % PZ_W, by = Math.floor(b / PZ_W);
-  if (Math.abs(ax - bx) + Math.abs(ay - by) !== 1) return { ok: false, why: "となり どうしだけ" };
-  if (!pzWouldMatch(pz.cells, a, b)) return { ok: false, why: "そろわないよ" };
+  if (Math.abs(ax - bx) + Math.abs(ay - by) !== 1) return { ok: false, why: T("となり どうしだけ") };
+  if (!pzWouldMatch(pz.cells, a, b)) return { ok: false, why: T("そろわないよ") };
   const t = pz.cells[a]; pz.cells[a] = pz.cells[b]; pz.cells[b] = t;
   return { ok: true };
 }
@@ -3338,7 +3339,7 @@ function pzReshuffle() {
 function pzFinishTurn() {
   pz.moves--;
   if (!pzHasMove(pz.cells)) {
-    if (pzReshuffle()) { try { pzMsg("手づまり！ ならべ直したよ", "ok"); } catch (e) { } }
+    if (pzReshuffle()) { try { pzMsg(T("手づまり！ ならべ直したよ"), "ok"); } catch (e) { } }
     else pz.moves = 0;                       // どうしても手が無ければ そこで終わりにする（固まらせない）
   }
   const win = pz.got >= pz.lv.need;
@@ -3458,10 +3459,10 @@ function pzRenderHud() {
   if (!pz) return;
   const done = pz.got >= pz.lv.need;
   $("#pzGoal").innerHTML = pzGoalIcon() + " <b>" + Math.min(pz.got, pz.lv.need) + " / " + pz.lv.need + "</b>" + (done ? ' <span class="pz-ok">✓</span>' : "");
-  $("#pzMoves").innerHTML = "のこり <b>" + Math.max(0, pz.moves) + "</b> 手";
+  $("#pzMoves").innerHTML = T("のこり <b>") + Math.max(0, pz.moves) + T("</b> 手");
   const sc = $("#pzScore"); if (sc) sc.textContent = (pz.score || 0).toLocaleString();
   pzKingFace();
-  $("#pzLv").textContent = "レベル " + pz.lv.n;
+  $("#pzLv").textContent = T("レベル ") + pz.lv.n;
   const bar = $("#pzBar"); if (bar) bar.style.width = Math.min(100, Math.round(pz.got / pz.lv.need * 100)) + "%";
 }
 function pzMsg(t, cls) {
@@ -3476,7 +3477,7 @@ function pzShake(strong) {
   setTimeout(() => b.classList.remove("shake", "shake-b"), 400);
 }
 /* ---------- 気持ちよさの演出（点数・つぶ・音・ほめ言葉） ---------- */
-const PZ_PRAISE = ["", "", "いいね！", "すごい！", "さいこう！", "でんせつ！", "しんきろく！"];
+const PZ_PRAISE = ["", "", T("いいね！"), T("すごい！"), T("さいこう！"), T("でんせつ！"), T("しんきろく！")];
 function pzFx(i, html, cls, life) {
   const el = $("#pzBoard"); if (!el) return;
   const d = document.createElement("div");
@@ -3547,7 +3548,7 @@ async function pzCascadeAnim(swapAt, chain) {
   if (r.big || maxD > 100) pzShake(maxD > 150);
   if (chain >= 2) {
     pzFx(mid < 0 ? 27 : mid, PZ_PRAISE[Math.min(chain, PZ_PRAISE.length - 1)], "pz-praise", 1000);
-    pzMsg(chain + "れんさ！", "ok");
+    pzMsg(chain + T("れんさ！"), "ok");
   }
   await pzWait(Math.max(chain > 1 ? 150 : 175, maxD + 190));
   pzApply(pz.cells, r);
@@ -3557,7 +3558,7 @@ async function pzCascadeAnim(swapAt, chain) {
   pzScoreAdd(pts, mid);
   if (got) pzGoalPop();
   const left = pz.lv.need - pz.got;
-  if (left > 0 && left <= 2) pzMsg("あと " + left + " こ！", "ok");
+  if (left > 0 && left <= 2) pzMsg(T("あと ") + left + T(" こ！"), "ok");
   pzSync();
   pzRenderHud();
   await pzWait(200);
@@ -3567,7 +3568,7 @@ async function pzCascadeAnim(swapAt, chain) {
 async function pzFinale() {
   const left = Math.min(pz.moves, 8);
   if (left <= 0) return;
-  pzMsg("のこり " + pz.moves + " 手が ロケットに！", "ok");
+  pzMsg(T("のこり ") + pz.moves + T(" 手が ロケットに！"), "ok");
   await pzWait(500);
   for (let k = 0; k < left; k++) {
     const pool = [];
@@ -3603,11 +3604,11 @@ async function pzFinale() {
 }
 /* ---------- あそび中に使える道具バー（画面の下・ロイヤルマッチと同じ位置） ---------- */
 const PZ_TOOLS = [
-  { id: "moves", n: "手数+5", em: "⏱", cost: 30, tip: "のこり手数を 5 ふやす", now: true },
-  { id: "hammer", n: "ハンマー", em: "🔨", cost: 25, tip: "タップした玉を 1つ こわす（手数は へらない）" },
-  { id: "rocket", n: "ロケット", em: "🚀", cost: 40, tip: "タップした場所を ロケットにして すぐ 発射（たて か よこ 1れつ）" },
-  { id: "prop", n: "プロペラ", em: "🚁", cost: 50, tip: "タップした場所を プロペラにして すぐ 発射（目あての玉へ）" },
-  { id: "tnt", n: "TNT", em: "💣", cost: 60, tip: "タップした場所を TNTにして すぐ ばくはつ（まわり 3×3）" },
+  { id: "moves", n: T("手数+5"), em: "⏱", cost: 30, tip: T("のこり手数を 5 ふやす"), now: true },
+  { id: "hammer", n: T("ハンマー"), em: "🔨", cost: 25, tip: T("タップした玉を 1つ こわす（手数は へらない）") },
+  { id: "rocket", n: T("ロケット"), em: "🚀", cost: 40, tip: T("タップした場所を ロケットにして すぐ 発射（たて か よこ 1れつ）") },
+  { id: "prop", n: T("プロペラ"), em: "🚁", cost: 50, tip: T("タップした場所を プロペラにして すぐ 発射（目あての玉へ）") },
+  { id: "tnt", n: "TNT", em: "💣", cost: 60, tip: T("タップした場所を TNTにして すぐ ばくはつ（まわり 3×3）") },
 ];
 let pzArmed = null;                    // いま かまえている道具
 function pzToolStock(id) { const d = pzLoad(); return (d.items && d.items[id]) || 0; }
@@ -3626,21 +3627,21 @@ function pzArm(id) {
   const t = PZ_TOOLS.find((x) => x.id === id);
   if (t && t.now) return pzUseNow(t);                 // 手数+5 のように その場で効く道具
   if (pzArmed === id) { pzArmed = null; pzRenderTools(); $("#pzToolTip").textContent = ""; return; }
-  if (!pzToolStock(id) && getGold() < t.cost) { pzMsg("GOLDが たりない。そろばんで かせごう！", "ng"); return; }
+  if (!pzToolStock(id) && getGold() < t.cost) { pzMsg(T("GOLDが たりない。そろばんで かせごう！"), "ng"); return; }
   pzArmed = id;
   pzRenderTools();
-  $("#pzToolTip").textContent = t.n + "：" + t.tip + (pzToolStock(id) ? "" : "（つかうと " + t.cost + "G）");
+  $("#pzToolTip").textContent = t.n + T("：") + t.tip + (pzToolStock(id) ? "" : T("（つかうと ") + t.cost + T("G）"));
 }
 // マスをえらばずに すぐ効く道具（手数+5）
 function pzUseNow(t) {
   const stock = pzToolStock(t.id);
   if (!stock) {
-    if (getGold() < t.cost) { pzMsg("GOLDが たりないよ", "ng"); return; }
+    if (getGold() < t.cost) { pzMsg(T("GOLDが たりないよ"), "ng"); return; }
     addGold(-t.cost);
   } else { const d = pzLoad(); d.items[t.id] = stock - 1; pzSave(d); }
   if (t.id === "moves") {
     pz.moves += 5;
-    pzMsg("手数を 5 ふやした！", "ok");
+    pzMsg(T("手数を 5 ふやした！"), "ok");
     try { sfx("coin", function () { coinSnd(0); }); } catch (e) { }
   }
   pzRenderHud(); pzRenderTools();
@@ -3649,10 +3650,10 @@ function pzUseNow(t) {
 async function pzUseTool(i) {
   const id = pzArmed, t = PZ_TOOLS.find((x) => x.id === id);
   if (!t || !pz || pz.busy || pz.done) return false;
-  if (!pz.cells[i]) { pzMsg("そこには つかえないよ", "ng"); return true; }
+  if (!pz.cells[i]) { pzMsg(T("そこには つかえないよ"), "ng"); return true; }
   const stock = pzToolStock(id);
   if (!stock) {
-    if (getGold() < t.cost) { pzMsg("GOLDが たりないよ", "ng"); return true; }
+    if (getGold() < t.cost) { pzMsg(T("GOLDが たりないよ"), "ng"); return true; }
     addGold(-t.cost);
   } else { const d = pzLoad(); d.items[id] = stock - 1; pzSave(d); }
   pzArmed = null;
@@ -3681,7 +3682,7 @@ async function pzUseTool(i) {
   const win = pz.got >= pz.lv.need;
   if (win) pz.done = "win";
   if (!pz.done && !pzHasMove(pz.cells)) {          // 道具のあとに 手づまりでも 固まらない
-    if (pzReshuffle()) { try { pzMsg("手づまり！ ならべ直したよ", "ok"); } catch (e) { } }
+    if (pzReshuffle()) { try { pzMsg(T("手づまり！ ならべ直したよ"), "ok"); } catch (e) { } }
     else { pz.moves = 0; pz.done = "lose"; }
   }
   pzSync(); pzRenderHud(); pzRenderTools();
@@ -3727,7 +3728,7 @@ async function pzTry(a, b) {
   }
   let chain = 0;
   while (await pzCascadeAnim(b, ++chain)) {
-    if (chain >= 2) pzMsg(chain + "れんさ！", "ok");
+    if (chain >= 2) pzMsg(chain + T("れんさ！"), "ok");
     if (chain > 30) break;
   }
   const done = pzFinishTurn();
@@ -3746,16 +3747,16 @@ async function pzCeremony(st, cleared) {
   const d = pzLoad();
   // ① 見出し
   ov.innerHTML = '<div class="pz-res-h ' + (cleared ? "ok" : "ng") + '">' +
-    (cleared ? "レベル " + pz.lv.n + " クリア！" : "手数ぎれ…") + "</div>" +
+    (cleared ? T("レベル ") + pz.lv.n + T(" クリア！") : T("手数ぎれ…")) + "</div>" +
     '<div class="pz-stars" id="pzStarRow"></div>' +
     '<div class="pz-tally" id="pzTally"></div>' +
     '<div class="pz-gifts" id="pzGifts"></div>' +
     '<div class="pz-res-btns" id="pzBtns"></div>';
   if (!cleared) {
-    $("#pzTally").innerHTML = 'あと <b>' + Math.max(0, pz.lv.need - pz.got) + "</b> こ だったね<br><span class=\"sub\">スコア " + (pz.score || 0).toLocaleString() + "</span>" +
+    $("#pzTally").innerHTML = T('あと <b>') + Math.max(0, pz.lv.need - pz.got) + T("</b> こ だったね<br><span class=\"sub\">スコア ") + (pz.score || 0).toLocaleString() + "</span>" +
       (getGold() >= PZ_CONT_COST
-        ? '<button id="pzCont" class="big-cta pz-cont">⏱ ＋5手 つづける（' + PZ_CONT_COST + 'G）</button>' +
-          '<div class="sub">いまの ばんめんの まま つづきます</div>'
+        ? T('<button id="pzCont" class="big-cta pz-cont">⏱ ＋5手 つづける（') + PZ_CONT_COST + T('G）</button>') +
+          T('<div class="sub">いまの ばんめんの まま つづきます</div>')
         : "");
     try { wrongSnd(); } catch (e) { }
     pzCeremonyButtons(false);
@@ -3776,7 +3777,7 @@ async function pzCeremony(st, cleared) {
   // ③ スコアを かぞえ上げる
   const tal = $("#pzTally");
   const total = pz.score || 0;
-  tal.innerHTML = 'スコア <b id="pzCount">0</b>';
+  tal.innerHTML = T('スコア <b id="pzCount">0</b>');
   const cnt = $("#pzCount");
   const steps = 18;
   for (let i = 1; i <= steps; i++) {
@@ -3794,15 +3795,15 @@ async function pzCeremony(st, cleared) {
   if (gotBonus > 0) pzGiveItem(d, "moves5", gotBonus);
   pzSave(d);
   const nextAt = Math.ceil((d.star + 1) / 9) * 9;
-  tal.innerHTML += '<div class="pz-meter"><span>あつめた ★</span><b>' + d.star + "</b>" +
+  tal.innerHTML += T('<div class="pz-meter"><span>あつめた ★</span><b>') + d.star + "</b>" +
     '<i class="pz-meter-bar"><u style="width:' + Math.round((d.star % 9) / 9 * 100) + '%"></u></i>' +
-    "<small>つぎの ごほうびまで あと " + Math.max(1, nextAt - d.star) + " ★</small></div>" +
-    (gotBonus > 0 ? '<div class="pz-gift-item">★9こ たまった！ ⏱ <b>手数 ＋5 ×' + gotBonus + "</b> を もらった！</div>" : "");
+    T("<small>つぎの ごほうびまで あと ") + Math.max(1, nextAt - d.star) + " ★</small></div>" +
+    (gotBonus > 0 ? T('<div class="pz-gift-item">★9こ たまった！ ⏱ <b>手数 ＋5 ×') + gotBonus + T("</b> を もらった！</div>") : "");
   await pzWait(gotBonus > 0 ? 700 : 420);
   // ⑤ たからばこ（3レベルごと）
   if (pz.lv.n % PZ_CHEST_EVERY === 0) {
     const gif = $("#pzGifts");
-    gif.innerHTML = '<div class="pz-chest" id="pzChest">🎁</div><div class="sub">たからばこ！</div>';
+    gif.innerHTML = T('<div class="pz-chest" id="pzChest">🎁</div><div class="sub">たからばこ！</div>');
     try { bigFanfareSnd(); } catch (e) { }
     await pzWait(700);
     const pick = PZ_ITEMS[Math.floor(Math.random() * PZ_ITEMS.length)];
@@ -3810,13 +3811,13 @@ async function pzCeremony(st, cleared) {
     pzGiveItem(d, pick.id, num); pzSave(d);
     $("#pzChest").classList.add("open");
     gif.innerHTML = '<div class="pz-chest open">🎁</div>' +
-      '<div class="pz-gift-item">' + pick.em + " <b>" + pick.n + " ×" + num + "</b> を もらった！</div>" +
-      '<div class="sub">つぎのレベルで タダで つかえるよ</div>';
+      '<div class="pz-gift-item">' + pick.em + " <b>" + pick.n + " ×" + num + T("</b> を もらった！</div>") +
+      T('<div class="sub">つぎのレベルで タダで つかえるよ</div>');
     try { coinSnd(0); } catch (e) { }
     await pzWait(500);
   } else if (st >= 3) {
     pzGiveItem(d, "rocket", 1); pzSave(d);
-    $("#pzGifts").innerHTML = '<div class="pz-gift-item">★3 ボーナス！ 🚀 <b>ロケット ×1</b> を もらった！</div>';
+    $("#pzGifts").innerHTML = T('<div class="pz-gift-item">★3 ボーナス！ 🚀 <b>ロケット ×1</b> を もらった！</div>');
     await pzWait(400);
   }
   pzCeremonyButtons(true);
@@ -3824,9 +3825,9 @@ async function pzCeremony(st, cleared) {
 function pzCeremonyButtons(cleared) {
   const g = getGold();
   $("#pzBtns").innerHTML =
-    (g >= PZ_PLAY_COST ? '<button id="pzAgain" class="big-cta">▶ ' + (cleared ? "つぎの レベル" : "もう一度") + "（" + PZ_PLAY_COST + "G）</button>"
-      : '<div class="pz-need">GOLDが たりない。そろばんで かせごう！</div>') +
-    ' <button id="pzHome" class="ghost">やめる</button>';
+    (g >= PZ_PLAY_COST ? '<button id="pzAgain" class="big-cta">▶ ' + (cleared ? T("つぎの レベル") : T("もう一度")) + T("（") + PZ_PLAY_COST + T("G）</button>")
+      : T('<div class="pz-need">GOLDが たりない。そろばんで かせごう！</div>')) +
+    T(' <button id="pzHome" class="ghost">やめる</button>');
   const ag = $("#pzAgain"); if (ag) ag.onclick = () => { pz = null; renderPuzzle(); };
   $("#pzHome").onclick = () => { pz = null; renderPuzzle(); };
 }
@@ -3839,7 +3840,7 @@ function pzContinue() {
   if (!pzHasMove(pz.cells)) pzReshuffle();
   const ov = $("#pzOver"); ov.classList.add("hidden"); ov.innerHTML = "";
   pzSync(); pzRenderHud(); pzRenderTools();
-  pzMsg("＋5手！ もうひとふんばり", "ok");
+  pzMsg(T("＋5手！ もうひとふんばり"), "ok");
   try { sfx("coin", function () { coinSnd(0); }); } catch (e) { }
 }
 /* 1面の終わり（記録は すぐ／演出は そのあと） */
@@ -3850,9 +3851,9 @@ function pzFinish(done) {
     d.lv = Math.max(d.lv, pz.lv.n + 1);
     d.best = Math.max(d.best || 0, pz.lv.n);
     pzSave(d);
-    fxCelebrate(st, "レベル " + pz.lv.n + " クリア！", st >= 3 ? "パーフェクト！ ★★★" : "よく がんばったね");
+    fxCelebrate(st, T("レベル ") + pz.lv.n + T(" クリア！"), st >= 3 ? T("パーフェクト！ ★★★") : T("よく がんばったね"));
   } else {
-    fxCheer("あと " + Math.max(0, pz.lv.need - pz.got) + " こ だった…", "つぎは いけるよ！");
+    fxCheer(T("あと ") + Math.max(0, pz.lv.need - pz.got) + T(" こ だった…"), T("つぎは いけるよ！"));
   }
   (async () => {
     try {
@@ -3863,7 +3864,7 @@ function pzFinish(done) {
       const ov = $("#pzOver");
       ov.classList.remove("hidden");
       ov.innerHTML = '<div class="pz-res-h ' + (done === "win" ? "ok" : "ng") + '">' +
-        (done === "win" ? "レベル " + pz.lv.n + " クリア！" : "手数ぎれ…") + '</div><div class="pz-res-btns" id="pzBtns"></div>';
+        (done === "win" ? T("レベル ") + pz.lv.n + T(" クリア！") : T("手数ぎれ…")) + '</div><div class="pz-res-btns" id="pzBtns"></div>';
       pzCeremonyButtons(done === "win");
     }
   })();
@@ -3880,30 +3881,30 @@ function pzBuyCost() {
 }
 function pzRenderLobby() {
   const d = pzLoad(), lv = pzLevel(d.lv), g = getGold();
-  const face = lv.goal === "grass" ? '<i class="pz-fl sm"></i> 草を'
-    : lv.goal === "box" ? '<i class="pz-bk box sm"></i> 箱を'
-    : '<img class="pz-mini" src="assets/' + (PZ_IMG[lv.target] || PZ_IMG.dia) + '.png" alt=""> を';
+  const face = lv.goal === "grass" ? T('<i class="pz-fl sm"></i> 草を')
+    : lv.goal === "box" ? T('<i class="pz-bk box sm"></i> 箱を')
+    : '<img class="pz-mini" src="assets/' + (PZ_IMG[lv.target] || PZ_IMG.dia) + T('.png" alt=""> を');
   const items = PZ_ITEMS.map((it) => {
     const n = pzBuy[it.id] || 0;
     const stock = (d.items && d.items[it.id]) || 0;
     return '<div class="pz-item"><span class="pz-em">' + it.em + '</span><span class="pz-in"><b>' + it.n + "</b><small>" + it.tip + "</small></span>" +
-      (stock ? '<span class="pz-stock">もっている ' + stock + '</span>' : '<span class="pz-ic">' + it.cost + "G</span>") +
-      '<button class="pz-buy" data-it="' + it.id + '"' + (!stock && g < it.cost ? " disabled" : "") + ">＋</button>" +
+      (stock ? T('<span class="pz-stock">もっている ') + stock + '</span>' : '<span class="pz-ic">' + it.cost + "G</span>") +
+      '<button class="pz-buy" data-it="' + it.id + '"' + (!stock && g < it.cost ? " disabled" : "") + T(">＋</button>") +
       '<span class="pz-have">' + (n ? "×" + n : "") + "</span></div>";
   }).join("");
   const total = PZ_PLAY_COST + pzBuyCost();
   const stars = [];
-  for (let i = Math.max(1, d.lv - 4); i < d.lv; i++) stars.push('<span class="pz-past">' + i + "：" + "★".repeat(d.stars[i] || 0) + "</span>");
+  for (let i = Math.max(1, d.lv - 4); i < d.lv; i++) stars.push('<span class="pz-past">' + i + T("：") + "★".repeat(d.stars[i] || 0) + "</span>");
   $("#pzLobby").innerHTML =
-    '<div class="pz-lv-big">レベル <b>' + lv.n + "</b></div>" +
-    '<div class="pz-goal-big">' + face + " <b>" + lv.need + "</b> こ　／　<b>" + lv.moves + "</b> 手 いない</div>" +
+    T('<div class="pz-lv-big">レベル <b>') + lv.n + "</b></div>" +
+    '<div class="pz-goal-big">' + face + " <b>" + lv.need + T("</b> こ　／　<b>") + lv.moves + T("</b> 手 いない</div>") +
     (stars.length ? '<div class="pz-past-row">' + stars.join("") + "</div>" : "") +
-    '<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>' +
-    '<div class="sub pz-howto">つかい方：特殊な玉を <b>となりの玉と 入れかえる</b>と はっしゃ！　4つならべ＝🚀　T字・L字＝💣　2×2＝🚁　5つならべ＝✨</div>' + items +
-    '<div class="pz-total">つかう GOLD：<b>' + total + "</b>　（もっている " + g.toLocaleString() + "）</div>" +
-    (g >= total ? '<button id="pzGo" class="big-cta">▶ はじめる</button>'
-      : '<div class="pz-need">GOLDが ' + (total - g) + " たりない。そろばんの れんしゅうで かせごう！</div>") +
-    '<p class="sub">※ パズルでは GOLDは 増えません。GOLDが 増えるのは そろばんの れんしゅうと ランキングの ごほうびだけ。</p>';
+    T('<div class="pz-items-h">アイテム（GOLDで 買うと はじめから 盤に あるよ）</div>') +
+    T('<div class="sub pz-howto">つかい方：特殊な玉を <b>となりの玉と 入れかえる</b>と はっしゃ！　4つならべ＝🚀　T字・L字＝💣　2×2＝🚁　5つならべ＝✨</div>') + items +
+    T('<div class="pz-total">つかう GOLD：<b>') + total + T("</b>　（もっている ") + g.toLocaleString() + T("）</div>") +
+    (g >= total ? T('<button id="pzGo" class="big-cta">▶ はじめる</button>')
+      : T('<div class="pz-need">GOLDが ') + (total - g) + T(" たりない。そろばんの れんしゅうで かせごう！</div>")) +
+    T('<p class="sub">※ パズルでは GOLDは 増えません。GOLDが 増えるのは そろばんの れんしゅうと ランキングの ごほうびだけ。</p>');
   $$("#pzLobby .pz-buy").forEach((b) => {
     b.onclick = () => {
       const it = PZ_ITEMS.find((i) => i.id === b.dataset.it), rec = pzLoad();
@@ -3911,7 +3912,7 @@ function pzRenderLobby() {
       const used = pzBuy[it.id] || 0;
       if (used < stock) { pzBuy[it.id] = used + 1; return pzRenderLobby(); }   // もらった分は タダ
       const cur = pzBuyCost();
-      if (getGold() < PZ_PLAY_COST + cur + it.cost) return pzMsg("GOLDが たりないよ", "ng");
+      if (getGold() < PZ_PLAY_COST + cur + it.cost) return pzMsg(T("GOLDが たりないよ"), "ng");
       pzBuy[it.id] = Math.min(3, used + 1);
       pzRenderLobby();
     };
@@ -3919,7 +3920,7 @@ function pzRenderLobby() {
   const go = $("#pzGo");
   if (go) go.onclick = () => {
     const cost = PZ_PLAY_COST + pzBuyCost();
-    if (getGold() < cost) return pzMsg("GOLDが たりないよ", "ng");
+    if (getGold() < cost) return pzMsg(T("GOLDが たりないよ"), "ng");
     addGold(-cost);
     const rec = pzLoad(); rec.items = rec.items || {};
     const list = [];
@@ -3938,17 +3939,17 @@ function pzRenderLobby() {
 // はじめて出てくる仕掛けは、あそぶ前に 説明する
 function pzTipFor(lv) {
   if (lv.goal === "grass") {
-    tipOnce("pz-grass", "🌿 みどりの 草を はがそう",
+    tipOnce("pz-grass", T("🌿 みどりの 草を はがそう"),
       '<div class="tip-demo"><i class="pz-fl big"></i><span class="tip-ar">▶</span><i class="pz-fl big gone"></i></div>' +
-      "<p><b>草のマスの上で、玉を3つ そろえる</b>と 草が はがれます。</p>" +
-      "<p>草そのものを 動かすことは できません。<b>草の上に ある玉</b>を そろえるのが コツ。</p>" +
-      "<p>ロケットや TNT で ふきとばしても はがれます。</p>");
+      T("<p><b>草のマスの上で、玉を3つ そろえる</b>と 草が はがれます。</p>") +
+      T("<p>草そのものを 動かすことは できません。<b>草の上に ある玉</b>を そろえるのが コツ。</p>") +
+      T("<p>ロケットや TNT で ふきとばしても はがれます。</p>"));
   } else if (lv.goal === "box") {
-    tipOnce("pz-box", "📦 木箱を こわそう",
+    tipOnce("pz-box", T("📦 木箱を こわそう"),
       '<div class="tip-demo"><i class="pz-bk box big"></i><span class="tip-ar">▶</span><i class="pz-bk box big gone"></i></div>' +
-      "<p><b>箱の となりで 玉を そろえる</b>と こわれます。箱の上では そろえられません。</p>" +
-      "<p>箱は 動かせず、玉も 通りぬけできません。</p>" +
-      "<p><b>石の箱</b>は かたいので <b>2回</b> こわす ひつようが あります。</p>");
+      T("<p><b>箱の となりで 玉を そろえる</b>と こわれます。箱の上では そろえられません。</p>") +
+      T("<p>箱は 動かせず、玉も 通りぬけできません。</p>") +
+      T("<p><b>石の箱</b>は かたいので <b>2回</b> こわす ひつようが あります。</p>"));
   }
 }
 function renderPuzzle() {
@@ -4003,7 +4004,7 @@ function renderPuzzle() {
   el.addEventListener("pointercancel", () => { from = -1; });
 })();
 $("#pzQuit").addEventListener("click", function () {
-  if (pz && !pz.done && !confirm("やめる？（つかった GOLDは もどりません）")) return;
+  if (pz && !pz.done && !confirm(T("やめる？（つかった GOLDは もどりません）"))) return;
   pz = null; renderPuzzle();
 });
 
@@ -4037,14 +4038,14 @@ $("#homeToRecords").addEventListener("click", () => { showView("records"); setAc
 
 /* ============================================================ つかっている素材の 出どころ（魔王魂は 表記が きまり） */
 function creditHTML() {
-  return "<p><b>BGM</b>：魔王魂（https://maou.audio/）<br>" +
-    "魔王魂の素材は 商用利用できますが、<b>クレジット表記が 必要</b>です。この表示を 消さないでください。</p>" +
-    "<p><b>効果音</b>：効果音ラボ（https://soundeffect-lab.info/）<br>" +
-    "商用利用・クレジット表記なしで つかえます（音源ファイルそのものの 再配布は できません）。</p>" +
-    "<p><b>イラスト</b>：生成AIで 作ったものを つかっています。</p>" +
-    '<p><a href="legal.html#tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>　<a href="legal.html#privacy" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="legal.html#terms" target="_blank" rel="noopener">利用規約</a></p>' +
-    "<p><b>問題の内容</b>：出題の形式（桁数・口数）は、公開されている 珠算検定の 出題例を 参考にした <b>このアプリ独自</b>の めやすです。問題は すべて このアプリが その場で 作っています（数字を どこかから 写して いません）。" +
-    "当アプリは 個人が 作った 非公式の 練習アプリで、珠算の 検定を 行う 団体とは 一切 関係ありません。</p>";
+  return T("<p><b>BGM</b>：魔王魂（https://maou.audio/）<br>") +
+    T("魔王魂の素材は 商用利用できますが、<b>クレジット表記が 必要</b>です。この表示を 消さないでください。</p>") +
+    T("<p><b>効果音</b>：効果音ラボ（https://soundeffect-lab.info/）<br>") +
+    T("商用利用・クレジット表記なしで つかえます（音源ファイルそのものの 再配布は できません）。</p>") +
+    T("<p><b>イラスト</b>：生成AIで 作ったものを つかっています。</p>") +
+    T('<p><a href="legal.html#tokushoho" target="_blank" rel="noopener">特定商取引法に基づく表記</a>　<a href="legal.html#privacy" target="_blank" rel="noopener">プライバシーポリシー</a>　<a href="legal.html#terms" target="_blank" rel="noopener">利用規約</a></p>') +
+    T("<p><b>問題の内容</b>：出題の形式（桁数・口数）は、公開されている 珠算検定の 出題例を 参考にした <b>このアプリ独自</b>の めやすです。問題は すべて このアプリが その場で 作っています（数字を どこかから 写して いません）。") +
+    T("当アプリは 個人が 作った 非公式の 練習アプリで、珠算の 検定を 行う 団体とは 一切 関係ありません。</p>");
 }
 
 /* ============================================================ 説明用の そろばんの絵（SVG）
@@ -4081,90 +4082,90 @@ function sbStep(a, b, cap, cols) {
 }
 
 /* ============================================================ はじめての案内（1回だけ 出る） */
-const TIP_OPEN = { t: "👑 そろばんキングダムへ ようこそ！",
-  b: '<ol class="tip-steps"><li><b>そろばん</b>で れんしゅうすると</li><li><b>GOLD</b>（きんか）が たまって</li><li><b>パズル</b>や <b>たいせん</b>で あそべるよ</li></ol>' +
-     '<p>まずは <b>「今日の練習を始める」</b>を おしてみよう。はじめは <b>20級</b>からだよ。</p>' };
-const TIP_PLAY = { t: "🧮 そろばんの つかいかた",
-  b: sbStep(0, 3, "たまを <b>ゆびで なぞる</b>と うごくよ。上に よせると「入る」") +
-     '<p>🔴 <b>あかい点</b>の れつが「一のくらい」。<br>できたら <b>「こたえる」</b>を おそう。まちがえても だいじょうぶ！</p>' };
-const TIP_ROUTINE = { t: "🔥 本日の練習って？",
-  b: '<p>きょうの ぶんを <b>じゅんばんに</b> やる メニューだよ。</p>' +
-     '<ol class="tip-steps"><li>いくつかの セットを とく</li><li>あいだに <b>きゅうけい</b>が 入る（とばしても いい）</li><li>さいごに <b>せいせき はっぴょう</b>！</li></ol>' +
-     '<p>とちゅうで やめても、また はじめから できるよ。</p>' };
-const TIP_RESULT = { t: "🔍 ここが いちばん だいじ",
-  b: '<p>この下に、<b>まちがえた もんだい</b>が 1つずつ、<b>たまの うごき</b>で せつめいされているよ。</p>' +
-     '<p>「どこで まちがえたか」が わかると、つぎは できるようになる。<br>ゆっくり 見てみよう。</p>' };
-const TIP_PUZZLE = { t: "🧩 パズルの あそびかた",
-  b: '<p>となりの たまと <b>入れかえて</b>、おなじ たまを <b>3つ ならべる</b>と きえるよ。</p>' +
-     '<p>1回 あそぶのに <b>GOLD</b>を つかうよ。GOLDは <b>そろばんの れんしゅう</b>で たまる。<br>パズルでは ふえないよ。</p>' };
+const TIP_OPEN = { t: T("👑 そろばんキングダムへ ようこそ！"),
+  b: T('<ol class="tip-steps"><li><b>そろばん</b>で れんしゅうすると</li><li><b>GOLD</b>（きんか）が たまって</li><li><b>パズル</b>や <b>たいせん</b>で あそべるよ</li></ol>') +
+     T('<p>まずは <b>「今日の練習を始める」</b>を おしてみよう。はじめは <b>20級</b>からだよ。</p>') };
+const TIP_PLAY = { t: T("🧮 そろばんの つかいかた"),
+  b: sbStep(0, 3, T("たまを <b>ゆびで なぞる</b>と うごくよ。上に よせると「入る」")) +
+     T('<p>🔴 <b>あかい点</b>の れつが「一のくらい」。<br>できたら <b>「こたえる」</b>を おそう。まちがえても だいじょうぶ！</p>') };
+const TIP_ROUTINE = { t: T("🔥 本日の練習って？"),
+  b: T('<p>きょうの ぶんを <b>じゅんばんに</b> やる メニューだよ。</p>') +
+     T('<ol class="tip-steps"><li>いくつかの セットを とく</li><li>あいだに <b>きゅうけい</b>が 入る（とばしても いい）</li><li>さいごに <b>せいせき はっぴょう</b>！</li></ol>') +
+     T('<p>とちゅうで やめても、また はじめから できるよ。</p>') };
+const TIP_RESULT = { t: T("🔍 ここが いちばん だいじ"),
+  b: T('<p>この下に、<b>まちがえた もんだい</b>が 1つずつ、<b>たまの うごき</b>で せつめいされているよ。</p>') +
+     T('<p>「どこで まちがえたか」が わかると、つぎは できるようになる。<br>ゆっくり 見てみよう。</p>') };
+const TIP_PUZZLE = { t: T("🧩 パズルの あそびかた"),
+  b: T('<p>となりの たまと <b>入れかえて</b>、おなじ たまを <b>3つ ならべる</b>と きえるよ。</p>') +
+     T('<p>1回 あそぶのに <b>GOLD</b>を つかうよ。GOLDは <b>そろばんの れんしゅう</b>で たまる。<br>パズルでは ふえないよ。</p>') };
 function tipFirstOpen() { tipOnce("first-open", TIP_OPEN.t, TIP_OPEN.b, soloIntro); }   // 説明のあと、ソロモンが あらわれる（第1話）
 
 /* ============================================================ 入門級（20〜15級）の 絵つき説明
    級体系の表（curriculum/sk.js の 20〜16級）に決めた 学習の順（5の友 → くり上がりなし → 10の友 → くり上がり）に そって、
    その級を はじめる前に 1回だけ 見せる。 */
 const LESSON_LOW = {
-  20: { t: "20級：たまの いみ",
-    b: '<p><b>一玉（いちだま）</b>は 1。上に よせると 入るよ。<br><b>五玉（ごだま）</b>は 5。下に よせると 入るよ。</p>' +
-       sbStep(0, 3, "1 + 2 ＝ 3　一玉を 1つ、また 2つ 入れる") + sbStep(0, 5, "5 は 五玉 1つ") +
-       '<p class="un-note">本物の そろばんを つかうときは、<b>おやゆび</b>で 一玉を 上げ、<b>ひとさしゆび</b>で 下げます。' +
-       'くわしくは 上の 📖「そろばんの きほん」を 見てね。</p>' +
-       '<p>こたえが <b>5まで</b>の もんだいを やってみよう！</p>' },
-  19: { t: "19級：5の友（とも）",
-    b: '<p>一玉が たりないときは、<b>五玉を 入れて</b> あまりを <b>はらう</b>よ。</p>' +
-       '<p class="ls-key"><b>5の友</b>：1と4 ／ 2と3</p>' +
-       sbStep(3, 7, "3 + 4：一玉が たりない → 五玉を 入れて、4の友の <b>1</b>を はらう") +
-       '<p>こたえが <b>9まで</b>。くり上がりは まだ ないよ。</p>' },
-  18: { t: "18級：五玉を つかう",
-    b: '<p>6・7・8・9 は <b>五玉 ＋ 一玉</b>だよ。</p>' +
-       sbStep(6, 9, "6 + 3 ＝ 9　一玉を 3つ 入れる") + sbStep(4, 8, "4 + 4：一玉が たりない → 五玉を 入れて 1を はらう") +
-       '<p>こたえが <b>6〜10</b>の もんだいだよ。</p>' },
-  17: { t: "17級：くり上がり（10の友）",
-    b: '<p>9より 大きくなるときは、<b>となりの くらいに 1</b>を 入れて、<b>10の友</b>を はらうよ。</p>' +
-       '<p class="ls-key"><b>10の友</b>：1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>' +
-       sbStep(8, 13, "8 + 5：十のくらいに 1 を 入れて、5の友の <b>5</b>を はらう → 13") +
-       '<p>こたえが <b>11〜18</b>の もんだいだよ。</p>' },
-  16: { t: "16級：3つの かず",
-    b: '<p>かずが <b>3つ</b>に なるよ。<b>じゅんばんに</b> たしていこう。</p>' +
-       sbStep(2, 5, "2 + 3 ＝ 5") + sbStep(5, 9, "つづけて + 4 ＝ 9") +
-       '<p>くり上がりは ないよ。1つずつ たしかめながら 進もう。</p>' },
-  15: { t: "15級：3つの かず と くり上がり",
-    b: '<p>3つの かずで、<b>くり上がり</b>も 出てくるよ。</p>' +
-       sbStep(7, 11, "7 + 4：十のくらいに 1、6を はらう → 11") + sbStep(11, 18, "つづけて + 7 ＝ 18") +
-       '<p>あわてなくて いいよ。1つずつ たしかめよう。</p>' },
-  14: { t: "14級：5の友で ひく",
-    b: '<p>ひき算も 同じ。一玉が <b>たりないとき</b>は、<b>五玉を はらって</b> 友の かずを <b>入れる</b>よ。</p>' +
-       '<p class="ls-key"><b>5の友</b>：1と4 ／ 2と3</p>' +
-       sbStep(7, 4, "7 − 3：一玉が たりない → 五玉を はらって、3の友の <b>2</b>を 入れる") +
-       sbStep(6, 2, "6 − 4：五玉を はらって、4の友の <b>1</b>を 入れる") },
-  13: { t: "13級：くり下がり（10の友で ひく）",
-    b: '<p>ひけないときは、<b>十のくらいから 1 を はらって</b>、<b>10の友</b>を 入れるよ。</p>' +
-       '<p class="ls-key"><b>10の友</b>：1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>' +
-       sbStep(13, 7, "13 − 6：十のくらいの 1 を はらって、6の友の <b>4</b>を 入れる → 7") +
-       sbStep(15, 8, "15 − 7：十のくらいの 1 を はらって、7の友の <b>3</b>を 入れる → 8") },
-  12: { t: "12級：たしたり ひいたり",
-    b: '<p>3つの かずを、<b>上から じゅんばんに</b>。たし算と ひき算が まざっても、1つずつ やれば だいじょうぶ。</p>' +
-       sbStep(9, 13, "9 + 4 ＝ 13（くり上がり）") + sbStep(13, 8, "つづけて − 5 ＝ 8（五玉を はらう）") },
-  11: { t: "11級：はやく、せいかくに",
-    b: '<p>やり方は もう ぜんぶ 知っているよ。ここからは <b>手を 止めない</b>れんしゅう。</p>' +
-       '<ul><li>かずを 見たら <b>すぐ</b> 玉を 動かす</li><li>まよったら 🔴 <b>一のくらい</b>を 見る</li><li>まちがえても <b>ご破算（0にする）</b>で やり直せる</li></ul>' +
-       sbStep(6, 14, "6 + 8 ＝ 14") + sbStep(14, 5, "つづけて − 9 ＝ 5") },
-  10: { t: "10級：2けたの かず",
-    b: '<p>2けたに なっても 同じ。<b>左（十のくらい）から</b> 入れていくよ。</p>' +
-       sbStep(23, 68, "23 + 45：十のくらい 2+4、一のくらい 3+5 → 68") +
-       sbStep(47, 85, "47 + 38：十のくらい 4+3=7、一のくらい 7+8 は くり上がり → 十に 1、8の友 2を はらう → 85") +
-       '<p>かずが 5つ つづくよ。<b>1つ たすごとに</b> そろばんを 見て たしかめよう。</p>' },
+  20: { t: T("20級：たまの いみ"),
+    b: T('<p><b>一玉（いちだま）</b>は 1。上に よせると 入るよ。<br><b>五玉（ごだま）</b>は 5。下に よせると 入るよ。</p>') +
+       sbStep(0, 3, T("1 + 2 ＝ 3　一玉を 1つ、また 2つ 入れる")) + sbStep(0, 5, T("5 は 五玉 1つ")) +
+       T('<p class="un-note">本物の そろばんを つかうときは、<b>おやゆび</b>で 一玉を 上げ、<b>ひとさしゆび</b>で 下げます。') +
+       T('くわしくは 上の 📖「そろばんの きほん」を 見てね。</p>') +
+       T('<p>こたえが <b>5まで</b>の もんだいを やってみよう！</p>') },
+  19: { t: T("19級：5の友（とも）"),
+    b: T('<p>一玉が たりないときは、<b>五玉を 入れて</b> あまりを <b>はらう</b>よ。</p>') +
+       T('<p class="ls-key"><b>5の友</b>：1と4 ／ 2と3</p>') +
+       sbStep(3, 7, T("3 + 4：一玉が たりない → 五玉を 入れて、4の友の <b>1</b>を はらう")) +
+       T('<p>こたえが <b>9まで</b>。くり上がりは まだ ないよ。</p>') },
+  18: { t: T("18級：五玉を つかう"),
+    b: T('<p>6・7・8・9 は <b>五玉 ＋ 一玉</b>だよ。</p>') +
+       sbStep(6, 9, T("6 + 3 ＝ 9　一玉を 3つ 入れる")) + sbStep(4, 8, T("4 + 4：一玉が たりない → 五玉を 入れて 1を はらう")) +
+       T('<p>こたえが <b>6〜10</b>の もんだいだよ。</p>') },
+  17: { t: T("17級：くり上がり（10の友）"),
+    b: T('<p>9より 大きくなるときは、<b>となりの くらいに 1</b>を 入れて、<b>10の友</b>を はらうよ。</p>') +
+       T('<p class="ls-key"><b>10の友</b>：1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>') +
+       sbStep(8, 13, T("8 + 5：十のくらいに 1 を 入れて、5の友の <b>5</b>を はらう → 13")) +
+       T('<p>こたえが <b>11〜18</b>の もんだいだよ。</p>') },
+  16: { t: T("16級：3つの かず"),
+    b: T('<p>かずが <b>3つ</b>に なるよ。<b>じゅんばんに</b> たしていこう。</p>') +
+       sbStep(2, 5, T("2 + 3 ＝ 5")) + sbStep(5, 9, T("つづけて + 4 ＝ 9")) +
+       T('<p>くり上がりは ないよ。1つずつ たしかめながら 進もう。</p>') },
+  15: { t: T("15級：3つの かず と くり上がり"),
+    b: T('<p>3つの かずで、<b>くり上がり</b>も 出てくるよ。</p>') +
+       sbStep(7, 11, T("7 + 4：十のくらいに 1、6を はらう → 11")) + sbStep(11, 18, T("つづけて + 7 ＝ 18")) +
+       T('<p>あわてなくて いいよ。1つずつ たしかめよう。</p>') },
+  14: { t: T("14級：5の友で ひく"),
+    b: T('<p>ひき算も 同じ。一玉が <b>たりないとき</b>は、<b>五玉を はらって</b> 友の かずを <b>入れる</b>よ。</p>') +
+       T('<p class="ls-key"><b>5の友</b>：1と4 ／ 2と3</p>') +
+       sbStep(7, 4, T("7 − 3：一玉が たりない → 五玉を はらって、3の友の <b>2</b>を 入れる")) +
+       sbStep(6, 2, T("6 − 4：五玉を はらって、4の友の <b>1</b>を 入れる")) },
+  13: { t: T("13級：くり下がり（10の友で ひく）"),
+    b: T('<p>ひけないときは、<b>十のくらいから 1 を はらって</b>、<b>10の友</b>を 入れるよ。</p>') +
+       T('<p class="ls-key"><b>10の友</b>：1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>') +
+       sbStep(13, 7, T("13 − 6：十のくらいの 1 を はらって、6の友の <b>4</b>を 入れる → 7")) +
+       sbStep(15, 8, T("15 − 7：十のくらいの 1 を はらって、7の友の <b>3</b>を 入れる → 8")) },
+  12: { t: T("12級：たしたり ひいたり"),
+    b: T('<p>3つの かずを、<b>上から じゅんばんに</b>。たし算と ひき算が まざっても、1つずつ やれば だいじょうぶ。</p>') +
+       sbStep(9, 13, T("9 + 4 ＝ 13（くり上がり）")) + sbStep(13, 8, T("つづけて − 5 ＝ 8（五玉を はらう）")) },
+  11: { t: T("11級：はやく、せいかくに"),
+    b: T('<p>やり方は もう ぜんぶ 知っているよ。ここからは <b>手を 止めない</b>れんしゅう。</p>') +
+       T('<ul><li>かずを 見たら <b>すぐ</b> 玉を 動かす</li><li>まよったら 🔴 <b>一のくらい</b>を 見る</li><li>まちがえても <b>ご破算（0にする）</b>で やり直せる</li></ul>') +
+       sbStep(6, 14, T("6 + 8 ＝ 14")) + sbStep(14, 5, T("つづけて − 9 ＝ 5")) },
+  10: { t: T("10級：2けたの かず"),
+    b: T('<p>2けたに なっても 同じ。<b>左（十のくらい）から</b> 入れていくよ。</p>') +
+       sbStep(23, 68, T("23 + 45：十のくらい 2+4、一のくらい 3+5 → 68")) +
+       sbStep(47, 85, T("47 + 38：十のくらい 4+3=7、一のくらい 7+8 は くり上がり → 十に 1、8の友 2を はらう → 85")) +
+       T('<p>かずが 5つ つづくよ。<b>1つ たすごとに</b> そろばんを 見て たしかめよう。</p>') },
 };
 // かけ算（9級から）・わり算（7級から）の はじめての説明
-const LESSON_KAKE = { t: "9級：かけ算の やりかた",
-  b: '<p>かけ算は <b>九九を 1つずつ</b> そろばんに たしていくよ。</p>' +
-     '<p class="ls-key">23 × 4 → <b>20×4</b> と <b>3×4</b> に わける</p>' +
-     sbStep(0, 80, "まず 20 × 4 ＝ 80 を 入れる", 3) + sbStep(80, 92, "つぎに 3 × 4 ＝ 12 を たす → 92", 3) +
-     '<p>コツ：九九の答えが 1けたのときは「<b>0</b>6」のように 0を つけて、<b>2けたぶんの 場所</b>に 入れる。</p>' };
-const LESSON_WARI = { t: "7級：わり算の やりかた",
-  b: '<p>わり算は <b>大きい くらいから</b>「いくつ 入るか」を 考えるよ。</p>' +
-     '<p class="ls-key">84 ÷ 4 → 十のくらいの <b>8</b> から</p>' +
-     sbStep(84, 21, "8 に 4 は 2つ → 十のくらいに <b>2</b>。のこりの 4 に 4 は 1つ → 一のくらいに <b>1</b>。こたえ 21") +
-     '<p>コツ：入る数を 大きく とりすぎたら、1つ もどして やり直す。<b>あまり</b>は 出ないように 作ってあるよ。</p>' };
+const LESSON_KAKE = { t: T("9級：かけ算の やりかた"),
+  b: T('<p>かけ算は <b>九九を 1つずつ</b> そろばんに たしていくよ。</p>') +
+     T('<p class="ls-key">23 × 4 → <b>20×4</b> と <b>3×4</b> に わける</p>') +
+     sbStep(0, 80, T("まず 20 × 4 ＝ 80 を 入れる"), 3) + sbStep(80, 92, T("つぎに 3 × 4 ＝ 12 を たす → 92"), 3) +
+     T('<p>コツ：九九の答えが 1けたのときは「<b>0</b>6」のように 0を つけて、<b>2けたぶんの 場所</b>に 入れる。</p>') };
+const LESSON_WARI = { t: T("7級：わり算の やりかた"),
+  b: T('<p>わり算は <b>大きい くらいから</b>「いくつ 入るか」を 考えるよ。</p>') +
+     T('<p class="ls-key">84 ÷ 4 → 十のくらいの <b>8</b> から</p>') +
+     sbStep(84, 21, T("8 に 4 は 2つ → 十のくらいに <b>2</b>。のこりの 4 に 4 は 1つ → 一のくらいに <b>1</b>。こたえ 21")) +
+     T('<p>コツ：入る数を 大きく とりすぎたら、1つ もどして やり直す。<b>あまり</b>は 出ないように 作ってあるよ。</p>') };
 function lessonFor(g, subj) {
   if (!g || g.band !== "kyu") return null;
   if (subj === "kake" && g.kyu === 9) return LESSON_KAKE;
@@ -4188,28 +4189,28 @@ function renderLesson() {
   const box = $("#lessonBody"); if (!box) return;
   const sec = (open, title, body) => "<details" + (open ? " open" : "") + "><summary>" + title + '</summary><div class="lesson-body">' + body + "</div></details>";
   box.innerHTML =
-    sec(true, "① たまの なまえ",
-      '<p><b>一玉（いちだま）</b>＝1。上に よせると 入る。<br><b>五玉（ごだま）</b>＝5。下に よせると 入る。<br>' +
-      'まん中の 黒い ぼうが <b>はり</b>。🔴 あかい点の れつが <b>一のくらい</b>。</p>' +
-      '<div class="sb-pair">' + sbSVG(0) + '<span class="sb-ar">→</span>' + sbSVG(7, 0) + '</div><div class="sb-cap">7 ＝ 五玉 1つ ＋ 一玉 2つ</div>') +
-    sec(true, "② ゆびの つかいかた（運指）", unshiHTML(true)) +
-    sec(false, "③ 5の友（とも）",
-      '<p>一玉が たりないときは、<b>五玉を 入れて</b> 友の かずを <b>はらう</b>。</p><p class="ls-key">1と4 ／ 2と3</p>' +
-      sbStep(3, 7, "3 + 4 → 五玉を 入れて 1を はらう") + sbStep(7, 4, "7 − 3 → 五玉を はらって 2を 入れる（ひき算は ぎゃく）")) +
-    sec(false, "④ 10の友（くり上がり・くり下がり）",
-      '<p>10を こえるときは、<b>となりの くらいに 1</b>を 入れて、10の友を はらう。</p><p class="ls-key">1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>' +
-      sbStep(8, 13, "8 + 5 → 十のくらいに 1、5を はらう") + sbStep(13, 7, "13 − 6 → 十のくらいの 1を はらって、4を 入れる")) +
-    sec(false, "⑤ かけ算（9級から）", LESSON_KAKE.b) +
-    sec(false, "⑥ わり算（7級から）", LESSON_WARI.b) +
-    sec(false, "⑦ けんていの きまり（めやす）",
-      '<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>' +
-      '暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>' +
-      '<p class="sub">公開されている 珠算検定の 出題例を 参考にした、このアプリ独自の めやすです。よその 検定とは 関係ありません。</p>') +
+    sec(true, T("① たまの なまえ"),
+      T('<p><b>一玉（いちだま）</b>＝1。上に よせると 入る。<br><b>五玉（ごだま）</b>＝5。下に よせると 入る。<br>') +
+      T('まん中の 黒い ぼうが <b>はり</b>。🔴 あかい点の れつが <b>一のくらい</b>。</p>') +
+      '<div class="sb-pair">' + sbSVG(0) + '<span class="sb-ar">→</span>' + sbSVG(7, 0) + T('</div><div class="sb-cap">7 ＝ 五玉 1つ ＋ 一玉 2つ</div>')) +
+    sec(true, T("② ゆびの つかいかた（運指）"), unshiHTML(true)) +
+    sec(false, T("③ 5の友（とも）"),
+      T('<p>一玉が たりないときは、<b>五玉を 入れて</b> 友の かずを <b>はらう</b>。</p><p class="ls-key">1と4 ／ 2と3</p>') +
+      sbStep(3, 7, T("3 + 4 → 五玉を 入れて 1を はらう")) + sbStep(7, 4, T("7 − 3 → 五玉を はらって 2を 入れる（ひき算は ぎゃく）"))) +
+    sec(false, T("④ 10の友（くり上がり・くり下がり）"),
+      T('<p>10を こえるときは、<b>となりの くらいに 1</b>を 入れて、10の友を はらう。</p><p class="ls-key">1と9 ／ 2と8 ／ 3と7 ／ 4と6 ／ 5と5</p>') +
+      sbStep(8, 13, T("8 + 5 → 十のくらいに 1、5を はらう")) + sbStep(13, 7, T("13 − 6 → 十のくらいの 1を はらって、4を 入れる"))) +
+    sec(false, T("⑤ かけ算（9級から）"), LESSON_KAKE.b) +
+    sec(false, T("⑥ わり算（7級から）"), LESSON_WARI.b) +
+    sec(false, T("⑦ けんていの きまり（めやす）"),
+      T('<p>珠算（そろばん）：1しゅもく 15もん・7分・150点まん点で <b>100点いじょう</b> ごうかく。<br>') +
+      T('暗算：20もん・3分・100点まん点で <b>70点いじょう</b>。<br>フラッシュ暗算：20もん・200点まん点で <b>140点いじょう</b>。</p>') +
+      T('<p class="sub">公開されている 珠算検定の 出題例を 参考にした、このアプリ独自の めやすです。よその 検定とは 関係ありません。</p>')) +
     // おうちの人・先生が じっくり 読める、印刷しやすい 解説ページ（検索からも 来られる）
-    '<div class="lesson-links"><b>くわしい解説（べつのページ）</b>' +
-    '<a href="soroban-yubi.html">✋ 指づかい（運指）</a>' +
-    '<a href="soroban-tomo.html">🖐 5の友・10の友</a>' +
-    '<a href="soroban-kyu.html">📘 級のレベルの めやす</a></div>';
+    T('<div class="lesson-links"><b>くわしい解説（べつのページ）</b>') +
+    T('<a href="soroban-yubi.html">✋ 指づかい（運指）</a>') +
+    T('<a href="soroban-tomo.html">🖐 5の友・10の友</a>') +
+    T('<a href="soroban-kyu.html">📘 級のレベルの めやす</a></div>');
 }
 
 
@@ -4219,7 +4220,7 @@ function renderLesson() {
      ② 1珠を 下げる            … ひとさしゆび（赤）
      ③ 5珠（上の1つ）を 動かす  … ひとさしゆび（赤・上げも下げも）
    1桁ぶんの そろばんを 描き、動く珠の よこに「どの指で・どっち向きか」の 矢印を つける。 */
-const FINGER = { thumb: { n: "おやゆび", c: "#2b6fd0", em: "👍" }, index: { n: "ひとさしゆび", c: "#c0392b", em: "☝" } };
+const FINGER = { thumb: { n: T("おやゆび"), c: "#2b6fd0", em: "👍" }, index: { n: T("ひとさしゆび"), c: "#c0392b", em: "☝" } };
 // 1桁ぶん：before → after で 動く珠と つかう指
 function unshiColMoves(before, after) {
   const hb = before >= 5, ha = after >= 5, eb = before % 5, ea = after % 5, out = [];
@@ -4277,61 +4278,61 @@ function unshiStep(before, after, cap, cols, note) {
   const tags = Array.from(new Set(flat.map((m) => m.finger))).map((f) =>
     '<span class="un-tag" style="background:' + FINGER[f].c + '">' + FINGER[f].em + " " + FINGER[f].n + "</span>").join("");
   return '<div class="un-step"><div class="un-pair">' + unshiSVG(before, byCol, cols) + '<span class="un-ar">→</span>' + unshiSVG(after, null, cols) + "</div>" +
-    '<div class="un-tags">' + tags + (flat.length > 1 ? '<span class="un-both">同時に！</span>' : "") + "</div>" +
+    '<div class="un-tags">' + tags + (flat.length > 1 ? T('<span class="un-both">同時に！</span>') : "") + "</div>" +
     '<div class="un-cap">' + cap + "</div>" + (note ? '<div class="un-why">' + note + "</div>" : "") + "</div>";
 }
 /* 運指の説明。本物の そろばんを つかうときの ゆびの動かし方 */
 function unshiHTML(full) {
-  let o = '<p class="un-lead">どんな 習いごとにも <b>「型（かた）」</b>が あります。' +
-    'そろばんの 型は、まさに この <b>指づかい</b>です。</p>' +
-    '<p class="un-lead">そろばんは <b>かぎられた時間で、速く 正確に</b> はじくもの。' +
-    'そのために <b>むだな 動きを しない</b> きれいな 指づかいが 必要です。' +
-    'つかうのは <b>右手の おやゆび と ひとさしゆび の 2本だけ</b>。</p>' +
-    '<p class="un-h">指づかいの ルールは 3つだけ</p>' +
-    '<div class="un-rule"><span class="un-no">①</span><span class="un-tag" style="background:' + FINGER.thumb.c + '">👍 おやゆび</span>' +
-    '<span class="un-txt"><b>1珠</b>（下の4つの珠）を <b>上げる</b>とき</span></div>' +
-    unshiStep(0, 3, "3 を 入れる … <b>おやゆび</b>で 下から 上へ") +
-    '<div class="un-rule"><span class="un-no">②</span><span class="un-tag" style="background:' + FINGER.index.c + '">☝ ひとさしゆび</span>' +
-    '<span class="un-txt"><b>1珠</b>を <b>下げる</b>とき</span></div>' +
-    unshiStep(3, 0, "3 を はらう … <b>ひとさしゆび</b>で 上から 下へ") +
-    '<div class="un-rule"><span class="un-no">③</span><span class="un-tag" style="background:' + FINGER.index.c + '">☝ ひとさしゆび</span>' +
-    '<span class="un-txt"><b>5珠</b>（上の1つの珠）を <b>動かす</b>とき（上げるのも 下げるのも）</span></div>' +
-    unshiStep(0, 5, "5 を 入れる … <b>ひとさしゆび</b>で 下げる") +
-    unshiStep(5, 0, "5 を はらう … <b>ひとさしゆび</b>で 上げる");
+  let o = T('<p class="un-lead">どんな 習いごとにも <b>「型（かた）」</b>が あります。') +
+    T('そろばんの 型は、まさに この <b>指づかい</b>です。</p>') +
+    T('<p class="un-lead">そろばんは <b>かぎられた時間で、速く 正確に</b> はじくもの。') +
+    T('そのために <b>むだな 動きを しない</b> きれいな 指づかいが 必要です。') +
+    T('つかうのは <b>右手の おやゆび と ひとさしゆび の 2本だけ</b>。</p>') +
+    T('<p class="un-h">指づかいの ルールは 3つだけ</p>') +
+    '<div class="un-rule"><span class="un-no">①</span><span class="un-tag" style="background:' + FINGER.thumb.c + T('">👍 おやゆび</span>') +
+    T('<span class="un-txt"><b>1珠</b>（下の4つの珠）を <b>上げる</b>とき</span></div>') +
+    unshiStep(0, 3, T("3 を 入れる … <b>おやゆび</b>で 下から 上へ")) +
+    '<div class="un-rule"><span class="un-no">②</span><span class="un-tag" style="background:' + FINGER.index.c + T('">☝ ひとさしゆび</span>') +
+    T('<span class="un-txt"><b>1珠</b>を <b>下げる</b>とき</span></div>') +
+    unshiStep(3, 0, T("3 を はらう … <b>ひとさしゆび</b>で 上から 下へ")) +
+    '<div class="un-rule"><span class="un-no">③</span><span class="un-tag" style="background:' + FINGER.index.c + T('">☝ ひとさしゆび</span>') +
+    T('<span class="un-txt"><b>5珠</b>（上の1つの珠）を <b>動かす</b>とき（上げるのも 下げるのも）</span></div>') +
+    unshiStep(0, 5, T("5 を 入れる … <b>ひとさしゆび</b>で 下げる")) +
+    unshiStep(5, 0, T("5 を はらう … <b>ひとさしゆび</b>で 上げる"));
   if (full) {
-    o += '<p class="un-h">なぜ この ルールなのか</p>' +
-      '<p class="un-lead">ルールには <b>ちゃんと 理由</b>が あります。やってみると わかります。</p>' +
-      '<p class="un-ex">れい ①　<b>3 ＋ 2</b>　（5をたして、3をひく）</p>' +
-      unshiStep(3, 5, "5珠を 下げる と 1珠を 下げる。<b>どちらも ひとさしゆび</b>",
-        1, "ひとさしゆびを <b>上から下へ 1回 すべらせる</b>だけで おわります。<br>" +
-        "もし 3を <b>おやゆび</b>で ひこうとすると、指を もちかえる ぶん 手間と 時間が かかります。") +
-      '<p class="un-ex">れい ②　<b>1 ＋ 9</b>　（1をひいて、10をたす）</p>' +
-      unshiStep(1, 10, "1珠を 下げる（ひとさしゆび）と、となりに 10を 入れる（おやゆび）",
-        2, "<b>ひとさしゆびで 1を 下げながら、同時に おやゆびで 10を たせます。</b><br>" +
-        "もし 1を <b>おやゆび</b>で ひくと、ひき終わるまで 10を たせません。<br>" +
-        "ぎゃくに 1を おやゆび・10を ひとさしゆび に すると、<b>指が 交差して</b> もっと 手間で、つぎの 動きも おそくなります。") +
-      '<p class="un-note">桁の多い 問題を はじくように なると よく わかります。このルールで 動かすと、指が とても なめらかで むだが 少ないのです。' +
-      '<br><b>この 基礎を ばかにせず、しっかり 身につけたか どうかで、そのあとの のびが 確実に 変わります。</b></p>' +
-      '<p class="un-h">はじめる まえの かまえ</p>' +
-      '<ul class="un-list"><li>そろばんは <b>体の まん中</b>に、まっすぐ おく</li>' +
-      '<li><b>左手</b>で そろばんの 左はしを おさえる（ずれない ように）</li>' +
-      '<li>えんぴつは <b>くすりゆび と こゆび</b>で はさんで もつ。おやゆびと ひとさしゆびが 自由に なり、はじきながら 書ける</li>' +
-      '<li>珠は 指の <b>つめの ちかく</b>で、かるく はじく</li></ul>' +
-      '<p class="un-h">ご破算（ごわさん）＝ 0に もどす</p>' +
-      '<ul class="un-list"><li><b>ひとさしゆび</b>を 梁（はり）の 上に あてて、左から右へ すべらせる → 5珠が ぜんぶ 上がる</li>' +
-      '<li>つづけて <b>おやゆび</b>を 梁の 下に あてて、左から右へ すべらせる → 1珠が ぜんぶ 下がる</li>' +
-      '<li>なれてきたら、2本の 指で <b>はさむように</b> 一回で すべらせる</li></ul>' +
-      '<p class="un-note">かなりの 有段者に なると「1珠は おやゆびだけ、5珠は ひとさしゆびだけ」という 人も いますが、' +
-      '<b>基本は 上の 3つ</b>です。<br><br>' +
-      'このアプリの 画面の そろばんは、ゆびで <b>なぞる</b>だけで うごきます。' +
-      'でも <b>本物の そろばん</b>を つかうときは、上の 指づかいに してください。' +
-      '「級・段を選ぶ」で <b>「じぶんの そろばんを つかう」</b>に すると、本物で れんしゅうできます。</p>';
+    o += T('<p class="un-h">なぜ この ルールなのか</p>') +
+      T('<p class="un-lead">ルールには <b>ちゃんと 理由</b>が あります。やってみると わかります。</p>') +
+      T('<p class="un-ex">れい ①　<b>3 ＋ 2</b>　（5をたして、3をひく）</p>') +
+      unshiStep(3, 5, T("5珠を 下げる と 1珠を 下げる。<b>どちらも ひとさしゆび</b>"),
+        1, T("ひとさしゆびを <b>上から下へ 1回 すべらせる</b>だけで おわります。<br>") +
+        T("もし 3を <b>おやゆび</b>で ひこうとすると、指を もちかえる ぶん 手間と 時間が かかります。")) +
+      T('<p class="un-ex">れい ②　<b>1 ＋ 9</b>　（1をひいて、10をたす）</p>') +
+      unshiStep(1, 10, T("1珠を 下げる（ひとさしゆび）と、となりに 10を 入れる（おやゆび）"),
+        2, T("<b>ひとさしゆびで 1を 下げながら、同時に おやゆびで 10を たせます。</b><br>") +
+        T("もし 1を <b>おやゆび</b>で ひくと、ひき終わるまで 10を たせません。<br>") +
+        T("ぎゃくに 1を おやゆび・10を ひとさしゆび に すると、<b>指が 交差して</b> もっと 手間で、つぎの 動きも おそくなります。")) +
+      T('<p class="un-note">桁の多い 問題を はじくように なると よく わかります。このルールで 動かすと、指が とても なめらかで むだが 少ないのです。') +
+      T('<br><b>この 基礎を ばかにせず、しっかり 身につけたか どうかで、そのあとの のびが 確実に 変わります。</b></p>') +
+      T('<p class="un-h">はじめる まえの かまえ</p>') +
+      T('<ul class="un-list"><li>そろばんは <b>体の まん中</b>に、まっすぐ おく</li>') +
+      T('<li><b>左手</b>で そろばんの 左はしを おさえる（ずれない ように）</li>') +
+      T('<li>えんぴつは <b>くすりゆび と こゆび</b>で はさんで もつ。おやゆびと ひとさしゆびが 自由に なり、はじきながら 書ける</li>') +
+      T('<li>珠は 指の <b>つめの ちかく</b>で、かるく はじく</li></ul>') +
+      T('<p class="un-h">ご破算（ごわさん）＝ 0に もどす</p>') +
+      T('<ul class="un-list"><li><b>ひとさしゆび</b>を 梁（はり）の 上に あてて、左から右へ すべらせる → 5珠が ぜんぶ 上がる</li>') +
+      T('<li>つづけて <b>おやゆび</b>を 梁の 下に あてて、左から右へ すべらせる → 1珠が ぜんぶ 下がる</li>') +
+      T('<li>なれてきたら、2本の 指で <b>はさむように</b> 一回で すべらせる</li></ul>') +
+      T('<p class="un-note">かなりの 有段者に なると「1珠は おやゆびだけ、5珠は ひとさしゆびだけ」という 人も いますが、') +
+      T('<b>基本は 上の 3つ</b>です。<br><br>') +
+      T('このアプリの 画面の そろばんは、ゆびで <b>なぞる</b>だけで うごきます。') +
+      T('でも <b>本物の そろばん</b>を つかうときは、上の 指づかいに してください。') +
+      T('「級・段を選ぶ」で <b>「じぶんの そろばんを つかう」</b>に すると、本物で れんしゅうできます。</p>');
   }
   return o;
 }
-const TIP_FINGER = { t: "✋ 指づかいが そろばんの「型」", b: unshiHTML(false) +
-  '<p class="un-note">なぜ この ルールなのか、かまえ、ご破算の しかたは' +
-  '<b>「そろばんの きほん」</b>（上の 📖 ボタン）で 見られます。</p>' };
+const TIP_FINGER = { t: T("✋ 指づかいが そろばんの「型」"), b: unshiHTML(false) +
+  T('<p class="un-note">なぜ この ルールなのか、かまえ、ご破算の しかたは') +
+  T('<b>「そろばんの きほん」</b>（上の 📖 ボタン）で 見られます。</p>') };
 
 
 /* ============================================================ 印刷プリント（宿題用紙）
@@ -4381,7 +4382,7 @@ function sheetLineHTML(list) {
 /* 解答（先生・おうちの人用） */
 function sheetAnswerHTML(pages) {
   return pages.map((pg, pi) =>
-    '<div class="sh-akey"><b>' + (pages.length > 1 ? (pi + 1) + "枚目の " : "") + "こたえ</b>" +
+    '<div class="sh-akey"><b>' + (pages.length > 1 ? (pi + 1) + T("枚目の ") : "") + T("こたえ</b>") +
     pg.map((p, i) => '<span class="sh-akey-i">' + (i + 1) + ". <b>" + p.answer.toLocaleString() + "</b></span>").join("") + "</div>"
   ).join("");
 }
@@ -4409,12 +4410,12 @@ function sheetUpdateSubj() {
     if (ok) ss.value = ok.value;
   }
   const note = $("#sheetNote");
-  if (note) note.textContent = difficulty(g, ss.value) ? g.key + "／" + SUBJECT[ss.value].name + "：" + String(specText(g, ss.value)).replace(/<[^>]*>/g, "") : "";
+  if (note) note.textContent = difficulty(g, ss.value) ? g.key + T("／") + SUBJECT[ss.value].name + T("：") + String(specText(g, ss.value)).replace(/<[^>]*>/g, "") : "";
 }
 function sheetBuild() {
   const g = GRADES[+$("#sheetGrade").value], subj = $("#sheetSubj").value;
   const n = +$("#sheetN").value, pages = +$("#sheetPages").value;
-  if (!difficulty(g, subj)) { $("#sheetMsg").textContent = "この級には この種目が ありません"; return; }
+  if (!difficulty(g, subj)) { $("#sheetMsg").textContent = T("この級には この種目が ありません"); return; }
   sheetSave({ subj, n, pages });
   const p = profile();
   const list = [];
@@ -4424,16 +4425,16 @@ function sheetBuild() {
   $("#sheetOut").innerHTML = list.map((pg, pi) =>
     '<section class="sh-page">' +
     '<div class="sh-head"><div class="sh-title">' + g.key + "　" + SUBJECT[subj].name +
-    (list.length > 1 ? '<small>（' + (pi + 1) + " / " + list.length + "枚）</small>" : "") + "</div>" +
-    '<div class="sh-fields"><span>なまえ<i></i></span><span>日づけ<i></i></span><span>タイム<i></i></span><span>とくてん<i></i></span></div></div>' +
+    (list.length > 1 ? T('<small>（') + (pi + 1) + " / " + list.length + T("枚）</small>") : "") + "</div>" +
+    T('<div class="sh-fields"><span>なまえ<i></i></span><span>日づけ<i></i></span><span>タイム<i></i></span><span>とくてん<i></i></span></div></div>') +
     (line ? sheetLineHTML(pg) : sheetMitoriHTML(pg)) +
-    '<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>').join("") +
+    T('<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>')).join("") +
     '<section class="sh-page sh-akey-page"><div class="sh-head"><div class="sh-title">' + g.key + "　" + SUBJECT[subj].name +
-    '　こたえ<small>（おうちの人・先生用）</small></div></div>' + sheetAnswerHTML(list) +
-    '<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>';
+    T('　こたえ<small>（おうちの人・先生用）</small></div></div>') + sheetAnswerHTML(list) +
+    T('<div class="sh-foot">そろばんキングダム　sorobankingdom.com</div></section>');
   $("#sheetOut").classList.remove("hidden");
   $("#sheetPrint").classList.remove("hidden");
-  $("#sheetMsg").textContent = "できました！ 下に 出ています。「印刷する」で 紙に 出せます。";
+  $("#sheetMsg").textContent = T("できました！ 下に 出ています。「印刷する」で 紙に 出せます。");
   $("#sheetOut").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 function sheetPrint() {
@@ -4477,12 +4478,12 @@ function examUpdateSpec() {
   const g = GRADES[+$("#exGrade").value], track = $("#exTrack").value;
   const steps = examSteps(g, track), box = $("#exSpec");
   if (!g || !box) return;
-  if (!steps.length) { box.innerHTML = '<p class="sub">この級には この検定が ありません。</p>'; $("#exGo").disabled = true; return; }
+  if (!steps.length) { box.innerHTML = T('<p class="sub">この級には この検定が ありません。</p>'); $("#exGo").disabled = true; return; }
   $("#exGo").disabled = false;
-  box.innerHTML = '<table class="rec-table ex-table"><tr><th>しゅもく</th><th>もんだい</th><th>時間</th><th>ごうかく点</th></tr>' +
-    steps.map((s) => "<tr><td>" + s.cf.name + "</td><td>" + s.cf.N + "問</td><td>" + Math.round(s.cf.limit / 60) + "分</td><td>" + s.cf.pass + "点／" + (s.cf.N * s.cf.per) + "点</td></tr>").join("") +
-    '</table><p class="sub">' + (steps.length > 1 ? "ぜんぶの しゅもくで ごうかく点を とると " : "") + g.key + " " + EXAM_TRACKS[track].name + " 合格。" +
-    (steps.length > 1 ? "しゅもくの あいだに 30秒の 休けいが あります。" : "") + "</p>";
+  box.innerHTML = T('<table class="rec-table ex-table"><tr><th>しゅもく</th><th>もんだい</th><th>時間</th><th>ごうかく点</th></tr>') +
+    steps.map((s) => "<tr><td>" + s.cf.name + "</td><td>" + s.cf.N + T("問</td><td>") + Math.round(s.cf.limit / 60) + T("分</td><td>") + s.cf.pass + T("点／") + (s.cf.N * s.cf.per) + T("点</td></tr>")).join("") +
+    '</table><p class="sub">' + (steps.length > 1 ? T("ぜんぶの しゅもくで ごうかく点を とると ") : "") + g.key + " " + EXAM_TRACKS[track].name + T(" 合格。") +
+    (steps.length > 1 ? T("しゅもくの あいだに 30秒の 休けいが あります。") : "") + "</p>";
 }
 function startExam() {
   const g = GRADES[+$("#exGrade").value], track = $("#exTrack").value;
@@ -4510,7 +4511,7 @@ function startExamSection(step) {
   $("#playFlashWrap").classList.add("hidden");
   $("#anzanTip").classList.add("hidden");
   $("#stepsRow").classList.add("hidden");           // 検定中は「解き方」を 見せない
-  $("#playGrade").textContent = "🏅 SK検定 " + grade.key + " " + EXAM_TRACKS[examState.track].name + "　" + (examState.idx + 1) + "/" + examState.steps.length + "：" + cf.name + "（" + Math.round(cf.limit / 60) + "分）";
+  $("#playGrade").textContent = T("🏅 SK検定 ") + grade.key + " " + EXAM_TRACKS[examState.track].name + "　" + (examState.idx + 1) + "/" + examState.steps.length + T("：") + cf.name + T("（") + Math.round(cf.limit / 60) + T("分）");
   $("#playResult").textContent = ""; $("#playResult").className = "result"; $("#steps").classList.add("hidden");
   startPlayTimer();
   nextPlayProblem();
@@ -4533,10 +4534,10 @@ function showExamBreak(next) {
   $("#playSorobanWrap").classList.add("hidden");
   $("#playInputWrap").classList.add("hidden");
   $("#playFlashWrap").classList.add("hidden");
-  $("#playResult").textContent = ""; $("#playGrade").textContent = "🏅 SK検定：休けい"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  $("#playResult").textContent = ""; $("#playGrade").textContent = T("🏅 SK検定：休けい"); $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
   $("#playRest").classList.remove("hidden");
-  $("#restResult").innerHTML = '<p class="sub">けっかは さいごに まとめて 出ます。</p>';
-  $("#restNext").textContent = "つぎは：" + next.cf.name + "（" + Math.round(next.cf.limit / 60) + "分）　自動で 始まります";
+  $("#restResult").innerHTML = T('<p class="sub">けっかは さいごに まとめて 出ます。</p>');
+  $("#restNext").textContent = T("つぎは：") + next.cf.name + T("（") + Math.round(next.cf.limit / 60) + T("分）　自動で 始まります");
   let left = 30;
   const render = () => ($("#restTimer").textContent = fmtClock(left));
   render();
@@ -4557,10 +4558,10 @@ function finishExam() {
   const rec = { d: today(), g: ex.grade.key, track: ex.track, pass, sections: ex.sections.map((s) => ({ subj: s.subj, correct: s.correct, N: s.N, score: s.score, ok: s.ok, sec: Math.round(s.sec) })) };
   try { const h = allExams(); h.push(rec); localStorage.setItem(EXAMS, JSON.stringify(h.slice(-300))); } catch (e) { console.error("検定の記録に失敗", e); }
   logStudy(totalSec); touchStreak();
-  const rows = ex.sections.map((s) => "<tr><td>" + s.name + "</td><td>" + s.correct + " / " + s.N + "</td><td><b>" + s.score + "</b>／" + s.full + "<small>（合格 " + s.pass + "）</small></td><td>" + fmtClock(s.sec) + '</td><td class="' + (s.ok ? "ok" : "ng") + '">' + (s.ok ? "◎ 合格" : "×") + "</td></tr>").join("");
-  let msg = '<div class="ex-result-h">' + (pass ? "🎉 <b>" + ex.grade.key + " " + track.name + " ごうかく！</b>" : "<b>不合格</b>　もう少し！") + "</div>" +
-    '<table class="rec-table ex-table"><tr><th>しゅもく</th><th>せいかい</th><th>点</th><th>タイム</th><th></th></tr>' + rows + "</table>" +
-    '<p class="sub">自宅受験（' + rec.d + "）。" + (pass ? "合格証には「自宅受験」と 入ります。" : "まちがえ方は 下に 出ます。にがてを 直して もう一度！") + "</p>";
+  const rows = ex.sections.map((s) => "<tr><td>" + s.name + "</td><td>" + s.correct + " / " + s.N + "</td><td><b>" + s.score + T("</b>／") + s.full + T("<small>（合格 ") + s.pass + T("）</small></td><td>") + fmtClock(s.sec) + '</td><td class="' + (s.ok ? "ok" : "ng") + '">' + (s.ok ? T("◎ 合格") : "×") + "</td></tr>").join("");
+  let msg = '<div class="ex-result-h">' + (pass ? "🎉 <b>" + ex.grade.key + " " + track.name + T(" ごうかく！</b>") : T("<b>不合格</b>　もう少し！")) + "</div>" +
+    T('<table class="rec-table ex-table"><tr><th>しゅもく</th><th>せいかい</th><th>点</th><th>タイム</th><th></th></tr>') + rows + "</table>" +
+    T('<p class="sub">自宅受験（') + rec.d + T("）。") + (pass ? T("合格証には「自宅受験」と 入ります。") : T("まちがえ方は 下に 出ます。にがてを 直して もう一度！")) + "</p>";
   ex.sections.forEach((s) => { msg += '<div class="ex-sec"><b>' + s.name + "</b>" + missReportHTML(s.items) + "</div>"; });
   let gold = 0;
   ex.sections.forEach((s) => { gold += goldForSection({ correct: s.correct, N: s.N, bestUpdated: false, completed: true, grade: ex.grade, subj: s.subj, count: dailyCount("exam_" + ex.grade.key) }).g; });
@@ -4568,19 +4569,19 @@ function finishExam() {
   if (pass) gold += Math.round(100 * gradeGoldMult(ex.grade));
   addGold(gold);
   solomonAfterStudy();               // 🐣 SK検定 合格は Lv.5 の 条件（★には 数えない）
-  msg += '<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋' + gold + " GOLD</b>" + (pass ? '<div class="gold-lines">🏅 検定 合格 ボーナス</div>' : "") + "</div>";
-  msg += '<br><button id="exAgainBtn">もう一度</button> <button id="exBackBtn" class="ghost">検定の 画面へ</button>';
-  msg = '<div class="result-hero"><img class="rh-face" src="assets/' + (pass ? "king_celebrate.png" : "king_wave.png") + '" alt="レオ王" />' +
-    (pass ? '<span class="rh-badge"><span class="badge-chip perfect">🏅 SK検定 ごうかく！</span></span>' : "") + "</div>" + msg;
+  msg += T('<div class="gold-earn"><img class="ico-coin" src="assets/coin.png" alt="" /> <b>＋') + gold + " GOLD</b>" + (pass ? T('<div class="gold-lines">🏅 検定 合格 ボーナス</div>') : "") + "</div>";
+  msg += T('<br><button id="exAgainBtn">もう一度</button> <button id="exBackBtn" class="ghost">検定の 画面へ</button>');
+  msg = '<div class="result-hero"><img class="rh-face" src="assets/' + (pass ? "king_celebrate.png" : "king_wave.png") + T('" alt="レオ王" />') +
+    (pass ? T('<span class="rh-badge"><span class="badge-chip perfect">🏅 SK検定 ごうかく！</span></span>') : "") + "</div>" + msg;
   $("#playRest").classList.add("hidden");
   $("#playProblemWrap").classList.remove("hidden");
-  $("#playProblem").textContent = "おつかれさま！";
+  $("#playProblem").textContent = T("おつかれさま！");
   $("#playSorobanWrap").classList.add("hidden"); $("#playInputWrap").classList.add("hidden");
   $("#playResult").innerHTML = msg; $("#playResult").className = "result " + (pass ? "ok" : "ng");
-  $("#playGrade").textContent = "🏅 SK検定 " + ex.grade.key + " " + track.name + "：けっか"; $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
+  $("#playGrade").textContent = T("🏅 SK検定 ") + ex.grade.key + " " + track.name + T("：けっか"); $("#playProgress").textContent = ""; $("#playTimer").textContent = "";
   renderProfile();
-  if (pass) { fxCelebrate(3, "🏅 " + ex.grade.key + " " + track.name + " ごうかく！", "SK検定 合格 おめでとう！"); bigFanfareSnd(); certify(ex.grade.key, "sk-" + ex.track); }
-  else fxCheer("あと すこし…", "ぜんぶの しゅもくで 合格点を とろう");
+  if (pass) { fxCelebrate(3, "🏅 " + ex.grade.key + " " + track.name + T(" ごうかく！"), T("SK検定 合格 おめでとう！")); bigFanfareSnd(); certify(ex.grade.key, "sk-" + ex.track); }
+  else fxCheer(T("あと すこし…"), T("ぜんぶの しゅもくで 合格点を とろう"));
   coinSnd(1.0);
   $("#exAgainBtn").onclick = () => { examState = { grade: ex.grade, track: ex.track, steps: ex.steps, idx: 0, sections: [] }; runExamStep(); };
   $("#exBackBtn").onclick = () => { showView("kentei"); setActiveNav(document.querySelector('.nav[data-view="kentei"]')); };
@@ -4588,10 +4589,10 @@ function finishExam() {
 function renderExamHistory() {
   const box = $("#exHist"); if (!box) return;
   const list = allExams().slice().reverse().slice(0, 30);
-  if (!list.length) { box.innerHTML = '<p class="sub">まだ 受けていません。合格すると 合格証が もらえて、「記録を見る」にも ならびます。</p>'; return; }
-  box.innerHTML = '<table class="rec-table ex-table"><tr><th>日</th><th>級</th><th>検定</th><th>けっか</th><th>点</th></tr>' +
-    list.map((r) => "<tr><td>" + r.d + "</td><td>" + r.g + "</td><td>" + ((EXAM_TRACKS[r.track] || {}).name || r.track) + '</td><td class="' + (r.pass ? "ok" : "ng") + '">' + (r.pass ? "◎ 合格" : "×") + "</td><td>" +
-      r.sections.map((s) => subjName(s.subj) + " " + s.score).join("／") + "</td></tr>").join("") + "</table>";
+  if (!list.length) { box.innerHTML = T('<p class="sub">まだ 受けていません。合格すると 合格証が もらえて、「記録を見る」にも ならびます。</p>'); return; }
+  box.innerHTML = T('<table class="rec-table ex-table"><tr><th>日</th><th>級</th><th>検定</th><th>けっか</th><th>点</th></tr>') +
+    list.map((r) => "<tr><td>" + r.d + "</td><td>" + r.g + "</td><td>" + ((EXAM_TRACKS[r.track] || {}).name || r.track) + '</td><td class="' + (r.pass ? "ok" : "ng") + '">' + (r.pass ? T("◎ 合格") : "×") + "</td><td>" +
+      r.sections.map((s) => subjName(s.subj) + " " + s.score).join(T("／")) + "</td></tr>").join("") + "</table>";
 }
 
 /* ---------- SK検定 画面の ボタン ---------- */
@@ -4650,7 +4651,7 @@ function hwStart(h) {
   const gi = GRADES.findIndex((g) => g.key === h.g);
   if (gi >= 0) gradeIdx = gi;
   subject = h.subj;
-  if (!difficulty(currentGrade(), subject)) { alert("この級には " + ((SUBJECT[subject] && SUBJECT[subject].name) || subject) + " が ありません。先生に つたえてね。"); return; }
+  if (!difficulty(currentGrade(), subject)) { alert(T("この級には ") + ((SUBJECT[subject] && SUBJECT[subject].name) || subject) + T(" が ありません。先生に つたえてね。")); return; }
   renderGrid(); updateInfo();
   setActiveNav(document.querySelector('.nav[data-subj="' + subject + '"]'));
   startWithTips(subject);
@@ -4662,16 +4663,16 @@ function renderHomework() {
   boxes.forEach((box) => {
     if (!list.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
     box.classList.remove("hidden");
-    box.innerHTML = '<div class="hw-h">📨 先生からの 宿題</div>' + list.map((h, i) => {
+    box.innerHTML = T('<div class="hw-h">📨 先生からの 宿題</div>') + list.map((h, i) => {
       const done = hwDoneLocal(h), ok = done >= h.sets;
       const name = (SUBJECT[h.subj] && SUBJECT[h.subj].name) || h.subj;
       let due = "";
-      if (h.due && !ok) { const m = h.due.split("-"); due = "　" + (+m[1]) + "/" + (+m[2]) + " まで" + (h.due < td ? ' <span class="hw-late">きげん すぎ！</span>' : ""); }
-      return '<div class="hw-row' + (ok ? " ok" : "") + '"><span class="hw-t"><b>' + jesc(name) + " " + jesc(h.g) + "</b> を " + h.sets + " セット" +
-        (h.note ? "<br><small>先生から：" + jesc(h.note) + "</small>" : "") + "</span>" +
-        '<span class="hw-p">' + (ok ? "✅ できた！" : "あと " + (h.sets - done) + " セット" + due) + "</span>" +
-        (ok ? "" : '<button class="hw-go" data-i="' + i + '">▶ やる</button>') + "</div>";
-    }).join("") + '<div class="hw-sub">やった ぶんは 自動で 先生に とどくよ。</div>';
+      if (h.due && !ok) { const m = h.due.split("-"); due = "　" + (+m[1]) + "/" + (+m[2]) + T(" まで") + (h.due < td ? T(' <span class="hw-late">きげん すぎ！</span>') : ""); }
+      return '<div class="hw-row' + (ok ? " ok" : "") + '"><span class="hw-t"><b>' + jesc(name) + " " + jesc(h.g) + T("</b> を ") + h.sets + T(" セット") +
+        (h.note ? T("<br><small>先生から：") + jesc(h.note) + "</small>" : "") + "</span>" +
+        '<span class="hw-p">' + (ok ? T("✅ できた！") : T("あと ") + (h.sets - done) + T(" セット") + due) + "</span>" +
+        (ok ? "" : '<button class="hw-go" data-i="' + i + T('">▶ やる</button>')) + "</div>";
+    }).join("") + T('<div class="hw-sub">やった ぶんは 自動で 先生に とどくよ。</div>');
     box.querySelectorAll(".hw-go").forEach((b) => { b.onclick = () => hwStart(list[+b.dataset.i]); });
   });
 }
@@ -4688,7 +4689,7 @@ function loadStore() {
   if (storeLoading) return storeLoading;
   const one = (src) => new Promise((ok, ng) => {
     const s = document.createElement("script"); s.src = src; s.async = false;
-    s.onload = ok; s.onerror = () => ng(new Error("読みこめません：" + src));
+    s.onload = ok; s.onerror = () => ng(new Error(T("読みこめません：") + src));
     document.head.appendChild(s);
   });
   storeLoading = FB_SRC.reduce((p, src) => p.then(() => one(src)), Promise.resolve())
@@ -4701,9 +4702,9 @@ function loadStore() {
    ・参加は 本人（保護者）が このページで オンに したときだけ。Firestore ranking/{月}/rows/{端末のuid}
    ・自分の 行は この端末の 記録から 毎回 計算して 送る（ズルが しにくい・二重に 数えない） */
 const RANK_KEY = "soroban_ranking";   // { on, country, cls }（"soroban_rank" は 認定級の 保存に 使っているので 別の名前）
-const RANK_COUNTRIES = [["JP", "日本"], ["US", "アメリカ"], ["CA", "カナダ"], ["MY", "マレーシア"], ["SG", "シンガポール"], ["IN", "インド"],
-  ["AE", "UAE"], ["SA", "サウジアラビア"], ["GB", "イギリス"], ["AU", "オーストラリア"], ["TH", "タイ"], ["PH", "フィリピン"],
-  ["ID", "インドネシア"], ["VN", "ベトナム"], ["KR", "韓国"], ["TW", "台湾"], ["CN", "中国"], ["BR", "ブラジル"], ["MX", "メキシコ"], ["ES", "スペイン"], ["ZZ", "そのほか"]];
+const RANK_COUNTRIES = [["JP", T("日本")], ["US", T("アメリカ")], ["CA", T("カナダ")], ["MY", T("マレーシア")], ["SG", T("シンガポール")], ["IN", T("インド")],
+  ["AE", "UAE"], ["SA", T("サウジアラビア")], ["GB", T("イギリス")], ["AU", T("オーストラリア")], ["TH", T("タイ")], ["PH", T("フィリピン")],
+  ["ID", T("インドネシア")], ["VN", T("ベトナム")], ["KR", T("韓国")], ["TW", T("台湾")], ["CN", T("中国")], ["BR", T("ブラジル")], ["MX", T("メキシコ")], ["ES", T("スペイン")], ["ZZ", T("そのほか")]];
 const rankCfg = () => { try { return Object.assign({ on: false, country: "JP", cls: "" }, JSON.parse(localStorage.getItem(RANK_KEY) || "{}")); } catch (e) { return { on: false, country: "JP", cls: "" }; } };
 const rankSave = (c) => { try { localStorage.setItem(RANK_KEY, JSON.stringify(c)); } catch (e) { } };
 const rankMonth = () => today().slice(0, 7);
@@ -4716,7 +4717,7 @@ function rankMine() {
   const fb = bestPerSubject().flash;
   let r = null; try { r = JSON.parse(localStorage.getItem(RANK) || "null"); } catch (e) { }
   return {
-    nick: String(profile().name || "").trim().slice(0, 20) || "そろ太くん",
+    nick: String(profile().name || "").trim().slice(0, 20) || T("そろ太くん"),
     country: /^[A-Z]{2}$/.test(c.country) ? c.country : "JP",
     cls: String(c.cls || "").trim().slice(0, 30),
     correct: ss.reduce((a, e) => a + (e.correct || 0), 0),
@@ -4742,37 +4743,37 @@ async function rankSync() {
 let rankTab = "world";
 function rankSetupHTML(c) {
   const opts = RANK_COUNTRIES.map((x) => `<option value="${x[0]}"${x[0] === c.country ? " selected" : ""}>${rankFlag(x[0])} ${x[1]}</option>`).join("");
-  const fields = `<label>国 <select id="rankCountry">${opts}</select></label>` +
-    `<label>教室名（なくても よい）<input id="rankCls" maxlength="30" placeholder="例：○○そろばん教室" value="${jesc(c.cls || "")}" /></label>`;
-  if (!c.on) return `<div class="rank-setup"><div class="rank-setup-t">🏆 参加すると、あなたの にっくねーむ「<b>${jesc(profile().name || "")}</b>」と 今月の 正解数が、世界の みんなと ならびます。</div>${fields}<button id="rankJoin">参加する</button></div>`;
-  return `<div class="rank-setup"><div class="rank-setup-t">✅ 参加中：<b>${jesc(profile().name || "")}</b></div>${fields}<button id="rankSaveBtn" class="ghost">変更を 保存</button><button id="rankLeave" class="ghost">やめる（行を 消す）</button></div>`;
+  const fields = T("<label>国 <select id=\"rankCountry\">{opts}</select></label>", { opts }) +
+    T("<label>教室名（なくても よい）<input id=\"rankCls\" maxlength=\"30\" placeholder=\"例：○○そろばん教室\" value=\"{v1}\" /></label>", { v1: jesc(c.cls || "") });
+  if (!c.on) return T("<div class=\"rank-setup\"><div class=\"rank-setup-t\">🏆 参加すると、あなたの にっくねーむ「<b>{v1}</b>」と 今月の 正解数が、世界の みんなと ならびます。</div>{fields}<button id=\"rankJoin\">参加する</button></div>", { v1: jesc(profile().name || ""), fields });
+  return T("<div class=\"rank-setup\"><div class=\"rank-setup-t\">✅ 参加中：<b>{v1}</b></div>{fields}<button id=\"rankSaveBtn\" class=\"ghost\">変更を 保存</button><button id=\"rankLeave\" class=\"ghost\">やめる（行を 消す）</button></div>", { v1: jesc(profile().name || ""), fields });
 }
 async function renderRanking() {
   const box = $("#rankList"), setup = $("#rankSetup"), me = $("#rankMe"); if (!box) return;
   const c = rankCfg();
   setup.innerHTML = rankSetupHTML(c);
   const readCfg = () => ({ on: c.on, country: $("#rankCountry").value, cls: String($("#rankCls").value || "").trim().slice(0, 30) });
-  const join = $("#rankJoin"); if (join) join.onclick = async () => { const n = readCfg(); n.on = true; rankSave(n); rankLastSent = ""; join.disabled = true; join.textContent = "送っています…"; const ok = await rankSync(); if (!ok) { alert("いま つながりません。あとで もう一度 ためしてください"); } renderRanking(); };
-  const sv = $("#rankSaveBtn"); if (sv) sv.onclick = async () => { rankSave(readCfg()); rankLastSent = ""; sv.textContent = "保存しました"; await rankSync(); renderRanking(); };
-  const lv = $("#rankLeave"); if (lv) lv.onclick = async () => { if (!confirm("ランキングから 抜けますか？（あなたの 行を 消します。記録は 消えません）")) return; const n = readCfg(); n.on = false; rankSave(n); try { const S = await loadStore(); await S.rankRemove(rankMonth()); } catch (e) { } rankLastSent = ""; renderRanking(); };
+  const join = $("#rankJoin"); if (join) join.onclick = async () => { const n = readCfg(); n.on = true; rankSave(n); rankLastSent = ""; join.disabled = true; join.textContent = T("送っています…"); const ok = await rankSync(); if (!ok) { alert(T("いま つながりません。あとで もう一度 ためしてください")); } renderRanking(); };
+  const sv = $("#rankSaveBtn"); if (sv) sv.onclick = async () => { rankSave(readCfg()); rankLastSent = ""; sv.textContent = T("保存しました"); await rankSync(); renderRanking(); };
+  const lv = $("#rankLeave"); if (lv) lv.onclick = async () => { if (!confirm(T("ランキングから 抜けますか？（あなたの 行を 消します。記録は 消えません）"))) return; const n = readCfg(); n.on = false; rankSave(n); try { const S = await loadStore(); await S.rankRemove(rankMonth()); } catch (e) { } rankLastSent = ""; renderRanking(); };
   $$("#rankTabs button").forEach((b) => { b.classList.toggle("on", b.dataset.t === rankTab); b.onclick = () => { rankTab = b.dataset.t; renderRanking(); }; });
-  const cb = $('#rankTabs button[data-t="country"]'); if (cb) cb.textContent = rankFlag(c.country) + " 国内";
-  box.innerHTML = '<div class="sub">読みこみ中…</div>'; me.textContent = "";
+  const cb = $('#rankTabs button[data-t="country"]'); if (cb) cb.textContent = rankFlag(c.country) + T(" 国内");
+  box.innerHTML = T('<div class="sub">読みこみ中…</div>'); me.textContent = "";
   let rows = [], uid = "";
   try { const S = await loadStore(); if (c.on) await rankSync(); rows = await S.rankTop(rankMonth(), 300); uid = S.rankUid(); }
-  catch (e) { box.innerHTML = '<div class="sub">いま ランキングを 読めません（通信を 確かめてください）</div>'; return; }
+  catch (e) { box.innerHTML = T('<div class="sub">いま ランキングを 読めません（通信を 確かめてください）</div>'); return; }
   if (rankTab === "country") rows = rows.filter((r) => r.country === c.country);
   if (rankTab === "cls") {
-    if (!c.cls) { box.innerHTML = '<div class="sub">上の「教室名」を 入れて 保存すると、同じ 教室名の 子と くらべられます。</div>'; return; }
+    if (!c.cls) { box.innerHTML = T('<div class="sub">上の「教室名」を 入れて 保存すると、同じ 教室名の 子と くらべられます。</div>'); return; }
     rows = rows.filter((r) => (r.cls || "") === c.cls);
   }
   rows.sort((a, b) => (b.correct || 0) - (a.correct || 0) || (a.updatedAt || 0) - (b.updatedAt || 0));
   const myIdx = rows.findIndex((r) => r.uid === uid);
-  if (c.on) me.textContent = myIdx >= 0 ? `あなたは ${myIdx + 1}位（今月 ${rows[myIdx].correct}問 正解）` : `あなたは まだ 300位より 下（今月 ${rankMine().correct}問 正解）。れんしゅうすると 上がるよ`;
+  if (c.on) me.textContent = myIdx >= 0 ? T("あなたは {v1}位（今月 {v2}問 正解）", { v1: myIdx + 1, v2: rows[myIdx].correct }) : T("あなたは まだ 300位より 下（今月 {v1}問 正解）。れんしゅうすると 上がるよ", { v1: rankMine().correct });
   else me.textContent = "";
-  if (!rows.length) { box.innerHTML = '<div class="sub">まだ だれも いません。いちばん 最初に 参加してみよう！</div>'; return; }
+  if (!rows.length) { box.innerHTML = T('<div class="sub">まだ だれも いません。いちばん 最初に 参加してみよう！</div>'); return; }
   box.innerHTML = rows.slice(0, 100).map((r, i) => {
-    const no = i + 1, medal = no === 1 ? "🥇" : no === 2 ? "🥈" : no === 3 ? "🥉" : no + "位";
+    const no = i + 1, medal = no === 1 ? "🥇" : no === 2 ? "🥈" : no === 3 ? "🥉" : no + T("位");
     return `<div class="rank-row${r.uid === uid ? " me" : ""}"><span class="rank-no${no <= 3 ? " top" : ""}">${medal}</span><span class="rank-flag" title="${jesc(rankCountryName(r.country))}">${rankFlag(r.country)}</span>` +
       `<span class="rank-nick">${jesc(r.nick || "")}${r.grade ? `<small>${jesc(r.grade)}</small>` : ""}${r.cls ? `<small>🏫 ${jesc(r.cls)}</small>` : ""}</span><span class="rank-val">${(r.correct || 0).toLocaleString()}問</span></div>`;
   }).join("");
@@ -4784,27 +4785,27 @@ function renderJoin() {
   const box = $("#joinBox"); if (!box) return;
   const cl = classLink();
   if (cl) {
-    box.innerHTML = '<div class="join-on"><div class="join-on-h">🏫 ' + jesc(cl.className) + " に 参加中</div>" +
-      "<p>あなたの 名前：<b>" + jesc(cl.nick) + "</b>　／　級の基準：<b>" + jesc((CUR && CUR.name) || "標準") + "</b>（" + GRADES.length + "段階）</p>" +
-      '<p class="sub">れんしゅうの きろくは、先生の 画面に とどきます。まちがえ方の クセも 先生が 見て、つぎの 宿題を 決めます。</p>' +
+    box.innerHTML = '<div class="join-on"><div class="join-on-h">🏫 ' + jesc(cl.className) + T(" に 参加中</div>") +
+      T("<p>あなたの 名前：<b>") + jesc(cl.nick) + T("</b>　／　級の基準：<b>") + jesc(T((CUR && CUR.name) || "標準")) + T("</b>（") + GRADES.length + T("段階）</p>") +
+      T('<p class="sub">れんしゅうの きろくは、先生の 画面に とどきます。まちがえ方の クセも 先生が 見て、つぎの 宿題を 決めます。</p>') +
       '<div id="joinSync" class="sub"></div>' +
-      '<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>' +
+      T('<div class="btn-row"><button id="joinPush">↻ いま おくる</button><button id="joinLeave" class="ghost">教室から ぬける</button></div></div>') +
       '<div id="joinHw" class="hw-box hidden"></div>';
     $("#joinPush").onclick = () => fetchHomework().then(() => pushToClass(true));
     renderHomework();
-    $("#joinLeave").onclick = () => { if (confirm("教室から ぬけます。この端末の れんしゅうの きろくは 消えません。よろしいですか？")) setClassLink(null); };
+    $("#joinLeave").onclick = () => { if (confirm(T("教室から ぬけます。この端末の れんしゅうの きろくは 消えません。よろしいですか？"))) setClassLink(null); };
     return;
   }
-  box.innerHTML = '<p class="sub">そろばん教室で もらった <b>クラスコード</b>（6文字）を 入れてね。おうちで れんしゅうすると、先生が 見てくれます。<br>' +
-    "コードが ない人は 入らなくて だいじょうぶ。ふつうに ぜんぶ あそべます。</p>" +
-    '<p><button type="button" id="joinSpeak" class="ghost">🔊 よみあげる</button></p>' +
+  box.innerHTML = T('<p class="sub">そろばん教室で もらった <b>クラスコード</b>（6文字）を 入れてね。おうちで れんしゅうすると、先生が 見てくれます。<br>') +
+    T("コードが ない人は 入らなくて だいじょうぶ。ふつうに ぜんぶ あそべます。</p>") +
+    T('<p><button type="button" id="joinSpeak" class="ghost">🔊 よみあげる</button></p>') +
     '<div class="join-row"><input id="joinCode" type="text" inputmode="latin" autocapitalize="characters" maxlength="6" placeholder="ABC123" />' +
-    '<button id="joinGo">つぎへ</button></div><div id="joinMsg" class="result"></div><div id="joinPick"></div>';
+    T('<button id="joinGo">つぎへ</button></div><div id="joinMsg" class="result"></div><div id="joinPick"></div>');
   const inp = $("#joinCode");
   const js = $("#joinSpeak");
   if (js) js.onclick = () => {
     if (!("speechSynthesis" in window)) return;
-    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("そろばん教室で もらった クラスコード 6文字を 入れて、つぎへ を おしてね。そのあと、じぶんの 名前を えらぶと、先生に れんしゅうが とどくよ。コードが ない人は 入らなくて だいじょうぶ。"); u.lang = "ja-JP"; u.rate = 0.92; window.speechSynthesis.speak(u); } catch (e) { }
+    try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(T("そろばん教室で もらった クラスコード 6文字を 入れて、つぎへ を おしてね。そのあと、じぶんの 名前を えらぶと、先生に れんしゅうが とどくよ。コードが ない人は 入らなくて だいじょうぶ。")); u.lang = "ja-JP"; u.rate = 0.92; window.speechSynthesis.speak(u); } catch (e) { }
   };
   inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
   inp.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#joinGo").click(); });
@@ -4814,16 +4815,16 @@ async function joinStep1() {
   const code = ($("#joinCode").value || "").trim().toUpperCase();
   const msg = $("#joinMsg"), pick = $("#joinPick");
   pick.innerHTML = ""; msg.className = "result";
-  if (code.length !== 6) { msg.textContent = "コードは 6文字だよ"; msg.className = "result ng"; return; }
-  msg.textContent = "しらべています…";
+  if (code.length !== 6) { msg.textContent = T("コードは 6文字だよ"); msg.className = "result ng"; return; }
+  msg.textContent = T("しらべています…");
   let S;
-  try { S = await loadStore(); } catch (e) { msg.textContent = "つうしんが できません。電波を たしかめて、もう一度 おしてね。"; msg.className = "result ng"; return; }
+  try { S = await loadStore(); } catch (e) { msg.textContent = T("つうしんが できません。電波を たしかめて、もう一度 おしてね。"); msg.className = "result ng"; return; }
   try {
     const c = await S.resolveCode(code);
-    if (!c) { msg.textContent = "その コードの 教室が 見つかりません。先生に たしかめてね。"; msg.className = "result ng"; return; }
+    if (!c) { msg.textContent = T("その コードの 教室が 見つかりません。先生に たしかめてね。"); msg.className = "result ng"; return; }
     const list = await S.listStudents(c.id);
-    if (!list.length) { msg.textContent = "この 教室には まだ 名前が 登録されていません。先生に たのんでね。"; msg.className = "result ng"; return; }
-    msg.textContent = "🏫 " + c.name + "　じぶんの 名前を えらんでね"; msg.className = "result ok";
+    if (!list.length) { msg.textContent = T("この 教室には まだ 名前が 登録されていません。先生に たのんでね。"); msg.className = "result ng"; return; }
+    msg.textContent = "🏫 " + c.name + T("　じぶんの 名前を えらんでね"); msg.className = "result ok";
     pick.innerHTML = '<div class="join-names">' + list.map((s, i) => '<button class="join-name" data-i="' + i + '">' + jesc(s.nick) + "</button>").join("") + "</div>";
     $$("#joinPick .join-name").forEach((b) => {
       b.onclick = async () => {
@@ -4832,14 +4833,14 @@ async function joinStep1() {
           const j = await S.joinClass(c.id, s.id);
           // サーバーに もう ある記録は 送らない（入り直しても 二重に ならない）
           setClassLink({ cid: c.id, sid: s.id, className: c.name, nick: s.nick, preset: c.preset || "sk", curriculum: c.preset === "custom" ? (c.curriculum || null) : null, sent: (j && j.latest) || 0 });
-          fxCelebrate(2, "🏫 " + c.name + " に 参加したよ！", s.nick + " として れんしゅうを おくります");
+          fxCelebrate(2, "🏫 " + c.name + T(" に 参加したよ！"), s.nick + T(" として れんしゅうを おくります"));
           fetchHomework().then(() => pushToClass(false));
           // 教室の 級の基準が いまの 表と ちがえば、読みなおして その表に する
           if ((c.preset || "sk") !== (CUR && CUR.id)) setTimeout(() => location.reload(), 2500);
-        } catch (e) { msg.textContent = "参加できませんでした：" + ((e && e.message) || e); msg.className = "result ng"; }
+        } catch (e) { msg.textContent = T("参加できませんでした：") + ((e && e.message) || e); msg.className = "result ng"; }
       };
     });
-  } catch (e) { msg.textContent = "うまく いきませんでした。もう一度 おしてね。"; msg.className = "result ng"; console.error(e); }
+  } catch (e) { msg.textContent = T("うまく いきませんでした。もう一度 おしてね。"); msg.className = "result ng"; console.error(e); }
 }
 /* 記録を 先生に おくる。おくったところまでを sent に 覚えて、同じものを 二度 おくらない */
 let pushTimer = null, pushing = false;
@@ -4849,19 +4850,19 @@ async function pushToClass(loud) {
   const all = allSessions(), fresh = all.filter((e) => (e.t || 0) > (cl.sent || 0));
   // 宿題が 新しく 出ていたら、記録が 無くても「できた数」だけは おくり直す
   const hws = hwCache(), hwSig = hws.map((h) => h.id).join(",");
-  if (!fresh.length && hwSig === (cl.hwSig || "")) { if (loud && note) note.textContent = "おくるものは ありません（ぜんぶ とどいています）"; return; }
+  if (!fresh.length && hwSig === (cl.hwSig || "")) { if (loud && note) note.textContent = T("おくるものは ありません（ぜんぶ とどいています）"); return; }
   pushing = true;
-  if (note) note.textContent = "おくっています…";
+  if (note) note.textContent = T("おくっています…");
   try {
     const S = await loadStore();
     await S.pushSessions(cl.cid, cl.sid, fresh.slice(-200), all, hws);
     if (fresh.length) cl.sent = Math.max.apply(null, fresh.map((e) => e.t || 0));
     cl.hwSig = hwSig;
     try { localStorage.setItem(CLASSLINK, JSON.stringify(cl)); } catch (e) { }
-    if (note) note.textContent = fresh.length ? "✓ " + fresh.length + "件 とどきました" : "✓ とどいています";
+    if (note) note.textContent = fresh.length ? "✓ " + fresh.length + T("件 とどきました") : T("✓ とどいています");
   } catch (e) {
     console.error("先生への 送信に 失敗", e);
-    if (note) note.textContent = "いまは おくれませんでした。つぎに ひらいたとき もう一度 ためします。";
+    if (note) note.textContent = T("いまは おくれませんでした。つぎに ひらいたとき もう一度 ためします。");
   } finally { pushing = false; }
 }
 // 練習が おわるたび、少し待ってから まとめて おくる（連続で 通信しない）
@@ -4889,12 +4890,12 @@ const storyOn = () => { try { return localStorage.getItem(STORY_KEY) !== "off"; 
 function setStoryOn(on) {
   try { localStorage.setItem(STORY_KEY, on ? "on" : "off"); } catch (e) { }
   renderSolomonCard();
-  const m = $("#saveMsg"); if (m) m.textContent = on ? "ソロモンと 物語を つかいます" : "ソロモンと 物語を 出さないように しました";
+  const m = $("#saveMsg"); if (m) m.textContent = on ? T("ソロモンと 物語を つかいます") : T("ソロモンと 物語を 出さないように しました");
 }
 function soloState() { try { return Object.assign({ met: "", seen: {}, lv: 0, said: {} }, JSON.parse(localStorage.getItem(SOLO_KEY) || "{}")); } catch (e) { return { met: "", seen: {}, lv: 0, said: {} }; } }
 function soloSave(s) { try { localStorage.setItem(SOLO_KEY, JSON.stringify(s)); } catch (e) { console.error("ソロモンの 保存に 失敗", e); } }
 const SOLO_SUBJ = ["mitori", "kake", "wari", "anzan", "flash"];
-const SOLO_SUBJ_NAME = { mitori: "みとり力", kake: "かけ算力", wari: "わり算力", anzan: "暗算力", flash: "フラッシュ力" };
+const SOLO_SUBJ_NAME = { mitori: T("みとり力"), kake: T("かけ算力"), wari: T("わり算力"), anzan: T("暗算力"), flash: T("フラッシュ力") };
 const SOLO_STAR = [20, 50, 100, 200, 400];                        // しゅもく別 ★：その しゅもくの 正解数
 // 数えるのは「ソロモンと 出会った日」からの 記録だけ（前から 使っていた子も、みんな Lv.1 から いっしょに 始まる）
 const soloMet = () => soloState().met || "";
@@ -4916,28 +4917,28 @@ const starStr = (n, max) => "★".repeat(n) + "☆".repeat((max || 5) - n);
 const pickToday = (arr) => arr[new Date().getDate() % arr.length];       // その日は 同じ セリフ（開くたびに 変わらない）
 /* 5つの 段階。ok＝その段階に なる 条件、need＝あと どれだけか、talk＝その段階の 性格・言葉 */
 const SOLO_LEVELS = [
-  { lv: 1, name: "ちいさなソロモン", em: "🐣", cond: "練習を 1回 やりきる",
-    ok: (s) => s.sets >= 1 || s.routines >= 1, need: () => "練習を 1回 やりきろう",
-    talk: ["はじめまして！ ぼく、ソロモン。", "数字って、ちょっと ドキドキする…でも きみと なら やってみる！"],
-    after: ["できた！ 数字、こわくなかった！", "また あしたも いっしょに やろうね！"] },
-  { lv: 2, name: "そろばんを おぼえた ソロモン", em: "🧮", cond: "練習を 3回",
-    ok: (s) => s.sets >= 3, need: (s) => "🌲 森の奥への 道：あと " + Math.max(1, 3 - s.sets) + "回 練習",
-    talk: ["そろばんって おもしろい！", "パチパチって 音が すき！ きょうも やろう！"],
-    after: ["きょうも パチパチ できたね！", "そろばんが あると 数字が わかりやすいね！"] },
-  { lv: 3, name: "計算が とくいに なった ソロモン", em: "💪", cond: "正解 100問 と、練習した日 3日",
+  { lv: 1, name: T("ちいさなソロモン"), em: "🐣", cond: T("練習を 1回 やりきる"),
+    ok: (s) => s.sets >= 1 || s.routines >= 1, need: () => T("練習を 1回 やりきろう"),
+    talk: [T("はじめまして！ ぼく、ソロモン。"), T("数字って、ちょっと ドキドキする…でも きみと なら やってみる！")],
+    after: [T("できた！ 数字、こわくなかった！"), T("また あしたも いっしょに やろうね！")] },
+  { lv: 2, name: T("そろばんを おぼえた ソロモン"), em: "🧮", cond: T("練習を 3回"),
+    ok: (s) => s.sets >= 3, need: (s) => T("🌲 森の奥への 道：あと ") + Math.max(1, 3 - s.sets) + T("回 練習"),
+    talk: [T("そろばんって おもしろい！"), T("パチパチって 音が すき！ きょうも やろう！")],
+    after: [T("きょうも パチパチ できたね！"), T("そろばんが あると 数字が わかりやすいね！")] },
+  { lv: 3, name: T("計算が とくいに なった ソロモン"), em: "💪", cond: T("正解 100問 と、練習した日 3日"),
     ok: (s) => s.correct >= 100 && s.days >= 3,
-    need: (s) => "🚪 森の扉：" + [s.correct < 100 ? "正解 あと " + (100 - s.correct) + "問" : "", s.days < 3 ? "練習する日 あと " + (3 - s.days) + "日" : ""].filter(Boolean).join("・"),
-    talk: ["まちがえても、もう一回 やってみる！", "むずかしい 問題も、やってみたら できるかも！"],
-    after: ["できた！ まちがえても だいじょうぶ だったね！", "きょうの ぶんも できた！ つよくなってる！"] },
-  { lv: 4, name: "仲間を たすけられる ソロモン", em: "🤝", cond: "7日 つづける（または 正解300問 で 正答率85%）",
+    need: (s) => T("🚪 森の扉：") + [s.correct < 100 ? T("正解 あと ") + (100 - s.correct) + T("問") : "", s.days < 3 ? T("練習する日 あと ") + (3 - s.days) + T("日") : ""].filter(Boolean).join(T("・")),
+    talk: [T("まちがえても、もう一回 やってみる！"), T("むずかしい 問題も、やってみたら できるかも！")],
+    after: [T("できた！ まちがえても だいじょうぶ だったね！"), T("きょうの ぶんも できた！ つよくなってる！")] },
+  { lv: 4, name: T("仲間を たすけられる ソロモン"), em: "🤝", cond: T("7日 つづける（または 正解300問 で 正答率85%）"),
     ok: (s) => s.streak >= 7 || (s.correct >= 300 && s.acc30 >= 85),
-    need: (s) => "🏔 山の道：つづけて あと " + Math.max(1, 7 - s.streak) + "日" + (s.correct < 300 ? "（または 正解 あと " + (300 - s.correct) + "問 で 正答率85%）" : ""),
-    talk: ["こんどは ぼくが 仲間を たすける！", "きみが がんばるから、ぼくも がんばれる！"],
-    after: ["きょうも ありがとう！ 仲間が ふえた 気がする！", "きみと なら、数の乱れも こわくない！"] },
-  { lv: 5, name: "一人前の そろばん仲間", em: "👑", cond: "級に 合格（けんてい方式）か、SK検定に 合格",
-    ok: (s) => s.rank || s.examPass, need: () => "🏰 王国の門：級に 合格しよう（けんてい方式 か SK検定）",
-    talk: ["ぼく、一人前の そろばん仲間に なれたよ！", "つぎは どこへ 行こうかな！"],
-    after: ["きょうも いっしょに できて うれしい！", "一人前でも、れんしゅうは つづけるんだ！"] },
+    need: (s) => T("🏔 山の道：つづけて あと ") + Math.max(1, 7 - s.streak) + T("日") + (s.correct < 300 ? T("（または 正解 あと ") + (300 - s.correct) + T("問 で 正答率85%）") : ""),
+    talk: [T("こんどは ぼくが 仲間を たすける！"), T("きみが がんばるから、ぼくも がんばれる！")],
+    after: [T("きょうも ありがとう！ 仲間が ふえた 気がする！"), T("きみと なら、数の乱れも こわくない！")] },
+  { lv: 5, name: T("一人前の そろばん仲間"), em: "👑", cond: T("級に 合格（けんてい方式）か、SK検定に 合格"),
+    ok: (s) => s.rank || s.examPass, need: () => T("🏰 王国の門：級に 合格しよう（けんてい方式 か SK検定）"),
+    talk: [T("ぼく、一人前の そろばん仲間に なれたよ！"), T("つぎは どこへ 行こうかな！")],
+    after: [T("きょうも いっしょに できて うれしい！"), T("一人前でも、れんしゅうは つづけるんだ！")] },
 ];
 // いまの 段階：下から 順に 条件を 見て、とぎれた ところまで。前に とどいた 段階より 下がらない
 function soloLevel(s, st) {
@@ -4945,16 +4946,16 @@ function soloLevel(s, st) {
   for (const L of SOLO_LEVELS) { if (L.ok(s)) lv = L.lv; else break; }
   return Math.max(lv, (st || soloState()).lv || 0);
 }
-function soloTitle(lv) { const L = SOLO_LEVELS[lv - 1]; return L ? L.em + " Lv." + lv + " " + L.name : "🥚 まだ 出会っていない"; }
+function soloTitle(lv) { const L = SOLO_LEVELS[lv - 1]; return L ? L.em + " Lv." + lv + " " + L.name : T("🥚 まだ 出会っていない"); }
 // つぎの 段階までの ヒント
-function soloNext(s, lv) { const L = SOLO_LEVELS[lv]; return L ? L.need(s) : "🌍 もう 一人前！ これからも いっしょに"; }
+function soloNext(s, lv) { const L = SOLO_LEVELS[lv]; return L ? L.need(s) : T("🌍 もう 一人前！ これからも いっしょに"); }
 // ホームの 吹き出し。段階と きょうの 様子で 変わる
 function soloSpeech(s, lv) {
-  if (lv === 0) return "そろばん、いっしょに やってみる？";
+  if (lv === 0) return T("そろばん、いっしょに やってみる？");
   const L = SOLO_LEVELS[lv - 1];
-  if (s.days >= 30 && s.todayDone) return "きみと なら、どんな 数字も だいじょうぶ！";
-  if (s.streak >= 7 && s.todayDone) return "今日も 来てくれた！ " + s.streak + "日 つづいてるね！";
-  if (s.streak >= 7) return "今日も 来てくれた！ いっしょに やろう！";
+  if (s.days >= 30 && s.todayDone) return T("きみと なら、どんな 数字も だいじょうぶ！");
+  if (s.streak >= 7 && s.todayDone) return T("今日も 来てくれた！ ") + s.streak + T("日 つづいてるね！");
+  if (s.streak >= 7) return T("今日も 来てくれた！ いっしょに やろう！");
   return pickToday(s.todayDone ? L.after : L.talk);
 }
 /* 絵：docs/assets/solomon/{pose}.png（front / side / soroban / happy / cry / angry / run / friends / zukan / story）。
@@ -4962,7 +4963,7 @@ function soloSpeech(s, lv) {
 const SOLO_IMG_VER = "?v=3";   // 絵（ポーズ・漫画のコマ）を 入れかえたら 上げる（端末に 残った 古い絵を 使わせない）
 function soloPic(pose, cls) {
   // その ポーズの 絵が 無ければ 正面（front）を 使い、それも 無ければ 🐣
-  return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png' + SOLO_IMG_VER + '" alt="ソロモン" ' +
+  return '<span class="solo-pic ' + (cls || "") + '"><img src="assets/solomon/' + (pose || "front") + '.png' + SOLO_IMG_VER + T('" alt="ソロモン" ') +
     'onerror="if(!this.dataset.f){this.dataset.f=1;this.src=\'assets/solomon/front.png' + SOLO_IMG_VER + '\'}else{this.parentNode.classList.add(\'nopic\')}"><i>🐣</i></span>';
 }
 /* 物語（1話 30秒〜1分）。lv＝その段階に なったとき 読める（0＝はじめて ホームを 開いたとき）
@@ -4970,122 +4971,122 @@ function soloPic(pose, cls) {
    絵が 無い間は、空と 草原の 背景の 上に ソロモンを 置く */
 const SOLO_EPISODES = [
   // 第1話は 16コマ漫画（scene_1_1〜1_16）。「つぎへ」で 1コマずつ 進む＝アニメのように 見える
-  { id: "ep1", n: "第1話", t: "出会い", lv: 0, scene: 1, lines: [
-    { who: "", scene: "1_1", text: "ある日のこと。ぼくは、そろばんの 練習道具を 持って、森の 近くまで やってきた。" },
-    { who: "", scene: "1_2", text: "森の 入り口に 足を ふみ入れると、木々の すき間から やさしい 光が 差しこんできた。" },
-    { who: "", scene: "1_3", text: "鳥の さえずり、葉っぱが ゆれる 音。森は とても 静かで、きれいだった。" },
-    { who: "", scene: "1_4", text: "少し 歩くと、切り株の 上に、小さな 生きものが すわっていた。" },
-    { who: "ソロモン", scene: "1_5", text: "ソロモンは、ぼくを じっと 見つめてきた。「きみ… そろばん、持ってるの？」" },
-    { who: "きみ", scene: "1_6", text: "ぼくは、少し どきどき しながら うなずいた。「うん！ ぼく、そろばんが 好きなんだ！」" },
-    { who: "ソロモン", scene: "1_7", text: "ソロモンは そろばんに きょうみを 持ったようで、前あしで そっと 玉を さわってみた。「これは… なんだろう？」" },
-    { who: "", scene: "1_8", text: "ソロモンが 玉を 動かすと、心地よい 音が 森に ひびいた。パチ、パチ。「わぁ…！ いい音…！」" },
-    { who: "きみ", scene: "1_9", text: "ぼくも そろばんを 手に 取り、ゆっくりと 玉を はじいてみた。「こうやって 動かすんだよ。」" },
-    { who: "", scene: "1_10", text: "ソロモンは まねを して、何度も 玉を 動かした。「すごい！ 上手だよ！」「もう一回！ もう一回！」" },
-    { who: "きみ", scene: "1_11", text: "ぼくは、そろばんで できることを、少しずつ 教えてあげた。「こうやって 数を 表すんだよ。1、2、3…！」" },
+  { id: "ep1", n: T("第1話"), t: T("出会い"), lv: 0, scene: 1, lines: [
+    { who: "", scene: "1_1", text: T("ある日のこと。ぼくは、そろばんの 練習道具を 持って、森の 近くまで やってきた。") },
+    { who: "", scene: "1_2", text: T("森の 入り口に 足を ふみ入れると、木々の すき間から やさしい 光が 差しこんできた。") },
+    { who: "", scene: "1_3", text: T("鳥の さえずり、葉っぱが ゆれる 音。森は とても 静かで、きれいだった。") },
+    { who: "", scene: "1_4", text: T("少し 歩くと、切り株の 上に、小さな 生きものが すわっていた。") },
+    { who: T("ソロモン"), scene: "1_5", text: T("ソロモンは、ぼくを じっと 見つめてきた。「きみ… そろばん、持ってるの？」") },
+    { who: T("きみ"), scene: "1_6", text: T("ぼくは、少し どきどき しながら うなずいた。「うん！ ぼく、そろばんが 好きなんだ！」") },
+    { who: T("ソロモン"), scene: "1_7", text: T("ソロモンは そろばんに きょうみを 持ったようで、前あしで そっと 玉を さわってみた。「これは… なんだろう？」") },
+    { who: "", scene: "1_8", text: T("ソロモンが 玉を 動かすと、心地よい 音が 森に ひびいた。パチ、パチ。「わぁ…！ いい音…！」") },
+    { who: T("きみ"), scene: "1_9", text: T("ぼくも そろばんを 手に 取り、ゆっくりと 玉を はじいてみた。「こうやって 動かすんだよ。」") },
+    { who: "", scene: "1_10", text: T("ソロモンは まねを して、何度も 玉を 動かした。「すごい！ 上手だよ！」「もう一回！ もう一回！」") },
+    { who: T("きみ"), scene: "1_11", text: T("ぼくは、そろばんで できることを、少しずつ 教えてあげた。「こうやって 数を 表すんだよ。1、2、3…！」") },
     // 📖 ここで 漫画が 止まり、本物の そろばんで 3問。正解するたびに ソロモンが 反応する
-    { who: "", scene: "1_11", text: "ソロモンと いっしょに、そろばんで 3問 やってみよう！ まちがえても だいじょうぶ。",
-      practice: { n: 3, subj: "mitori", label: "ソロモンと いっしょに 3問",
-        react: ["ソロモンが 玉を じっと 見ている…", "ソロモン「パチ、パチ… いい音！」", "ソロモン「わあ！ できた！」"],
-        miss: ["ソロモン「まちがえても だいじょうぶ。もう一回 やってみよう！」", "ソロモン「もう一回 やるって、すごいね！」"] } },
-    { who: "ソロモン", scene: "1_12", text: "ソロモンは、目を キラキラ させながら、どんどん 夢中に なっていった。「わあ！ たのしい！ もっと やりたい！」" },
-    { who: "", scene: "1_13", text: "気がつくと、まわりには 森の 仲間たちも 集まっていた。「すごいね！」「たのしそう！」" },
-    { who: "", scene: "1_14", text: "夕日が 森を オレンジ色に そめるころ——「こんなに 楽しいものを、みんなにも 伝えたいね。」「うん！ 一緒に やろう！」" },
-    { who: "", scene: "1_15", text: "こうして、ぼくと ソロモンの 特別な 出会いが 始まった。「これから たくさんのことを 一緒に 学ぼう！」「うん！ よろしく！」" },
-    { who: "", scene: "1_16", text: "ここから、ぼくらの ものがたりが はじまる——　そろばんで つながる、もっと 大きな 世界へ。" } ] },
+    { who: "", scene: "1_11", text: T("ソロモンと いっしょに、そろばんで 3問 やってみよう！ まちがえても だいじょうぶ。"),
+      practice: { n: 3, subj: "mitori", label: T("ソロモンと いっしょに 3問"),
+        react: [T("ソロモンが 玉を じっと 見ている…"), T("ソロモン「パチ、パチ… いい音！」"), T("ソロモン「わあ！ できた！」")],
+        miss: [T("ソロモン「まちがえても だいじょうぶ。もう一回 やってみよう！」"), T("ソロモン「もう一回 やるって、すごいね！」")] } },
+    { who: T("ソロモン"), scene: "1_12", text: T("ソロモンは、目を キラキラ させながら、どんどん 夢中に なっていった。「わあ！ たのしい！ もっと やりたい！」") },
+    { who: "", scene: "1_13", text: T("気がつくと、まわりには 森の 仲間たちも 集まっていた。「すごいね！」「たのしそう！」") },
+    { who: "", scene: "1_14", text: T("夕日が 森を オレンジ色に そめるころ——「こんなに 楽しいものを、みんなにも 伝えたいね。」「うん！ 一緒に やろう！」") },
+    { who: "", scene: "1_15", text: T("こうして、ぼくと ソロモンの 特別な 出会いが 始まった。「これから たくさんのことを 一緒に 学ぼう！」「うん！ よろしく！」") },
+    { who: "", scene: "1_16", text: T("ここから、ぼくらの ものがたりが はじまる——　そろばんで つながる、もっと 大きな 世界へ。") } ] },
   // 第1話つづきは 6コマ（scene_1b_1〜1b_6）
-  { id: "ep1b", n: "第1話（つづき）", t: "できた！", lv: 1, scene: "1b_1", lines: [
-    { who: "ソロモン", scene: "1b_1", text: "「どきどき… ぼくにも できるかな…？」" },
-    { who: "ソロモン", scene: "1b_2", text: "「よし… やってみよう！」パチ… パチ…" },
-    { who: "ソロモン", scene: "1b_3", text: "「できた！ 数字が こわくなかった！」" },
-    { who: "きみ", scene: "1b_4", text: "「やったね、ソロモン！」" },
-    { who: "", scene: "1b_5", text: "パァァ…　ソロモンが、すこし 大きく なった！" },
-    { who: "", scene: "1b_6", text: "ソロモンは 新しい 一歩を ふみ出した。🐣「ちいさなソロモン」——これからも 一緒に ぼうけんしよう！" } ] },
+  { id: "ep1b", n: T("第1話（つづき）"), t: T("できた！"), lv: 1, scene: "1b_1", lines: [
+    { who: T("ソロモン"), scene: "1b_1", text: T("「どきどき… ぼくにも できるかな…？」") },
+    { who: T("ソロモン"), scene: "1b_2", text: T("「よし… やってみよう！」パチ… パチ…") },
+    { who: T("ソロモン"), scene: "1b_3", text: T("「できた！ 数字が こわくなかった！」") },
+    { who: T("きみ"), scene: "1b_4", text: T("「やったね、ソロモン！」") },
+    { who: "", scene: "1b_5", text: T("パァァ…　ソロモンが、すこし 大きく なった！") },
+    { who: "", scene: "1b_6", text: T("ソロモンは 新しい 一歩を ふみ出した。🐣「ちいさなソロモン」——これからも 一緒に ぼうけんしよう！") } ] },
   // 第2話は 16コマ＋END（scene_2_1〜2_16, 2_end）。青い子＝ルート
-  { id: "ep2", n: "第2話", t: "青い子の ひみつ", lv: 2, scene: 2, lines: [
-    { who: "", scene: "2_1", text: "次の日、ぼくと ソロモンは また 森へ やってきた。「よし！ 今日も 練習しよう！」「うん！」" },
-    { who: "", scene: "2_2", text: "すると、どこからか 森に パチパチという 音が 聞こえた。「ん？ あの音は…？」" },
-    { who: "", scene: "2_3", text: "音の する方へ 行ってみると、木の かげで 青い 生きものが そろばんを はじいていた。「わぁ…！ すごい…！ とっても 速い…！」" },
-    { who: "きみ", scene: "2_4", text: "気づかれてしまい、青い子は そろばんを かかえて 走り去ってしまった。「まってー！ 話を させて！」" },
-    { who: "ソロモン", scene: "2_5", text: "ソロモンも 一緒に 追いかけた。「待ってー！ 一緒に やろうよ！」" },
-    { who: "青い子", scene: "2_6", text: "でも、青い子は 立ち止まり、ふり返った。「ぼくは… 一人で いい。」" },
-    { who: "ソロモン", scene: "2_7", text: "ソロモンは 首を かしげた。「どうして？ 一緒に やろうよ。楽しいよ！」「……だって 間違えるのが こわいんだ。」" },
-    { who: "青い子", scene: "2_8", text: "ぼくは、青い子の 気持ちを 聞いた。「まちがえると すごく くやしくて… せっかく 覚えたのに できなくなるのが こわくて…」" },
-    { who: "ソロモン", scene: "2_9", text: "ソロモンは 笑って 言った。「ぼくなんて、昨日 はじめた ばっかりだよ！ まちがえても やりなおせば いいよ！ できたときの ほうが ずっと 楽しいよ！」" },
-    { who: "きみ", scene: "2_10", text: "ぼくは、話した。「まちがえるのは だれでも あるよ。いっしょに やれば きっと できる。ぼくたち、仲間だから。」" },
-    { who: "", scene: "2_11", text: "そして、ぼくたちは そろばんを ならべた。「じゃあ、3人で やってみよう！」「……うん。」" },
-    { who: "", scene: "2_12", text: "一つずつ、ゆっくりと 玉を 動かす。パチ… パチ… パチ…" },
+  { id: "ep2", n: T("第2話"), t: T("青い子の ひみつ"), lv: 2, scene: 2, lines: [
+    { who: "", scene: "2_1", text: T("次の日、ぼくと ソロモンは また 森へ やってきた。「よし！ 今日も 練習しよう！」「うん！」") },
+    { who: "", scene: "2_2", text: T("すると、どこからか 森に パチパチという 音が 聞こえた。「ん？ あの音は…？」") },
+    { who: "", scene: "2_3", text: T("音の する方へ 行ってみると、木の かげで 青い 生きものが そろばんを はじいていた。「わぁ…！ すごい…！ とっても 速い…！」") },
+    { who: T("きみ"), scene: "2_4", text: T("気づかれてしまい、青い子は そろばんを かかえて 走り去ってしまった。「まってー！ 話を させて！」") },
+    { who: T("ソロモン"), scene: "2_5", text: T("ソロモンも 一緒に 追いかけた。「待ってー！ 一緒に やろうよ！」") },
+    { who: T("青い子"), scene: "2_6", text: T("でも、青い子は 立ち止まり、ふり返った。「ぼくは… 一人で いい。」") },
+    { who: T("ソロモン"), scene: "2_7", text: T("ソロモンは 首を かしげた。「どうして？ 一緒に やろうよ。楽しいよ！」「……だって 間違えるのが こわいんだ。」") },
+    { who: T("青い子"), scene: "2_8", text: T("ぼくは、青い子の 気持ちを 聞いた。「まちがえると すごく くやしくて… せっかく 覚えたのに できなくなるのが こわくて…」") },
+    { who: T("ソロモン"), scene: "2_9", text: T("ソロモンは 笑って 言った。「ぼくなんて、昨日 はじめた ばっかりだよ！ まちがえても やりなおせば いいよ！ できたときの ほうが ずっと 楽しいよ！」") },
+    { who: T("きみ"), scene: "2_10", text: T("ぼくは、話した。「まちがえるのは だれでも あるよ。いっしょに やれば きっと できる。ぼくたち、仲間だから。」") },
+    { who: "", scene: "2_11", text: T("そして、ぼくたちは そろばんを ならべた。「じゃあ、3人で やってみよう！」「……うん。」") },
+    { who: "", scene: "2_12", text: T("一つずつ、ゆっくりと 玉を 動かす。パチ… パチ… パチ…") },
     // 📖 ここで 漫画が 止まり、本物の そろばんで 3問。1問 正解→ルートが さわる、2問→少し 笑う、3問→「できたー！！」
-    { who: "", scene: "2_11", text: "ルートと いっしょに、そろばんで 3問 やってみよう。まちがえても だいじょうぶ——それは できるように なるための 道だから。",
-      practice: { n: 3, subj: "mitori", label: "ルートと いっしょに 3問",
-        react: ["ルートが そっと そろばんに さわった…", "ルートが 少し 笑った！", "ルート「……できた！」"],
-        miss: ["ソロモン「だいじょうぶ！ ぼくも 昨日 いっぱい 間違えたよ！」", "ルート「もう一回 やるって、ちょっと 勇気が いるんだね。」"] } },
-    { who: "", scene: "2_13", text: "そして——答えが 出た！「できたー！！」" },
-    { who: "青い子", scene: "2_14", text: "青い子は、少し てれながら 言った。「……明日は、ぼくが 教えてあげる。もっと 速く できる コツ、教えるね。」" },
-    { who: "ソロモン", scene: "2_15", text: "ソロモンは 大喜びした。「やったー！ よろしくね、ルート！」「……うん。いっしょに がんばろう。」" },
-    { who: "", scene: "2_16", text: "3人は、夕ぐれの 森を 歩いて 帰った。「明日も やろうね！」「うん！」" },
-    { who: "", scene: "2_end", text: "第2章 END　空の 向こうから、大きな 何かが やってくる——。" } ] },
+    { who: "", scene: "2_11", text: T("ルートと いっしょに、そろばんで 3問 やってみよう。まちがえても だいじょうぶ——それは できるように なるための 道だから。"),
+      practice: { n: 3, subj: "mitori", label: T("ルートと いっしょに 3問"),
+        react: [T("ルートが そっと そろばんに さわった…"), T("ルートが 少し 笑った！"), T("ルート「……できた！」")],
+        miss: [T("ソロモン「だいじょうぶ！ ぼくも 昨日 いっぱい 間違えたよ！」"), T("ルート「もう一回 やるって、ちょっと 勇気が いるんだね。」")] } },
+    { who: "", scene: "2_13", text: T("そして——答えが 出た！「できたー！！」") },
+    { who: T("青い子"), scene: "2_14", text: T("青い子は、少し てれながら 言った。「……明日は、ぼくが 教えてあげる。もっと 速く できる コツ、教えるね。」") },
+    { who: T("ソロモン"), scene: "2_15", text: T("ソロモンは 大喜びした。「やったー！ よろしくね、ルート！」「……うん。いっしょに がんばろう。」") },
+    { who: "", scene: "2_16", text: T("3人は、夕ぐれの 森を 歩いて 帰った。「明日も やろうね！」「うん！」") },
+    { who: "", scene: "2_end", text: T("第2章 END　空の 向こうから、大きな 何かが やってくる——。") } ] },
   // 第3話は 12コマ（scene_3_1〜3_12）。赤い ドラゴン＝カケルは 仲間に ならず 飛び去る → ホームに「🔒 カケルの谷」
-  { id: "ep3", n: "第3話", t: "空を たどる 赤い影", lv: 3, scene: 3, lines: [
-    { who: "", scene: "3_1", text: "森での 練習を 終えた 帰り道、空に 大きな かげが よぎった。「わぁ…！ あれは…？」" },
-    { who: "きみ", scene: "3_2", text: "「すごい…！ あんなに 大きい ドラゴン、はじめて 見たよ！」" },
-    { who: "", scene: "3_3", text: "たどり着いたのは、山の ふもと。そこに 赤い ドラゴンが いた。ゴォォォ…" },
-    { who: "ドラゴン", scene: "3_4", text: "「……よく ここまで 来たな、小さな そろばん使いよ。」" },
-    { who: "カケル", scene: "3_5", text: "「きみは…？」「私は カケル。この山の 向こうで 王国の 空を 守っている ドラゴンだ。」" },
-    { who: "カケル", scene: "3_6", text: "「この世界には、まだ 解決できていない “数の乱れ” が ある。その先へ 行くには、もっと 強い 力が 必要だ。」" },
-    { who: "", scene: "3_7", text: "「ぼくたちも 一緒に 行きたい！」「うん…！ ぼくたち、もっと 強く なりたい！」" },
-    { who: "カケル", scene: "3_8", text: "「……その気持ちは うれしい。だが、いまの 力では まだ 早い。」" },
-    { who: "カケル", scene: "3_9", text: "「その そろばんで、ここまで 来られるか？」「……はい！」" },
-    { who: "カケル", scene: "3_10", text: "「ならば、また 会おう。もっと 成長したときに、その先の 世界へ 案内してやる。」バサッ…！" },
-    { who: "", scene: "3_11", text: "そう言うと、カケルは 大きく はばたき、空の 向こうへと 消えていった。「カケルー！！」「……うん。ぼくたち、がんばろう！」" },
-    { who: "", scene: "3_12", text: "それから、ホームに 新しい 場所が あらわれた。🔒 カケルの谷——あと {valley}回 練習すると この場所が ひらくよ！　カケルに また 会うために、ぼくたちの そろばんの 冒険は つづく！" } ] },
+  { id: "ep3", n: T("第3話"), t: T("空を たどる 赤い影"), lv: 3, scene: 3, lines: [
+    { who: "", scene: "3_1", text: T("森での 練習を 終えた 帰り道、空に 大きな かげが よぎった。「わぁ…！ あれは…？」") },
+    { who: T("きみ"), scene: "3_2", text: T("「すごい…！ あんなに 大きい ドラゴン、はじめて 見たよ！」") },
+    { who: "", scene: "3_3", text: T("たどり着いたのは、山の ふもと。そこに 赤い ドラゴンが いた。ゴォォォ…") },
+    { who: T("ドラゴン"), scene: "3_4", text: T("「……よく ここまで 来たな、小さな そろばん使いよ。」") },
+    { who: T("カケル"), scene: "3_5", text: T("「きみは…？」「私は カケル。この山の 向こうで 王国の 空を 守っている ドラゴンだ。」") },
+    { who: T("カケル"), scene: "3_6", text: T("「この世界には、まだ 解決できていない “数の乱れ” が ある。その先へ 行くには、もっと 強い 力が 必要だ。」") },
+    { who: "", scene: "3_7", text: T("「ぼくたちも 一緒に 行きたい！」「うん…！ ぼくたち、もっと 強く なりたい！」") },
+    { who: T("カケル"), scene: "3_8", text: T("「……その気持ちは うれしい。だが、いまの 力では まだ 早い。」") },
+    { who: T("カケル"), scene: "3_9", text: T("「その そろばんで、ここまで 来られるか？」「……はい！」") },
+    { who: T("カケル"), scene: "3_10", text: T("「ならば、また 会おう。もっと 成長したときに、その先の 世界へ 案内してやる。」バサッ…！") },
+    { who: "", scene: "3_11", text: T("そう言うと、カケルは 大きく はばたき、空の 向こうへと 消えていった。「カケルー！！」「……うん。ぼくたち、がんばろう！」") },
+    { who: "", scene: "3_12", text: T("それから、ホームに 新しい 場所が あらわれた。🔒 カケルの谷——あと {valley}回 練習すると この場所が ひらくよ！　カケルに また 会うために、ぼくたちの そろばんの 冒険は つづく！") } ] },
   // 第4話は「カケルの谷」の 道が 開いたら（第3話を 読んでから 練習 VALLEY_NEED 回）。16コマ（scene_4_1〜4_16）
-  { id: "ep4", n: "第4話", t: "カケルの谷", gate: "valley", lv: 3, scene: 4, lines: [
-    { who: "", scene: "4_1", text: "道が 開いた。谷を 進んでいると、遠くから 大きな うなり声が 聞こえてきた。ゴォォォ…！「なに!? すごい音…！」" },
-    { who: "", scene: "4_2", text: "音の する方へ 行ってみると、岩山の 前に 大きな かげが あった。「あれは… ドラゴン…!?」" },
-    { who: "きみ", scene: "4_3", text: "近づくのは こわいけど、ぼくは 一歩 前に 進んだ。「でも… 逃げない！ 勇気を 出そう！」" },
-    { who: "", scene: "4_4", text: "すると、赤くて 大きな ドラゴンが すがたを あらわした。ガオォ…!!「わぁ…！ すごい…！」" },
-    { who: "カケル", scene: "4_5", text: "ドラゴンは 大きな 声で 言った。「……おまえたち、ほんとうに ここまで 来たのか？」" },
-    { who: "きみ", scene: "4_6", text: "ぼくは 少し ふるえながらも、そろばんを 見せた。「ぼくは、そろばんが 大好きです。もっと たくさんの 人に そろばんの 楽しさを 伝えたいんです！」" },
-    { who: "カケル", scene: "4_7", text: "カケルは ふしぎそうに そろばんを 見つめた。「……これは 小さな 珠で 大きな 力を 生み出す 道具なのか……？」" },
-    { who: "カケル", scene: "4_8", text: "すると、カケルの 表情が 少し やわらかくなった。「おもしろい！ そんな 夢を 持つ 子に 出会えるなんて 久しぶりだ！」" },
-    { who: "", scene: "4_9", text: "ぼくたちの 仲間も、勇気を 出して 話しかけた。「よろしく お願いします！」「一緒に 冒険しよう！」" },
-    { who: "カケル", scene: "4_10", text: "カケルは 大きく 笑った。ハハッ！「いいだろう！ 私は カケル。かけ算が 得意なんだ！」" },
-    { who: "カケル", scene: "4_11", text: "カケルは つばさを 広げ、空高く 舞い上がった。「一緒に 行こう！ 君たちと なら もっと 遠くへ 行ける！」「わぁ…！ かっこいい！」" },
-    { who: "", scene: "4_12", text: "カケルが 舞い降りて、そっと 言った。「これから よろしく！」「よろしく！ ぼくたち 一緒に がんばろう！」" },
-    { who: "", scene: "4_13", text: "こうして、カケルは ぼくたちの 仲間に なった。「やったね！ 新しい 仲間だ！」" },
-    { who: "カケル", scene: "4_14", text: "カケルは みんなに 話してくれた。「私は かけ算の 力で、こまっている 人の 力に なりたい。君たちの 夢を 必ず 応援するよ！」" },
-    { who: "", scene: "4_15", text: "夕日が 森を 照らす中、新しい 冒険が はじまる 予感が した。「もっと たくさんの 仲間と 出会って、みんなで 進もう！」" },
-    { who: "", scene: "4_16", text: "こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——" } ] },
+  { id: "ep4", n: T("第4話"), t: T("カケルの谷"), gate: "valley", lv: 3, scene: 4, lines: [
+    { who: "", scene: "4_1", text: T("道が 開いた。谷を 進んでいると、遠くから 大きな うなり声が 聞こえてきた。ゴォォォ…！「なに!? すごい音…！」") },
+    { who: "", scene: "4_2", text: T("音の する方へ 行ってみると、岩山の 前に 大きな かげが あった。「あれは… ドラゴン…!?」") },
+    { who: T("きみ"), scene: "4_3", text: T("近づくのは こわいけど、ぼくは 一歩 前に 進んだ。「でも… 逃げない！ 勇気を 出そう！」") },
+    { who: "", scene: "4_4", text: T("すると、赤くて 大きな ドラゴンが すがたを あらわした。ガオォ…!!「わぁ…！ すごい…！」") },
+    { who: T("カケル"), scene: "4_5", text: T("ドラゴンは 大きな 声で 言った。「……おまえたち、ほんとうに ここまで 来たのか？」") },
+    { who: T("きみ"), scene: "4_6", text: T("ぼくは 少し ふるえながらも、そろばんを 見せた。「ぼくは、そろばんが 大好きです。もっと たくさんの 人に そろばんの 楽しさを 伝えたいんです！」") },
+    { who: T("カケル"), scene: "4_7", text: T("カケルは ふしぎそうに そろばんを 見つめた。「……これは 小さな 珠で 大きな 力を 生み出す 道具なのか……？」") },
+    { who: T("カケル"), scene: "4_8", text: T("すると、カケルの 表情が 少し やわらかくなった。「おもしろい！ そんな 夢を 持つ 子に 出会えるなんて 久しぶりだ！」") },
+    { who: "", scene: "4_9", text: T("ぼくたちの 仲間も、勇気を 出して 話しかけた。「よろしく お願いします！」「一緒に 冒険しよう！」") },
+    { who: T("カケル"), scene: "4_10", text: T("カケルは 大きく 笑った。ハハッ！「いいだろう！ 私は カケル。かけ算が 得意なんだ！」") },
+    { who: T("カケル"), scene: "4_11", text: T("カケルは つばさを 広げ、空高く 舞い上がった。「一緒に 行こう！ 君たちと なら もっと 遠くへ 行ける！」「わぁ…！ かっこいい！」") },
+    { who: "", scene: "4_12", text: T("カケルが 舞い降りて、そっと 言った。「これから よろしく！」「よろしく！ ぼくたち 一緒に がんばろう！」") },
+    { who: "", scene: "4_13", text: T("こうして、カケルは ぼくたちの 仲間に なった。「やったね！ 新しい 仲間だ！」") },
+    { who: T("カケル"), scene: "4_14", text: T("カケルは みんなに 話してくれた。「私は かけ算の 力で、こまっている 人の 力に なりたい。君たちの 夢を 必ず 応援するよ！」") },
+    { who: "", scene: "4_15", text: T("夕日が 森を 照らす中、新しい 冒険が はじまる 予感が した。「もっと たくさんの 仲間と 出会って、みんなで 進もう！」") },
+    { who: "", scene: "4_16", text: T("こうして、カケルとの 出会いは、ぼくたちの 大きな 一歩に なった——　それぞれの 得意な 力が ひとつに なると、どんな 困難も 乗り越えられる。新しい 仲間と、もっと 大きな 世界へ——") } ] },
   // 第4話つづき「こわれた橋」：第4話の すぐあと。20コマ目で 止まり、本物の そろばんで 3問（橋クエスト）→ 23コマ目へ
-  { id: "ep4b", n: "第4話（つづき）", t: "こわれた橋", gate: "after-ep4", lv: 3, scene: "4b_18", lines: [
-    { who: "カケル", scene: "4b_17", text: "朝、カケルが みんなを 起こしに きた。「おはよう！ 今日は 次の 場所へ 行こう！」「うん！」「わくわく！」" },
-    { who: "", scene: "4b_18", text: "森を 進むと、大きな 川が 見えてきた。「あっ…！ 橋が こわれてる…！」" },
-    { who: "", scene: "4b_19", text: "向こう側には、見たことのない 町が ある。「あの町へ 行くには この橋を 直すしか ないみたいだね。」「みんなで 力を 合わせよう！」" },
-    { who: "カケル", scene: "4b_20", text: "カケルが 言った。「橋を 直すには 数の力が 必要だ。そろばんで 問題を 解いて 橋の石を 集めよう！」「おれも 応援するぞ！」" },
-    { who: "", scene: "4b_play", text: "さあ、きみの 番だ。そろばんで 3問 とくと、橋の石が 3つ 集まる。まちがえても だいじょうぶ、もう一回 やればいい。",
-      practice: { n: 3, subj: "mitori", label: "橋の石を 集める 3問", quest: "bridge",
-        react: ["カケル「いいぞ！ 石が ひとつ 集まった！」", "ルート「橋が つながって いってる！」", "ソロモン「やった！ もう少しだよ！」"],
-        miss: ["ルート「ぼくも まちがえたこと あるよ。もう一回！」", "カケル「あきらめなかったな。それが 数の力だ。」"] } },
-    { who: "", scene: "4b_23", text: "1問 できるごとに、橋の 一部が 直っていく。「すごい！ 橋が つながって いってる！」" },
-    { who: "", scene: "4b_24", text: "みんなで 協力して たくさんの 問題を 解いた。「やった！ もう少しだよ！」「この調子！」" },
-    { who: "", scene: "4b_25", text: "そして——ついに！「できたー！」" },
-    { who: "カケル", scene: "4b_26", text: "橋を 渡る前に、カケルが 言った。「よくやった！ これからも 困ったことが あったら、そろばんの 力で 乗りこえていける。おれは いつも そばに いるぞ！」" },
-    { who: "ソロモン", scene: "4b_27", text: "ソロモンが うれしそうに 言った。「みんなと いっしょなら どんなことも できるね！ もっと いろんな 場所へ 行こう！」" },
-    { who: "きみ", scene: "4b_28", text: "少年は 新しい 仲間たちを 見て、心の中で 思った。「そろばんが あれば ぼくは きっと——もっと たくさんの 冒険が できる！」" },
-    { who: "", scene: "4b_29", text: "3匹も それぞれ 決意を 新たに した。ソロモン「みんなを 元気にするよ！」ルート「まちがえても あきらめない！」カケル「もっと 強くなるために いっしょに 進もう！」" },
-    { who: "", scene: "4b_30", text: "橋の 向こうには、きらめく 王都が 待っている。「さあ！ 次の 冒険へ 出発だ！」新しい 出会いが ぼくらを 待っている——" },
-    { who: "", scene: "4b_31", text: "そろばんの 力は 一人ではなく 仲間と 一緒に あると もっと 大きくなる。これからも——たくさんの 冒険が ぼくらを 待っている！" },
-    { who: "", scene: "4b_32", text: "つぎの 世界へ——　つづく！" } ] },
-  { id: "ep5", n: "第5話", t: "一人前の そろばん仲間", lv: 5, scene: 6, lines: [
-    { who: "ソロモン", pose: "happy", text: "ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！" },
-    { who: "きみ", pose: "celebrate", text: "これからも いっしょだよ。" },
-    { who: "ソロモン", pose: "side", text: "うん！ つぎは どこへ 行こうかな！" },
-    { who: "", pose: "celebrate", text: "👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！" } ] },
+  { id: "ep4b", n: T("第4話（つづき）"), t: T("こわれた橋"), gate: "after-ep4", lv: 3, scene: "4b_18", lines: [
+    { who: T("カケル"), scene: "4b_17", text: T("朝、カケルが みんなを 起こしに きた。「おはよう！ 今日は 次の 場所へ 行こう！」「うん！」「わくわく！」") },
+    { who: "", scene: "4b_18", text: T("森を 進むと、大きな 川が 見えてきた。「あっ…！ 橋が こわれてる…！」") },
+    { who: "", scene: "4b_19", text: T("向こう側には、見たことのない 町が ある。「あの町へ 行くには この橋を 直すしか ないみたいだね。」「みんなで 力を 合わせよう！」") },
+    { who: T("カケル"), scene: "4b_20", text: T("カケルが 言った。「橋を 直すには 数の力が 必要だ。そろばんで 問題を 解いて 橋の石を 集めよう！」「おれも 応援するぞ！」") },
+    { who: "", scene: "4b_play", text: T("さあ、きみの 番だ。そろばんで 3問 とくと、橋の石が 3つ 集まる。まちがえても だいじょうぶ、もう一回 やればいい。"),
+      practice: { n: 3, subj: "mitori", label: T("橋の石を 集める 3問"), quest: "bridge",
+        react: [T("カケル「いいぞ！ 石が ひとつ 集まった！」"), T("ルート「橋が つながって いってる！」"), T("ソロモン「やった！ もう少しだよ！」")],
+        miss: [T("ルート「ぼくも まちがえたこと あるよ。もう一回！」"), T("カケル「あきらめなかったな。それが 数の力だ。」")] } },
+    { who: "", scene: "4b_23", text: T("1問 できるごとに、橋の 一部が 直っていく。「すごい！ 橋が つながって いってる！」") },
+    { who: "", scene: "4b_24", text: T("みんなで 協力して たくさんの 問題を 解いた。「やった！ もう少しだよ！」「この調子！」") },
+    { who: "", scene: "4b_25", text: T("そして——ついに！「できたー！」") },
+    { who: T("カケル"), scene: "4b_26", text: T("橋を 渡る前に、カケルが 言った。「よくやった！ これからも 困ったことが あったら、そろばんの 力で 乗りこえていける。おれは いつも そばに いるぞ！」") },
+    { who: T("ソロモン"), scene: "4b_27", text: T("ソロモンが うれしそうに 言った。「みんなと いっしょなら どんなことも できるね！ もっと いろんな 場所へ 行こう！」") },
+    { who: T("きみ"), scene: "4b_28", text: T("少年は 新しい 仲間たちを 見て、心の中で 思った。「そろばんが あれば ぼくは きっと——もっと たくさんの 冒険が できる！」") },
+    { who: "", scene: "4b_29", text: T("3匹も それぞれ 決意を 新たに した。ソロモン「みんなを 元気にするよ！」ルート「まちがえても あきらめない！」カケル「もっと 強くなるために いっしょに 進もう！」") },
+    { who: "", scene: "4b_30", text: T("橋の 向こうには、きらめく 王都が 待っている。「さあ！ 次の 冒険へ 出発だ！」新しい 出会いが ぼくらを 待っている——") },
+    { who: "", scene: "4b_31", text: T("そろばんの 力は 一人ではなく 仲間と 一緒に あると もっと 大きくなる。これからも——たくさんの 冒険が ぼくらを 待っている！") },
+    { who: "", scene: "4b_32", text: T("つぎの 世界へ——　つづく！") } ] },
+  { id: "ep5", n: T("第5話"), t: T("一人前の そろばん仲間"), lv: 5, scene: 6, lines: [
+    { who: T("ソロモン"), pose: "happy", text: T("ぼく、一人前の そろばん仲間に なれたよ！ ぜんぶ、きみが 毎日 いっしょに やってくれた おかげ！") },
+    { who: T("きみ"), pose: "celebrate", text: T("これからも いっしょだよ。") },
+    { who: T("ソロモン"), pose: "side", text: T("うん！ つぎは どこへ 行こうかな！") },
+    { who: "", pose: "celebrate", text: T("👑 そして、つぎの エリアが ひらかれる……　きみの ぼうけんは まだまだ つづく！") } ] },
 ];
-const SOLO_SPECIAL_30 = { id: "d30", n: "とくべつな 日", t: "そろばんを やった日が 30日！", lv: 0, scene: 6, lines: [
-  { who: "ソロモン", pose: "happy", text: "そろばんを やった日が、30日に なったよ！" },
-  { who: "ソロモン", pose: "front", text: "最初は 数字を 見ると こわかったけど……" },
-  { who: "ソロモン", pose: "celebrate", text: "いまは、きみと なら だいじょうぶ！ これからも よろしくね！" } ] };
+const SOLO_SPECIAL_30 = { id: "d30", n: T("とくべつな 日"), t: T("そろばんを やった日が 30日！"), lv: 0, scene: 6, lines: [
+  { who: T("ソロモン"), pose: "happy", text: T("そろばんを やった日が、30日に なったよ！") },
+  { who: T("ソロモン"), pose: "front", text: T("最初は 数字を 見ると こわかったけど……") },
+  { who: T("ソロモン"), pose: "celebrate", text: T("いまは、きみと なら だいじょうぶ！ これからも よろしくね！") } ] };
 /* ---- カケルの谷：第3話を 読んでから 練習 VALLEY_NEED 回で 道が 開く（第4話） ----
    「あと○回 練習すると 道が 開く」と 場所で 見せる（成績表の 数字に しない） */
 const VALLEY_NEED = 10;
@@ -5105,7 +5106,7 @@ function startStorySession(ep, idx) {
   let subj = P.subj || "mitori";
   if (!difficulty(currentGrade(), subj)) subj = difficulty(currentGrade(), "anzan") ? "anzan" : "mitori";
   const st = soloState(); st.prog = st.prog || {}; st.prog[ep.id] = idx; soloSave(st);   // とちゅうで やめても ここから 再開
-  pendingStory = { ep: ep.id, idx, n: P.n || 3, hits: 0, retry: false, label: P.label || ("いっしょに " + (P.n || 3) + "問"), react: P.react || [], miss: P.miss || [], quest: P.quest || "" };
+  pendingStory = { ep: ep.id, idx, n: P.n || 3, hits: 0, retry: false, label: P.label || (T("いっしょに ") + (P.n || 3) + T("問")), react: P.react || [], miss: P.miss || [], quest: P.quest || "" };
   subject = subj; renderGrid(); updateInfo();
   startWithTips(subj);              // はじめての子には ゆびの 使い方の 説明が 先に 出る
 }
@@ -5121,25 +5122,25 @@ function storyOnAnswer(ok) {
   if (!S.retry) {
     S.retry = true;
     session.queue = [session.cur].concat(session.queue || []); session.N++;   // 同じ問題を もう一回（1問ぶん のびる）
-    renderBridge(S.miss[0] + "　→ もう一回 やってみよう", "sad");
+    renderBridge(S.miss[0] + T("　→ もう一回 やってみよう"), "sad");
     return 1800;
   }
-  renderBridge("だいじょうぶ、つぎに いこう。", "wave");
+  renderBridge(T("だいじょうぶ、つぎに いこう。"), "wave");
   return 1200;
 }
 /* 🌉 クエスト：練習に「意味」を つける。中身の 問題は ふつうと 同じ。
    before/after の 2枚の 絵が 同じ構図で、正解の ぶんだけ after が 左から あらわれる（＝橋が のびる） */
 const QUESTS = {
-  bridge: { name: "壊れた橋を 直せ！", em: "🌉", before: "assets/quests/bridge_before.jpg", after: "assets/quests/bridge_after.jpg",
-    start: "数の乱れで 橋が 消えちゃった！ 正解するたびに 橋が のびるよ。", done: "パチン！ 橋が できた！　🐣「渡れるー！！」" },
-  town:   { name: "暗い町に 灯りを ともせ！", em: "🔦", before: "assets/quests/town_before.jpg", after: "assets/quests/town_after.jpg",
-    start: "町の 灯りが ぜんぶ 消えちゃった！ 正解するたびに 灯りが ともるよ。", done: "パッ！ 町が 明るくなった！　🐣「みんな 出てきたよ！」" },
-  forest: { name: "迷子の森を ぬけろ！", em: "🐾", before: "assets/quests/forest_before.jpg", after: "assets/quests/forest_after.jpg",
-    start: "霧で 道が 見えない…。正解するたびに 霧が 晴れるよ。", done: "霧が 晴れて 道しるべが 見えた！　🐣「こっちだ！」" },
-  ship:   { name: "沈みそうな船を 助けろ！", em: "⛵", before: "assets/quests/ship_before.jpg", after: "assets/quests/ship_after.jpg",
-    start: "あらしで 船が かたむいてる！ 正解するたびに 海が おだやかに なるよ。", done: "船が 港に 着いた！　🐣「たすかった！」" },
-  valley: { name: "カケルの谷へ 進め！", em: "⛰️", before: "assets/quests/valley_before.jpg", after: "assets/quests/valley_after.jpg",
-    start: "数の霧で 谷の 道が 見えない！ 正解するたびに 道が あらわれるよ。", done: "谷の 向こうに 塔が 見えた！　🐣「もう少しだ！」" },
+  bridge: { name: T("壊れた橋を 直せ！"), em: "🌉", before: "assets/quests/bridge_before.jpg", after: "assets/quests/bridge_after.jpg",
+    start: T("数の乱れで 橋が 消えちゃった！ 正解するたびに 橋が のびるよ。"), done: T("パチン！ 橋が できた！　🐣「渡れるー！！」") },
+  town:   { name: T("暗い町に 灯りを ともせ！"), em: "🔦", before: "assets/quests/town_before.jpg", after: "assets/quests/town_after.jpg",
+    start: T("町の 灯りが ぜんぶ 消えちゃった！ 正解するたびに 灯りが ともるよ。"), done: T("パッ！ 町が 明るくなった！　🐣「みんな 出てきたよ！」") },
+  forest: { name: T("迷子の森を ぬけろ！"), em: "🐾", before: "assets/quests/forest_before.jpg", after: "assets/quests/forest_after.jpg",
+    start: T("霧で 道が 見えない…。正解するたびに 霧が 晴れるよ。"), done: T("霧が 晴れて 道しるべが 見えた！　🐣「こっちだ！」") },
+  ship:   { name: T("沈みそうな船を 助けろ！"), em: "⛵", before: "assets/quests/ship_before.jpg", after: "assets/quests/ship_after.jpg",
+    start: T("あらしで 船が かたむいてる！ 正解するたびに 海が おだやかに なるよ。"), done: T("船が 港に 着いた！　🐣「たすかった！」") },
+  valley: { name: T("カケルの谷へ 進め！"), em: "⛰️", before: "assets/quests/valley_before.jpg", after: "assets/quests/valley_after.jpg",
+    start: T("数の霧で 谷の 道が 見えない！ 正解するたびに 道が あらわれるよ。"), done: T("谷の 向こうに 塔が 見えた！　🐣「もう少しだ！」") },
 };
 const QUEST_ORDER = ["bridge", "town", "forest", "ship", "valley"];
 // きょうの クエスト：日付で かわる（同じ日は 同じ）。カケルの谷を 追いかけている あいだは 谷の 道を 多めに
@@ -5195,8 +5196,8 @@ function soloStory(ep, onClose, startIdx) {
       soloPic(L.pose, "story-pic") + "</div>";
     d.innerHTML = '<div class="tip-card story-card"><div class="story-h">' + ep.n + "　" + ep.t + "</div>" +
       scene + '<div class="story-who">' + (L.who || "") + '</div><div class="story-text">' + L.text + "</div>" +
-      '<button class="tip-ok">' + (P ? "🧮 はじめる（" + (P.n || 3) + "問）" : last ? "とじる" : "つぎへ ▶") + "</button>" +
-      (P || last ? "" : '<button class="story-skip-btn hidden">▶▶ とばす</button>') +
+      '<button class="tip-ok">' + (P ? T("🧮 はじめる（") + (P.n || 3) + T("問）") : last ? T("とじる") : T("つぎへ ▶")) + "</button>" +
+      (P || last ? "" : T('<button class="story-skip-btn hidden">▶▶ とばす</button>')) +
       '<div class="story-skip">' + (i + 1) + " / " + ep.lines.length + "</div></div>";
     d.querySelector(".tip-ok").onclick = () => {
       try { clickSnd(); } catch (e) { }
@@ -5242,7 +5243,7 @@ function solomonAfterStudy() {
   const next = () => { const ep = queue.shift(); if (ep) soloStory(ep, next); else renderSolomonCard(); };
   setTimeout(() => {
     if (queue.length) { try { sfx("levelup", function () { fanfareSnd(); }); } catch (e) { } next(); }
-    else { soloToast("🐣 ソロモン「れんしゅう ありがとう！」　つぎの 成長まで：" + soloNext(s, lv)); renderSolomonCard(); }
+    else { soloToast(T("🐣 ソロモン「れんしゅう ありがとう！」　つぎの 成長まで：") + soloNext(s, lv)); renderSolomonCard(); }
   }, 1600);
 }
 /* ホームの カード */
@@ -5253,12 +5254,12 @@ function renderSolomonCard() {
   const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
   // 絵：きょう 練習ずみ→よろこぶ／まだ→手をふる（Lv.5は マント）／出会う前→正面
   box.innerHTML = '<div class="solo-top">' + soloPic(lv === 0 ? "front" : s.todayDone ? "happy" : lv >= 5 ? "zukan" : "wave") +
-    "<div><b>🐣 ソロモン</b><small>" + (lv ? "Lv." + lv + " " + SOLO_LEVELS[lv - 1].name : "まだ 出会ったばかり") + "</small></div></div>" +
+    T("<div><b>🐣 ソロモン</b><small>") + (lv ? "Lv." + lv + " " + SOLO_LEVELS[lv - 1].name : T("まだ 出会ったばかり")) + "</small></div></div>" +
     '<div class="solo-speech">「' + soloSpeech(s, lv) + '」</div>' +
-    '<div class="solo-row"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
-    '<div class="solo-next">つぎの 場所まで　' + soloNext(s, lv) + "</div>" +
+    T('<div class="solo-row"><span>成長</span><b>') + starStr(lv, 5) + "</b></div>" +
+    T('<div class="solo-next">つぎの 場所まで　') + soloNext(s, lv) + "</div>" +
     soloValleyHTML(st) +
-    '<button id="homeToSolomon" class="wide-btn">🐣 ソロモンを 見る</button>';
+    T('<button id="homeToSolomon" class="wide-btn">🐣 ソロモンを 見る</button>');
   $("#homeToSolomon").onclick = () => { showView("solomon"); setActiveNav(document.querySelector('.nav[data-view="solomon"]')); };
   const vg = $("#valleyGo"); if (vg) vg.onclick = () => soloStory(SOLO_EPISODES.find((e) => e.id === "ep4"), renderSolomonCard);
   const vg2 = $("#valleyGo2"); if (vg2) vg2.onclick = () => soloStory(SOLO_EPISODES.find((e) => e.id === "ep4b"), renderSolomonCard);
@@ -5266,35 +5267,35 @@ function renderSolomonCard() {
 // 🔒 カケルの谷（第3話を 読んだ子にだけ 出る）
 function soloValleyHTML(st) {
   if (!st.seen.ep3) return "";
-  if (st.seen.ep4 && !st.seen.ep4b) return '<div class="solo-valley open">🌉 こわれた橋　つぎの 練習で 橋を 直そう！ <button id="valleyGo2" class="hw-go">▶ 読む</button></div>';
-  if (st.seen.ep4) return '<div class="solo-valley open">🏔 カケルの谷　カケルが 仲間に なった！</div>';
-  if (valleyOpen()) return '<div class="solo-valley open">🏔 カケルの谷の 道が 開いた！ <button id="valleyGo" class="hw-go">▶ 進む</button></div>';
-  return '<div class="solo-valley">🔒 カケルの谷　あと <b>' + valleyLeft() + '</b>回 練習すると 道が 開く</div>';
+  if (st.seen.ep4 && !st.seen.ep4b) return T('<div class="solo-valley open">🌉 こわれた橋　つぎの 練習で 橋を 直そう！ <button id="valleyGo2" class="hw-go">▶ 読む</button></div>');
+  if (st.seen.ep4) return T('<div class="solo-valley open">🏔 カケルの谷　カケルが 仲間に なった！</div>');
+  if (valleyOpen()) return T('<div class="solo-valley open">🏔 カケルの谷の 道が 開いた！ <button id="valleyGo" class="hw-go">▶ 進む</button></div>');
+  return T('<div class="solo-valley">🔒 カケルの谷　あと <b>') + valleyLeft() + T('</b>回 練習すると 道が 開く</div>');
 }
 /* ソロモンの 画面（図鑑＋物語） */
 function renderSolomon() {
   const main = $("#soloMain"), eps = $("#soloEpisodes"); if (!main) return;
   const st = soloState(), s = soloStats(), lv = soloLevel(s, st);
   const L = SOLO_LEVELS[lv - 1];
-  const fmtMet = st.met ? st.met.slice(0, 4) + "年" + (+st.met.slice(5, 7)) + "月" + (+st.met.slice(8, 10)) + "日" : "—";
+  const fmtMet = st.met ? st.met.slice(0, 4) + T("年") + (+st.met.slice(5, 7)) + T("月") + (+st.met.slice(8, 10)) + T("日") : "—";
   main.innerHTML = soloPic(lv >= 5 ? "celebrate" : lv >= 4 ? "zukan" : lv >= 3 ? "happy" : lv >= 2 ? "soroban" : lv >= 1 ? "front" : "wonder") +
     '<div class="solo-lvname">' + soloTitle(lv) + "</div>" +
-    '<div class="solo-quote">「' + (L ? pickToday(L.talk) : "そろばん、いっしょに やってみる？") + '」</div>' +
-    '<div class="solo-row big"><span>成長</span><b>' + starStr(lv, 5) + "</b></div>" +
-    '<div class="solo-stats"><div><b>' + s.sets + '</b><span>練習した 回数</span></div><div><b>' + s.correct + '</b><span>正解した 問題</span></div><div><b>' + s.days + '</b><span>そろばんを やった日</span></div></div>' +
-    '<div class="sub">出会った日：' + fmtMet + (s.dan ? "　⭐ 称号：段の ソロモン" : "") + "</div>" +
-    "<h4>そろばんの 力（しゅもく別）</h4>" +
-    SOLO_SUBJ.map((k) => '<div class="solo-skill"><span>' + SOLO_SUBJ_NAME[k] + "</span><b>" + starStr(soloStars(s.bySubj[k]), 5) + '</b><small>' + s.bySubj[k] + "問</small></div>").join("") +
-    '<p class="sub">★は ソロモンと 出会ってから、その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>' +
-    '<div class="solo-cond"><b>つぎの 場所まで</b><br>' + soloNext(s, lv) + (SOLO_LEVELS[lv] ? '<br><small>（' + SOLO_LEVELS[lv].cond + "）</small>" : "") + "</div>";
+    '<div class="solo-quote">「' + (L ? pickToday(L.talk) : T("そろばん、いっしょに やってみる？")) + '」</div>' +
+    T('<div class="solo-row big"><span>成長</span><b>') + starStr(lv, 5) + "</b></div>" +
+    '<div class="solo-stats"><div><b>' + s.sets + T('</b><span>練習した 回数</span></div><div><b>') + s.correct + T('</b><span>正解した 問題</span></div><div><b>') + s.days + T('</b><span>そろばんを やった日</span></div></div>') +
+    T('<div class="sub">出会った日：') + fmtMet + (s.dan ? T("　⭐ 称号：段の ソロモン") : "") + "</div>" +
+    T("<h4>そろばんの 力（しゅもく別）</h4>") +
+    SOLO_SUBJ.map((k) => '<div class="solo-skill"><span>' + SOLO_SUBJ_NAME[k] + "</span><b>" + starStr(soloStars(s.bySubj[k]), 5) + '</b><small>' + s.bySubj[k] + T("問</small></div>")).join("") +
+    T('<p class="sub">★は ソロモンと 出会ってから、その しゅもくの 練習で 正解した 数（20・50・100・200・400問）。パズル・たいせん・SK検定は 数えないよ。</p>') +
+    T('<div class="solo-cond"><b>つぎの 場所まで</b><br>') + soloNext(s, lv) + (SOLO_LEVELS[lv] ? T('<br><small>（') + SOLO_LEVELS[lv].cond + T("）</small>") : "") + "</div>";
   const all = SOLO_EPISODES.concat(st.said.d30 ? [SOLO_SPECIAL_30] : []);
-  eps.innerHTML = (storyOn() ? "" : '<p class="sub">いま「ソロモンと 物語」は オフです（設定で オンに できます）。図鑑は 見られます。</p>') + all.map((ep, i) => {
+  eps.innerHTML = (storyOn() ? "" : T('<p class="sub">いま「ソロモンと 物語」は オフです（設定で オンに できます）。図鑑は 見られます。</p>')) + all.map((ep, i) => {
     const open = ep.id === "d30" || st.seen[ep.id] || (ep.gate === "valley" ? valleyOpen() : ep.gate === "after-ep4" ? !!st.seen.ep4 : lv >= ep.lv);
-    const lock = ep.gate === "valley" ? (st.seen.ep3 ? "🔒 あと " + valleyLeft() + "回 練習で 道が 開く" : "🔒 第3話の あとで")
-      : ep.gate === "after-ep4" ? "🔒 第4話の あとで" : "🔒 Lv." + ep.lv + " で ひらく";
-    return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : "？？？") + "</b>" +
-      (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? "もう一度 よむ" : "▶ よむ") + "</button>" : "<small>" + lock + "</small>") + "</div>";
-  }).join("") + '<p class="sub">物語は「そろばんの 練習」で 進みます。パズルや たいせんでは 進みません。</p>';
+    const lock = ep.gate === "valley" ? (st.seen.ep3 ? T("🔒 あと ") + valleyLeft() + T("回 練習で 道が 開く") : T("🔒 第3話の あとで"))
+      : ep.gate === "after-ep4" ? T("🔒 第4話の あとで") : "🔒 Lv." + ep.lv + T(" で ひらく");
+    return '<div class="solo-ep' + (open ? "" : " locked") + '"><b>' + ep.n + "　" + (open ? ep.t : T("？？？")) + "</b>" +
+      (open ? '<button class="ep-read" data-i="' + i + '">' + (st.seen[ep.id] ? T("もう一度 よむ") : T("▶ よむ")) + "</button>" : "<small>" + lock + "</small>") + "</div>";
+  }).join("") + T('<p class="sub">物語は「そろばんの 練習」で 進みます。パズルや たいせんでは 進みません。</p>');
   eps.querySelectorAll(".ep-read").forEach((b) => { b.onclick = () => soloStory(all[+b.dataset.i], renderSolomon, 0); });   // 図鑑からは はじめから
 }
 
