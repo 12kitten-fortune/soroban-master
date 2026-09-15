@@ -9,4 +9,7 @@ window.SK_FIREBASE_CONFIG = {
   storageBucket: "soroban-kingdom.firebasestorage.app",
   messagingSenderId: "113503697891",
   appId: "1:113503697891:web:906c26fa73a3ced2eafed6",
+  // App Check（reCAPTCHA v3）の サイトキー。Firebase コンソール → App Check → アプリ → reCAPTCHA v3 で 登録して 出る 文字列を 貼る。
+  // null の あいだは App Check なしで 動く（Firebaseの設定メモ.md の ⑤）
+  appCheckKey: null,
 };

@@ -12,14 +12,15 @@
     <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../page.css" />
-    <link rel="stylesheet" href="class.css?v=391" />
+    <link rel="stylesheet" href="class.css?v=400" />
     <!-- Firebase（Google の CDN）。firebase-config.js が null の あいだは 使わず、お試しモードで 動く -->
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check-compat.js"></script>
     <script src="../i18n.js?v=20260914g"></script>
-    <script src="../firebase-config.js?v=391"></script>
-    <script src="store.js?v=392"></script>
+    <script src="../firebase-config.js?v=393"></script>
+    <script src="store.js?v=393"></script>
     <!-- 級の基準（級体系）の 表。教室ごとに えらぶ -->
     <script src="../curriculum/sk.js?v=20260914g"></script>
     <script src="../curriculum/presets_jp.js?v=20260914g"></script>
@@ -38,7 +39,7 @@
       <!-- いまの プラン（人数の 上限・のこり日数） -->
       <div id="planNote" class="cls-plan hidden"></div>
 
-      <!-- つぎに やること（状況に あわせて 変わる） -->
+      <!-- つぎに やること（状況に あわせて 変わる）。どの画面でも いちばん上に 1つだけ -->
       <div id="guideBar" class="guide hidden">
         <div class="guide-h"><span id="guideStep"></span><span id="guideTitle"></span></div>
         <p id="guideText"></p>
@@ -74,7 +75,7 @@
           <p class="hint fb-only" data-say="3つとも 入れたら、下の 黒い ボタンを 押します。これで 準備は 終わりです。">
             <b>④</b> 3つとも 入れたら、下の <b>黒いボタン</b>を 押します。</p>
           <div class="btn-row">
-            <button type="submit" id="lgGo">アカウントを 作って はじめる</button>
+            <button type="submit" id="lgGo" class="big-btn">アカウントを 作って はじめる</button>
           </div>
           <p class="sub fb-only cls-switch">2回目からは：<a href="#" id="lgToggle">ログインする（アカウントを 持っている）</a></p>
           <p class="sub fb-only"><a href="#" id="lgReset">パスワードを 忘れた（メールで 作りなおす）</a></p>
@@ -83,37 +84,107 @@
         <p class="un-note">生徒側は ログイン不要です。先生が 登録した にっくねーむを 選ぶだけで 使えます。メール・本名・生年月日は 集めません。</p>
       </section>
 
-      <!-- 教室の一覧 -->
+      <!-- 教室の一覧 ＝ 1／4 教室の 名前を 入れる（まだ 教室が 無いときは 一覧を 出さず、名前の 欄だけ） -->
       <section id="scr-classes" class="hidden">
-        <div class="card">
+        <div class="card" id="classListCard">
           <h1>教室</h1>
+          <p class="hint" data-say="教室の 名前を 押すと、その教室の 画面に なります。">教室の 名前を 押すと、その教室の 画面に なります。</p>
           <div id="classList" class="cls-list"></div>
-          <p class="hint" data-say="教室の 名前を 入れて、教室を 作る を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。">
-            教室の 名前を 入れて <b>「＋ 教室を 作る」</b>を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。</p>
-          <form id="newClassForm" class="cls-inline">
-            <input id="ncName" type="text" placeholder="教室の名前（例：月曜クラス）" required />
-            <label class="nc-preset">級の基準 <select id="ncPreset"></select></label>
-            <button type="submit">＋ 教室を 作る</button>
+        </div>
+        <div class="card">
+          <h1 id="ncTitle">教室の 名前を 入れる</h1>
+          <p class="hint" data-say="教室の 名前を 入れて、下の 黒い ボタンを 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。">
+            教室の 名前を 入れて、下の <b>黒いボタン</b>を 押します。曜日や 学年で 分けても かまいません。あとから いくつでも 作れます。</p>
+          <form id="newClassForm" class="cls-flow">
+            <label><span class="lb">教室の 名前</span><input id="ncName" type="text" placeholder="例：月曜クラス" required /></label>
+            <button type="submit" id="ncGo" class="big-btn">＋ この名前で 教室を 作る</button>
+            <div id="ncMsg" class="result"></div>
           </form>
-          <p class="hint">「級の基準」＝ この教室で 使う 級の 表（何級が 何桁 何口か）。<b>標準</b>は 20級（入門）〜十段、<b>標準（10級から）</b>は 入門の級を 使いません。あとから 教室の 画面で 変えられます。</p>
         </div>
       </section>
 
-      <!-- 教室 -->
-      <section id="scr-class" class="hidden">
-        <p class="cls-crumb"><a href="#" id="backClasses">← 教室の一覧</a></p>
+      <!-- 2／4 生徒の 名前を 入れる（教室を 作ると 自動で ここへ） -->
+      <section id="scr-add" class="hidden">
+        <p class="cls-crumb"><a href="#" id="addBack">← 教室の 画面へ</a></p>
         <div class="card">
-          <div class="cls-title-row">
-            <h1 id="clsName"></h1>
-            <button id="clsDelete" class="ghost small">教室を 消す</button>
+          <h1><span id="addClsName"></span>　生徒の 名前を 入れる</h1>
+          <form id="addForm" class="cls-add cls-flow">
+            <p class="hint" data-say="下の 白い 欄に、生徒の 名前を 書きます。2人以上のときは、1行に 1人ずつ。エンターキーで 改行して ください。本名で なくて かまいません。子どもが 自分で 見つけられる 呼び名に します。">
+              下の 白い欄に、生徒の 名前を 書きます。2人以上のときは <b>1行に 1人ずつ</b>（改行して ください）。<b>本名で なくて かまいません。</b>子どもが 自分で 見つけられる 呼び名に します。</p>
+            <label><span class="lb">生徒の 名前</span><textarea id="addNicks" rows="4" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
+            <button type="submit" id="addGo" class="big-btn">＋ この名前を 登録する</button>
+            <div id="addMsg" class="result"></div>
+          </form>
+        </div>
+        <div class="card hidden" id="addDone">
+          <h2>登録した 名前</h2>
+          <div id="addList" class="name-chips"></div>
+          <div class="flow-btns">
+            <button type="button" id="addMore" class="big-btn ghost">＋ もう1人 足す</button>
+            <button type="button" id="addNext" class="big-btn">つぎへ：カードを 印刷する →</button>
           </div>
-          <div class="cls-code-box">
-            <div>クラスコード<b id="clsCode"></b></div>
-            <p class="hint" data-say="これが この教室の 合いことばです。子どもは アプリを ひらいて、教室に 参加 を 押し、この 6文字を 入れて、自分の 名前を えらぶだけです。パスワードは ありません。この 6文字は 下の ログインカードにも 入ります。">
-              これが この教室の <b>合いことば</b>です。子どもは アプリの「🏫 教室に 参加」で この6文字を 入れ、<b>自分の名前を えらぶだけ</b>。パスワードは ありません。<br>
-              この6文字は 下の <b>ログインカード</b>にも 入ります。</p>
+        </div>
+      </section>
+
+      <!-- 3／4 カードを 印刷する → 4／4 子どもに 渡す -->
+      <section id="scr-cards" class="hidden">
+        <p class="cls-crumb"><a href="#" id="cardsBack">← 教室の 画面へ</a></p>
+        <div class="card">
+          <h1>ログインカードを 印刷する</h1>
+          <p class="hint" data-say="下に、1人 1枚の カードが 見えています。黒い ボタンを 押すと、印刷の 窓が 出ます。そこで 印刷 を 押してください。カードは 子どもに 渡します。紙が なくても、カードに 書いてある 6文字と 名前を 伝えれば、同じです。">
+            下に 1人 1枚の カードが 見えています。<b>黒いボタン</b>を 押すと 印刷の 窓が 出るので、そこで「印刷」を 押してください。<br>
+            紙が なくても、カードに 書いてある <b>6文字と 名前</b>を 子どもに 伝えれば 同じです。</p>
+          <div class="flow-btns">
+            <button type="button" id="cardsBtn" class="big-btn">🖨 印刷する</button>
+            <button type="button" id="noticeBtn" class="big-btn ghost">保護者への 案内も 印刷する</button>
           </div>
+          <p class="hint" data-say="保護者への 案内は、A4 1枚の お知らせです。ご家庭で どう使うか、お金は かからないこと、個人情報は 集めないことが 書いてあります。カードと いっしょに 渡してください。先生が 売りこむ 必要は ありません。">
+            <b>「保護者への 案内」</b>は A4 1枚の お知らせ（使い方・<b>ご家庭の お金は かからない</b>・個人情報は 集めない）。カードと いっしょに 渡すだけで OK です。</p>
+          <div id="cardsDone" class="cls-done hidden">
+            <b>✓ 印刷できました。</b>カードを 子どもに 渡してください。子どもが 家で 練習すると、教室の 画面に 自動で 出ます。
+          </div>
+          <div class="flow-btns"><button type="button" id="cardsToClass" class="big-btn ghost">教室の 画面へ →</button></div>
+        </div>
+        <div id="cardsOut"></div>
+      </section>
+
+      <!-- 教室（2回目からの ふだんの 画面）。ひらいて 見えるのは：生徒の 表と 大きな ボタン2つ。宿題と くわしい 設定は 畳む -->
+      <section id="scr-class" class="hidden">
+        <p class="cls-crumb"><a href="#" id="backClasses">← 教室の 一覧</a></p>
+        <div class="card">
+          <h1 id="clsName"></h1>
+          <div class="flow-btns">
+            <button type="button" id="toAddBtn" class="big-btn">＋ 生徒を 足す</button>
+            <button type="button" id="toCardsBtn" class="big-btn">🖨 カードを 印刷</button>
+          </div>
+          <p class="cls-code-line">この教室の 合いことば：<b id="clsCode"></b><br>
+            <span class="hint-inline">カードに 印刷されています。子どもは アプリの「🏫 教室に 参加」で これを 入れて、自分の 名前を えらびます。パスワードは ありません。</span></p>
+          <div id="studentTable"></div>
+          <div class="btn-row"><button id="reloadBtn" class="ghost">↻ 表を 新しくする</button></div>
+        </div>
+
+        <details class="card cls-fold" id="hwFold">
+          <summary>📨 宿題を 出す</summary>
+          <div id="hwList"></div>
+          <form id="hwForm" class="hw-form">
+            <p class="hint" data-say="宿題を 出します。しゅもくと 級、何セット やるかを えらんで、宿題を 出す を 押します。子どもの ホーム画面に、先生からの 宿題 として 出ます。子どもが やった ぶんは、上の 生徒の 表に 自動で 数が 入ります。">
+              <b>しゅもく・級・何セット</b>を えらんで <b>「📨 宿題を 出す」</b>を 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 上の 表に 自動で 入ります。</p>
+            <div class="hw-grid">
+              <label><span class="lb">しゅもく</span><select id="hwSubj"><option value="mitori">みとり算</option><option value="kake">かけ算</option><option value="wari">わり算</option><option value="anzan">あんざん</option><option value="flash">フラッシュ暗算</option></select></label>
+              <label><span class="lb">級</span><select id="hwGrade"></select></label>
+              <label><span class="lb">何セット</span><select id="hwSets"></select></label>
+              <label><span class="lb">いつまで（なくても可）</span><input id="hwDue" type="date" /></label>
+            </div>
+            <label><span class="lb">ひとこと（なくても可）</span><input id="hwNote" type="text" maxlength="60" placeholder="例：五玉に 気をつけて" /></label>
+            <button type="submit" id="hwGo" class="big-btn">📨 宿題を 出す</button>
+            <div id="hwMsg" class="result"></div>
+          </form>
+        </details>
+
+        <details class="card cls-fold" id="settingsFold">
+          <summary>⚙️ くわしい 設定（級の 基準・教室を 消す）</summary>
           <!-- 級の基準（級体系）。変えると この教室の 子どもの アプリが つぎに ひらいたとき その表に なる -->
+          <p class="hint">「級の基準」＝ この教室で 使う 級の 表（何級が 何桁 何口か）。<b>標準</b>は 20級（入門）〜十段、<b>標準（10級から）</b>は 入門の級を 使いません。ふつうは 変えなくて だいじょうぶです。</p>
           <div class="cls-preset-row">
             <label>📘 級の基準 <select id="clsPreset"></select></label>
             <span id="clsPresetNote" class="hint-inline"></span>
@@ -122,43 +193,11 @@
           <details id="curCompare" class="cur-compare"><summary>📊 級体系の くらべ表（どの級が だいたい 同じか・めやす）</summary><div id="curCompareBody"></div></details>
           <!-- 「この教室だけの 表」を えらんだとき：級の 表を ここで 直す -->
           <div id="curEditor" class="hidden"></div>
-          <div class="btn-row">
-            <button id="cardsBtn">🖨 ログインカードを 印刷</button>
-            <button id="noticeBtn" class="ghost">🖨 保護者への 案内を 印刷</button>
-            <button id="reloadBtn" class="ghost">↻ 最新に</button>
+          <div class="cls-danger">
+            <p class="hint">教室を 消すと、生徒と 記録も ぜんぶ 消えます。もとに もどせません。</p>
+            <button id="clsDelete" class="ghost small">教室を 消す</button>
           </div>
-          <p class="hint" data-say="保護者への 案内は、A4 1枚の お知らせです。ご家庭で どう使うか、お金は かからないこと、個人情報は 集めないことが 書いてあります。ログインカードと いっしょに 渡してください。先生が 売りこむ 必要は ありません。">
-            <b>「保護者への 案内」</b>は A4 1枚の お知らせ（使い方・<b>ご家庭の お金は かからない</b>・個人情報は 集めない）。ログインカードと いっしょに 渡すだけで OK です。</p>
-        </div>
-        <div class="card">
-          <h2>📨 宿題</h2>
-          <div id="hwList"></div>
-          <form id="hwForm" class="hw-form">
-            <p class="hint" data-say="宿題を 出します。しゅもくと 級、何セット やるかを えらんで、宿題を 出す を 押します。子どもの ホーム画面に、先生からの 宿題 として 出ます。子どもが やった ぶんは、下の 生徒の 表に 自動で 数が 入ります。">
-              <b>しゅもく・級・何セット</b>を えらんで <b>「📨 宿題を 出す」</b>を 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 下の 表に 自動で 入ります。</p>
-            <div class="hw-grid">
-              <label><span class="lb">しゅもく</span><select id="hwSubj"><option value="mitori">みとり算</option><option value="kake">かけ算</option><option value="wari">わり算</option><option value="anzan">あんざん</option><option value="flash">フラッシュ暗算</option></select></label>
-              <label><span class="lb">級</span><select id="hwGrade"></select></label>
-              <label><span class="lb">何セット</span><select id="hwSets"></select></label>
-              <label><span class="lb">いつまで（なくても可）</span><input id="hwDue" type="date" /></label>
-            </div>
-            <label><span class="lb">ひとこと（なくても可）</span><input id="hwNote" type="text" maxlength="60" placeholder="例：五玉に 気をつけて" /></label>
-            <button type="submit" id="hwGo" class="cls-add-btn">📨 宿題を 出す</button>
-            <div id="hwMsg" class="result"></div>
-          </form>
-        </div>
-        <div class="card">
-          <h2>生徒</h2>
-          <div id="studentTable"></div>
-          <form id="addForm" class="cls-add">
-            <p class="hint" data-say="下の 白い 欄に、生徒の 名前を 1行に 1人ずつ 書きます。エンターキーで 改行して ください。本名で なくて かまいません。子どもが 自分で 見つけられる 呼び名に します。">
-              下の 欄に 生徒の 名前を <b>1行に 1人ずつ</b>（改行して ください）。<b>本名で なくて かまいません。</b>子どもが 自分で 見つけられる 呼び名に します。</p>
-            <label><span class="lb">生徒を 追加</span><textarea id="addNicks" rows="4" placeholder="たろう&#10;はなこ&#10;けん"></textarea></label>
-            <p class="hint" data-say="書き終わったら、下の 黒い ボタンを 押すと 登録されます。あとから いつでも 足せます。">
-              書き終わったら 下の <b>黒いボタン</b>を 押すと 登録されます。あとから いつでも 足せます。</p>
-            <button type="submit" class="cls-add-btn">＋ この名前を 登録する</button>
-          </form>
-        </div>
+        </details>
       </section>
 
       <!-- 生徒 -->
@@ -175,19 +214,20 @@
         </div>
       </section>
 
-      <div id="cardsOut" class="hidden"></div>
+      <!-- 保護者への 案内（印刷用。画面には 出さない） -->
+      <div id="noticeOut" class="hidden"></div>
     </main>
 
     <!-- 使い方（ぜんぶの 手順） -->
     <div id="guideLayer" class="guide-layer hidden">
       <div class="guide-box">
-        <div class="guide-box-h">先生の画面の 使い方（5つの 手順）<button type="button" id="guideClose" class="guide-x" aria-label="とじる">✕</button></div>
+        <div class="guide-box-h">先生の画面の 使い方（はじめから 順に）<button type="button" id="guideClose" class="guide-x" aria-label="とじる">✕</button></div>
         <p class="guide-note">読み上げの 🔊 を 押すと、その手順を 声で 説明します。</p>
         <ol id="guideList" class="guide-list"></ol>
         <div class="btn-row"><button type="button" id="guideReadAll">🔊 ぜんぶ 読み上げる</button><button type="button" id="guideStop" class="ghost">■ 止める</button></div>
       </div>
     </div>
     <footer class="doc-foot"><a href="../">そろばんキングダム</a>　先生の画面</footer>
-    <script src="class.js?v=392"></script>
+    <script src="class.js?v=400"></script>
   </body>
 </html>

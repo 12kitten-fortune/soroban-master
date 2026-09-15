@@ -63,17 +63,47 @@
 .lc-steps { font-size: 11.5px; line-height: 1.6; color: #333; margin-top: 6px; }
 .lc-url { font-size: 12px; font-weight: 800; color: #16305c; }
 @media print {
-  body.print-cards * { visibility: hidden !important; }
+  body.print-cards *, body.print-notice * { visibility: hidden !important; }
   body.print-cards #cardsOut, body.print-cards #cardsOut * { visibility: visible !important; }
   body.print-cards #cardsOut { position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
   body.print-cards .lc-sheet { border: none; padding: 0; gap: 6mm; break-after: page; page-break-after: always; }
   body.print-cards .lc-sheet:last-child { break-after: auto; page-break-after: auto; }
+  /* 保護者への 案内：画面には 出さない 箱（#noticeOut）を 印刷のときだけ 出す */
+  body.print-notice #noticeOut { display: block !important; position: absolute; left: 0; top: 0; width: 100%; margin: 0; }
+  body.print-notice #noticeOut, body.print-notice #noticeOut * { visibility: visible !important; }
 }
 @media (max-width: 640px) {
-  .cls-code-box b { display: block; margin: 4px 0 0; font-size: 26px; }
-  .cls-inline { flex-direction: column; }
   .lc-sheet { grid-template-columns: 1fr; }
 }
+
+/* ============================================================ 一本道の 画面（1／4 〜 4／4）
+   押す ボタンは 画面に 1つ（多くて 2つ）。字も ボタンも 大きく。 */
+body.cls button { font-size: 16px; padding: 10px 16px; }
+.big-btn, body.cls .big-btn { display: block; width: 100%; font-size: 20px; font-weight: 800; padding: 16px 22px; border-radius: 12px; line-height: 1.3; }
+body.cls .big-btn.ghost { background: #fff; color: var(--navy); border: 2px solid var(--navy); }
+.cls-flow label { display: block; margin-bottom: 12px; }
+.cls-flow .lb { display: block; font-weight: 800; color: var(--navy); font-size: 15px; margin-bottom: 4px; }
+.cls-flow input, .cls-flow textarea { display: block; width: 100%; padding: 12px 14px; font: inherit; font-size: 20px; border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+.cls-flow .big-btn { margin-top: 4px; }
+.flow-btns { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+@media (min-width: 640px) { .flow-btns { flex-direction: row; } .flow-btns .big-btn { flex: 1; width: auto; } }
+.name-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 12px; }
+.name-chip { font-size: 18px; font-weight: 800; color: var(--navy); background: #fff8e4; border: 2px solid var(--royal-gold); border-radius: 999px; padding: 8px 16px; }
+.cls-done { background: #e7f5ec; border: 2px solid #62b88f; border-radius: 12px; padding: 12px 14px; font-size: 17px; line-height: 1.8; margin: 12px 0; color: #1f4d33; }
+.cls-done b { color: #1f8a4c; }
+.cls-code-line { font-size: 16px; line-height: 1.8; margin: 12px 0 8px; }
+.cls-code-line b { font-size: 26px; letter-spacing: .18em; color: var(--navy); font-variant-numeric: tabular-nums; margin-left: 6px; }
+.cls-main .result { font-size: 16px; line-height: 1.7; margin-top: 8px; }
+/* 教室の 一覧：名前だけ 大きく */
+.cls-item { padding: 16px 18px; }
+.cls-item b { font-size: 20px; }
+/* 畳む 箱（宿題・くわしい 設定） */
+.cls-fold summary { cursor: pointer; font-size: 19px; font-weight: 900; color: var(--navy); padding: 4px 0; list-style: none; }
+.cls-fold summary::-webkit-details-marker { display: none; }
+.cls-fold summary::before { content: "▸ "; color: var(--royal-gold); }
+.cls-fold[open] summary::before { content: "▾ "; }
+.cls-fold[open] summary { margin-bottom: 10px; border-bottom: 2px solid var(--royal-gold); padding-bottom: 6px; }
+.cls-danger { margin-top: 18px; padding-top: 10px; border-top: 1px dashed #d9cfb8; }
 
 /* ログイン画面の 案内 */
 .cls-steps { margin: 6px 0 14px; padding-left: 22px; line-height: 1.8; font-size: 14px; }

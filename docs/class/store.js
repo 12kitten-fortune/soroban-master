@@ -127,9 +127,10 @@
       rankUid() { return "local"; },
       async rankUpsert(month, d) { db.rank = db.rank || {}; db.rank[month] = db.rank[month] || {}; db.rank[month].local = d; save(); },
       async rankRemove(month) { if (db.rank && db.rank[month]) delete db.rank[month].local; save(); },
-      async rankTop(month, n) {
+      async rankTop(month, n, f) {
         return Object.entries((db.rank || {})[month] || {}).map(([uid, d]) => Object.assign({ uid }, d))
-          .sort((a, b) => (b.correct || 0) - (a.correct || 0)).slice(0, n || 300);
+          .filter((r) => !f || (f.country ? r.country === f.country : f.cls ? (r.cls || "") === f.cls : true))
+          .sort((a, b) => (b.correct || 0) - (a.correct || 0)).slice(0, Math.min(n || 100, 100));
       },
     };
   }
@@ -138,6 +139,15 @@
   function FireStore(cfg) {
     const fb = global.firebase;
     fb.initializeApp(cfg);
+    // App Check：「本物の サイトから 来た 通信」だけ Firestore が 受けとる（reCAPTCHA v3・無料）。
+    // firebase-config.js の appCheckKey が 空の あいだは 何も しない。Firestore を 使う 前に 始める こと。
+    // URL に ?appcheckdebug=1 を つけると、手元で 試すための「デバッグトークン」が コンソール（F12）に 出る
+    if (cfg.appCheckKey && fb.appCheck) {
+      try {
+        if (/[?&]appcheckdebug=1/.test(global.location ? global.location.search : "")) global.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        fb.appCheck().activate(cfg.appCheckKey, true);
+      } catch (e) { console.warn("App Check を 始められませんでした", e); }
+    }
     const auth = fb.auth(), fs = fb.firestore();
     const tRef = (uid) => fs.collection("teachers").doc(uid);
     const cRef = (cid) => fs.collection("classes").doc(cid);
@@ -145,6 +155,16 @@
     const obj = (d) => Object.assign({ id: d.id }, d.data());
     let me = null;
     const anon = async () => { if (!auth.currentUser) await auth.signInAnonymously(); return auth.currentUser; };
+    // 教室の 書類は 30秒 おぼえておく（ひらいたとき「教室」と「宿題」で 2回 読んでいたのを 1回に）。書いたら 忘れる
+    const clsCache = {};
+    const getCls = async (cid) => {
+      const c = clsCache[cid];
+      if (c && now() - c.t < 30000) return c.data;
+      const d = await cRef(cid).get(), data = d.exists ? obj(d) : null;
+      clsCache[cid] = { t: now(), data };
+      return data;
+    };
+    const sortHw = (l) => l.slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
     return {
       mode: "firebase",
       onAuth(cb) {
@@ -189,8 +209,8 @@
         }
         throw new Error(T("クラスコードが 作れませんでした。もう一度 おしてください"));
       },
-      async getClass(cid) { const d = await cRef(cid).get(); return d.exists ? obj(d) : null; },
-      async updateClass(cid, patch) { await cRef(cid).update(patch); return this.getClass(cid); },
+      async getClass(cid) { return getCls(cid); },
+      async updateClass(cid, patch) { await cRef(cid).update(patch); delete clsCache[cid]; return this.getClass(cid); },
       async _deleteStudentDeep(cid, sid) {
         // 記録を 300件ずつ 消してから 生徒を 消す（サブコレクションは 親を 消しても 残るため）
         for (let guard = 0; guard < 40; guard++) {
@@ -208,13 +228,33 @@
         if (c && c.code) { try { await fs.collection("codes").doc(c.code).delete(); } catch (e) { } }
         await cRef(cid).delete();
       },
-      /* ---- 宿題（先生が 出す。生徒は 読むだけ） ---- */
-      async listHomework(cid) { const q = await cRef(cid).collection("homework").get(); return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt); },
-      async addHomework(cid, hw) {
-        const r = cRef(cid).collection("homework").doc(), h = cleanHomework(hw);
-        await r.set(h); return Object.assign({ id: r.id }, h);
+      /* ---- 宿題（先生が 出す。生徒は 読むだけ）
+         2026-09-15 から 教室の 書類の hw（配列・20件まで）に 入れる。子どもが ひらくとき 宿題の 読みが 1回で すむ。
+         古い 置き場（homework サブコレクション）に 残っている ものは、先生が 教室を ひらいたときに 1回だけ 移す ---- */
+      async listHomework(cid) {
+        const c = await getCls(cid); if (!c) return [];
+        if (Array.isArray(c.hw)) return sortHw(c.hw);
+        const q = await cRef(cid).collection("homework").get();
+        const list = sortHw(q.docs.map(obj));
+        if (me && c.teacherUid === me.uid) {
+          try {
+            await cRef(cid).update({ hw: list }); delete clsCache[cid];
+            if (!q.empty) { const b = fs.batch(); q.docs.forEach((d) => b.delete(d.ref)); await b.commit(); }
+          } catch (e) { console.warn("宿題の 置き場所の 移しかえに 失敗", e); }
+        }
+        return list;
       },
-      async removeHomework(cid, hid) { await cRef(cid).collection("homework").doc(hid).delete(); },
+      async addHomework(cid, hw) {
+        const h = Object.assign({ id: newId() }, cleanHomework(hw));
+        const list = (await this.listHomework(cid)).concat([h]);
+        if (list.length > 20) throw new Error(T("宿題は 20件までです。古い 宿題を 消してから 出してください"));
+        await cRef(cid).update({ hw: list }); delete clsCache[cid];
+        return h;
+      },
+      async removeHomework(cid, hid) {
+        const list = (await this.listHomework(cid)).filter((h) => h.id !== hid);
+        await cRef(cid).update({ hw: list }); delete clsCache[cid];
+      },
       async listStudents(cid) { const q = await cRef(cid).collection("students").get(); return q.docs.map(obj).sort((a, b) => a.createdAt - b.createdAt); },
       async addStudents(cid, nicks) {
         const b = fs.batch(), out = [];
@@ -263,9 +303,22 @@
       rankUid() { return auth.currentUser ? auth.currentUser.uid : ""; },
       async rankUpsert(month, d) { const u = await anon(); await fs.collection("ranking").doc(month).collection("rows").doc(u.uid).set(d); },
       async rankRemove(month) { const u = await anon(); await fs.collection("ranking").doc(month).collection("rows").doc(u.uid).delete(); },
-      async rankTop(month, n) {
-        const q = await fs.collection("ranking").doc(month).collection("rows").orderBy("correct", "desc").limit(n || 300).get();
-        return q.docs.map((d) => Object.assign({ uid: d.id }, d.data()));
+      // 上位を 読む。一度に 100件まで（ルールで 決めている）。f＝{ country } か { cls } で しぼる（Firestore の 複合索引が 要る。
+      // 索引が まだ 無くて 失敗したら、世界の 上位 100件から 手元で しぼる）
+      async rankTop(month, n, f) {
+        const lim = Math.min(n || 100, 100);
+        let q = fs.collection("ranking").doc(month).collection("rows");
+        if (f && f.country) q = q.where("country", "==", f.country);
+        else if (f && f.cls) q = q.where("cls", "==", f.cls);
+        try {
+          const r = await q.orderBy("correct", "desc").limit(lim).get();
+          return r.docs.map((d) => Object.assign({ uid: d.id }, d.data()));
+        } catch (e) {
+          if (!f || !(f.country || f.cls)) throw e;
+          console.warn("ランキングの しぼりこみに 索引が ありません（世界の 上位から しぼります）", e && e.message);
+          const all = await this.rankTop(month, lim);
+          return all.filter((r) => f.country ? r.country === f.country : (r.cls || "") === f.cls);
+        }
       },
     };
   }

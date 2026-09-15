@@ -7,7 +7,13 @@ rules_version = '2';
    ・生徒（匿名ログイン）＝ 教室の 名前の一覧は 見られるが、ほかの子の 記録は 読めない
    ・生徒が 書けるのは 自分の 記録だけ。しかも「足す」だけ（消せない・書きかえられない）
    ・記録の 中身は 形と 範囲を 検査する（でたらめな 数や 未来の日付は はじく）
-   ・1人の生徒に つなげる 端末は 4台まで                                             */
+   ・1人の生徒に つなげる 端末は 4台まで
+
+   2026-09-15 の 見直し（Firestore 調査 A-2・A-3・A-4）
+   ・生徒の 書類：「端末を つなぐ」と「まとめ（stat）を 書く」を 分けた。stat は もう つながっている 本人だけ、形を 検査
+   ・記録（sessions）：入れて よい キーを 決めた（余分な キーで ふくらませられない）。級（g）・印（src）も 検査
+   ・ランキング：読むのは 一度に 100件まで。書く数は「その月の 日数」から 見て ありえない 値を はじく。今月の 行しか 書けない
+   ・宿題は 教室の 書類の hw（配列・20件まで）に 入れる。古い homework サブコレクションは 読む・消す だけ          */
 service cloud.firestore {
   match /databases/{db}/documents {
 
@@ -17,14 +23,15 @@ service cloud.firestore {
       return teacher() &&
         get(/databases/$(db)/documents/classes/$(cid)).data.teacherUid == request.auth.uid;
     }
-    // その 生徒が「この端末（匿名ログイン）」と むすびついているか
+    // その 生徒が「この端末（匿名ログイン）」と むすびついているか（記録を 足すときに 見る。1回の 送信で 1読み）
     function isMe(cid, sid) {
       return signedIn() &&
         request.auth.uid in get(/databases/$(db)/documents/classes/$(cid)/students/$(sid)).data.uids;
     }
-    // 1セットの 記録の 形。app.js の logSession が 作るもの と 同じ
+    // 1セットの 記録の 形。app.js の logSession が 作るもの と 同じ。書いてある キー以外は 入れられない
     function validSession(d, tid) {
-      return d.keys().hasAll(['d', 't', 'subj', 'N', 'correct', 'sec'])
+      return d.keys().hasOnly(['d', 't', 'g', 'subj', 'N', 'correct', 'sec', 'avg', 'pauses', 'miss', 'ft', 'src'])
+        && d.keys().hasAll(['d', 't', 'subj', 'N', 'correct', 'sec'])
         && d.t is int && string(d.t) == tid
         && d.t > request.time.toMillis() - 400 * 86400000     // 400日より 前の 記録は 受けない
         && d.t < request.time.toMillis() + 6 * 3600000        // 未来（時計ずれ 6時間まで）は 受けない
@@ -32,18 +39,29 @@ service cloud.firestore {
         && d.N is int && d.N >= 1 && d.N <= 200
         && d.correct is int && d.correct >= 0 && d.correct <= d.N
         && d.sec is number && d.sec >= 0 && d.sec <= 36000
-        && d.d is string && d.d.size() == 10;
+        && d.d is string && d.d.size() == 10
+        && (!('g' in d) || (d.g is string && d.g.size() <= 20))          // 級の 印
+        && (!('avg' in d) || d.avg is number)
+        && (!('pauses' in d) || (d.pauses is int && d.pauses >= 0))
+        && (!('miss' in d) || (d.miss is list && d.miss.size() <= 8))    // まちがえた 問題（8問まで）
+        && (!('ft' in d) || (d.ft is map && d.ft.size() <= 30))          // 技ごとの 正解／出題
+        && (!('src' in d) || d.src in ['exam', 'battle']);               // 印：SK検定・たいせん
     }
 
-    // 宿題の 形。先生画面の「宿題を 出す」が 作るもの と 同じ
-    function validHomework(d) {
-      return d.keys().hasOnly(['subj', 'g', 'sets', 'due', 'note', 'createdAt'])
-        && d.subj in ['mitori', 'kake', 'wari', 'anzan', 'flash']
-        && d.g is string && d.g.size() >= 1 && d.g.size() <= 4
-        && d.sets is int && d.sets >= 1 && d.sets <= 20
-        && d.due is string && d.due.size() <= 10
-        && d.note is string && d.note.size() <= 60
-        && d.createdAt is int;
+    // 生徒の「まとめ」の 形。store.js の statOf ＋ app.js の 進級の めやす（ready）と 同じ
+    function validStat(s) {
+      return s is map
+        && s.keys().hasOnly(['n7', 'acc7', 'last', 'lastG', 'miss7', 'hw', 'tech', 'ready'])
+        && s.n7 is int && s.n7 >= 0 && s.n7 <= 500
+        && (s.acc7 == null || (s.acc7 is int && s.acc7 >= 0 && s.acc7 <= 100))
+        && s.last is int
+        && s.lastG is string && s.lastG.size() <= 20
+        && (!('miss7' in s) || (s.miss7 is map && s.miss7.size() <= 12))
+        && (!('hw' in s) || (s.hw is map && s.hw.size() <= 50))
+        && (!('tech' in s) || (s.tech is map && s.tech.size() <= 30))
+        && (!('ready' in s) || (s.ready is map
+              && s.ready.keys().hasOnly(['g', 'track', 'pct', 'ok', 'rows'])
+              && s.ready.rows is list && s.ready.rows.size() <= 8));
     }
 
     /* 先生の 名前・プラン。本人だけ 読める。
@@ -72,14 +90,16 @@ service cloud.firestore {
 
     /* 教室 */
     match /classes/{cid} {
-      allow get:    if signedIn();                               // 参加のとき 名前を 見せる
+      allow get:    if signedIn();                               // 参加のとき 名前を 見せる。宿題（hw）も ここに ある
       // 一覧は「自分の教室」で しぼった 問い合わせ しか 通らない（他人の コードを 集められない）
       allow list:   if teacher() && resource.data.teacherUid == request.auth.uid;
       allow create: if teacher()
         && request.resource.data.teacherUid == request.auth.uid
         && request.resource.data.name is string && request.resource.data.name.size() <= 60;
       allow update: if classOwner(cid)
-        && request.resource.data.teacherUid == resource.data.teacherUid;   // 持ち主は 変えられない
+        && request.resource.data.teacherUid == resource.data.teacherUid    // 持ち主は 変えられない
+        && (!('hw' in request.resource.data)
+            || (request.resource.data.hw is list && request.resource.data.hw.size() <= 20));   // 宿題は 20件まで
       allow delete: if classOwner(cid);
 
       /* 生徒 */
@@ -90,13 +110,19 @@ service cloud.firestore {
           && request.resource.data.nick is string && request.resource.data.nick.size() <= 20;
         allow delete: if classOwner(cid);
         allow update: if classOwner(cid)
-          // 生徒本人：端末を つなぐ／最後に来た日時／まとめ を 書くだけ
+          // (1) 端末を つなぐ：uids と lastSeen だけ さわれる（stat は さわれない）。入り直し（変化なし）も ここで 通る
           || (signedIn()
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uids', 'lastSeen', 'stat'])
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uids', 'lastSeen'])
+              && request.resource.data.uids is list
               && request.resource.data.uids.hasAll(resource.data.uids)             // 他の端末を 外せない
               && request.resource.data.uids.size() <= 4                            // 端末は 4台まで
               && request.resource.data.uids.size() <= resource.data.uids.size() + 1 // 一度に 1台
-              && (request.auth.uid in request.resource.data.uids));
+              && request.auth.uid in request.resource.data.uids)
+          // (2) まとめを 書く：もう つながっている 本人だけ。lastSeen と stat だけ。stat は 形を 検査
+          || (signedIn()
+              && request.auth.uid in resource.data.uids
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeen', 'stat'])
+              && validStat(request.resource.data.stat));
 
         /* 練習の 記録。本人は 足すだけ。先生は 読む・消す（教室を 消すとき） */
         match /sessions/{tid} {
@@ -107,19 +133,24 @@ service cloud.firestore {
         }
       }
 
-      /* 宿題。先生が 出す・消す。生徒は 読むだけ（できた数は 生徒の stat.hw に 書く） */
+      /* 宿題の 古い 置き場（2026-09-15 から 教室の 書類の hw に 移した）。読む・消す だけ。新しく 作れない */
       match /homework/{hid} {
         allow get, list: if signedIn();
-        allow create:    if classOwner(cid) && validHomework(request.resource.data);
+        allow create:    if false;
         allow update:    if false;
         allow delete:    if classOwner(cid);
       }
     }
 
     /* 🏆 ランキング（月ごと）。ranking/2026-09/rows/{その端末の uid}
-       ・だれでも 読める（にっくねーむ・国・任意の教室名・今月の正解数 だけ。本名は 入れない）
-       ・書けるのは 自分の 行だけ。形と 範囲を 検査する
-       ・参加は 設定で 本人（保護者）が オンに したときだけ */
+       ・だれでも 読める（にっくねーむ・国・任意の教室名・今月の正解数 だけ。本名は 入れない）。一度に 100件まで
+       ・書けるのは 自分の 行だけ、今月の 行だけ。形と 範囲を 検査する
+       ・「その月の 何日目か」から 見て ありえない 数（1日 40セット・1セット 30問 をこえる）は はじく
+       ・参加は 設定で 本人（保護者）が オンに したときだけ
+       ※ 匿名ログインを 作り直して 行を 増やす ズルは ルールでは 止められない（本当の 対策は サーバー側の 集計）*/
+    function curMonth() {
+      return string(request.time.year()) + '-' + (request.time.month() < 10 ? '0' : '') + string(request.time.month());
+    }
     function validRank(d) {
       return d.keys().hasOnly(['nick', 'country', 'cls', 'correct', 'sessions', 'days', 'flashBest', 'grade', 'updatedAt'])
         && d.nick is string && d.nick.size() >= 1 && d.nick.size() <= 20
@@ -132,12 +163,18 @@ service cloud.firestore {
         && d.grade is string && d.grade.size() <= 4
         && d.updatedAt is int
         && d.updatedAt > request.time.toMillis() - 6 * 3600000
-        && d.updatedAt < request.time.toMillis() + 6 * 3600000;
+        && d.updatedAt < request.time.toMillis() + 6 * 3600000
+        // ありえない 数を はじく（今日が 月の 何日目か で 上限が 決まる）
+        && d.days <= d.sessions
+        && d.days <= request.time.day()
+        && d.sessions <= 40 * request.time.day()
+        && d.correct <= 30 * d.sessions;
     }
     match /ranking/{month}/rows/{uid} {
-      allow get, list: if true;
+      allow get:  if true;
+      allow list: if request.query.limit <= 100;
       allow create, update: if signedIn() && request.auth.uid == uid
-        && month.size() == 7 && validRank(request.resource.data);
+        && month == curMonth() && validRank(request.resource.data);
       allow delete: if signedIn() && request.auth.uid == uid;
     }
   }

@@ -5121,6 +5121,7 @@ const FB_SRC = [
   "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-app-compat.js",
   "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-auth-compat.js",
   "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-firestore-compat.js",
+  "https://www.gstatic.com/firebasejs/" + FB_VER + "/firebase-app-check-compat.js",   // App Check（本物の サイトからの 通信の 印）
   "firebase-config.js", "class/store.js",
 ];
 let storeLoading = null;
@@ -5168,16 +5169,22 @@ function rankMine() {
     updatedAt: Date.now(),
   };
 }
-let rankTimer = null, rankLastSent = "";
+// 最後に 送った 中身は この端末に おぼえておく（ひらくたびに 同じ 行を 送り直さない＝書き込みを へらす）
+const RANK_SENT_KEY = "soroban_ranking_sent";
+let rankTimer = null, rankLastSent = (() => { try { return localStorage.getItem(RANK_SENT_KEY) || ""; } catch (e) { return ""; } })();
+const rankRows = {};   // 読んだ 上位の 一覧を 3分 おぼえておく（タブを 行き来しても 読み直さない）
 // 練習が 終わるたびに 呼ぶ。少し 待ってから まとめて 送る（連続で 終わっても 1回）
 function rankSyncSoon() { if (!rankCfg().on) return; clearTimeout(rankTimer); rankTimer = setTimeout(rankSync, 1500); }
 async function rankSync() {
   if (!rankCfg().on) return false;
   try {
-    const S = await loadStore(); const d = rankMine();
-    const key = JSON.stringify([d.nick, d.country, d.cls, d.correct, d.sessions, d.days, d.flashBest, d.grade]);
+    const S = await loadStore(); const d = rankMine(), m = rankMonth();
+    const key = JSON.stringify([m, d.nick, d.country, d.cls, d.correct, d.sessions, d.days, d.flashBest, d.grade]);
     if (key === rankLastSent) return true;
-    await S.rankUpsert(rankMonth(), d); rankLastSent = key; return true;
+    await S.rankUpsert(m, d); rankLastSent = key;
+    try { localStorage.setItem(RANK_SENT_KEY, key); } catch (e) { }
+    Object.keys(rankRows).forEach((k) => delete rankRows[k]);   // 自分の 行が 変わったので 一覧を 読み直す
+    return true;
   } catch (e) { console.warn("ランキングに 送れませんでした", e); return false; }
 }
 let rankTab = "world";
@@ -5199,17 +5206,21 @@ async function renderRanking() {
   $$("#rankTabs button").forEach((b) => { b.classList.toggle("on", b.dataset.t === rankTab); b.onclick = () => { rankTab = b.dataset.t; renderRanking(); }; });
   const cb = $('#rankTabs button[data-t="country"]'); if (cb) cb.textContent = rankFlag(c.country) + T(" 国内");
   box.innerHTML = T('<div class="sub">読みこみ中…</div>'); me.textContent = "";
+  if (rankTab === "cls" && !c.cls) { box.innerHTML = T('<div class="sub">上の「教室名」を 入れて 保存すると、同じ 教室名の 子と くらべられます。</div>'); return; }
+  // 一度に 読むのは 100件まで（ルールで 決めている）。国内・教室は その しぼりこみで 上位 100件を 読む
+  const f = rankTab === "country" ? { country: c.country } : rankTab === "cls" ? { cls: c.cls } : null;
+  const ck = rankMonth() + "|" + rankTab + "|" + (f ? (f.country || f.cls) : "");
   let rows = [], uid = "";
-  try { const S = await loadStore(); if (c.on) await rankSync(); rows = await S.rankTop(rankMonth(), 300); uid = S.rankUid(); }
-  catch (e) { box.innerHTML = T('<div class="sub">いま ランキングを 読めません（通信を 確かめてください）</div>'); return; }
-  if (rankTab === "country") rows = rows.filter((r) => r.country === c.country);
-  if (rankTab === "cls") {
-    if (!c.cls) { box.innerHTML = T('<div class="sub">上の「教室名」を 入れて 保存すると、同じ 教室名の 子と くらべられます。</div>'); return; }
-    rows = rows.filter((r) => (r.cls || "") === c.cls);
-  }
+  try {
+    const S = await loadStore(); if (c.on) await rankSync(); uid = S.rankUid();
+    const hit = rankRows[ck];
+    if (hit && Date.now() - hit.t < 3 * 60000) rows = hit.rows;
+    else { rows = await S.rankTop(rankMonth(), 100, f); rankRows[ck] = { t: Date.now(), rows }; }
+    rows = rows.slice();
+  } catch (e) { box.innerHTML = T('<div class="sub">いま ランキングを 読めません（通信を 確かめてください）</div>'); return; }
   rows.sort((a, b) => (b.correct || 0) - (a.correct || 0) || (a.updatedAt || 0) - (b.updatedAt || 0));
   const myIdx = rows.findIndex((r) => r.uid === uid);
-  if (c.on) me.textContent = myIdx >= 0 ? T("あなたは {v1}位（今月 {v2}問 正解）", { v1: myIdx + 1, v2: rows[myIdx].correct }) : T("あなたは まだ 300位より 下（今月 {v1}問 正解）。れんしゅうすると 上がるよ", { v1: rankMine().correct });
+  if (c.on) me.textContent = myIdx >= 0 ? T("あなたは {v1}位（今月 {v2}問 正解）", { v1: myIdx + 1, v2: rows[myIdx].correct }) : T("あなたは まだ 100位より 下（今月 {v1}問 正解）。れんしゅうすると 上がるよ", { v1: rankMine().correct });
   else me.textContent = "";
   if (!rows.length) { box.innerHTML = T('<div class="sub">まだ だれも いません。いちばん 最初に 参加してみよう！</div>'); return; }
   box.innerHTML = rows.slice(0, 100).map((r, i) => {

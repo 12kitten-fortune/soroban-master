@@ -12,32 +12,39 @@
   const fmtSec = (s) => { s = Math.round(s || 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
 
   let me = null, cur = null, curStudents = [], curStudent = null, signup = true;
-  const screens = ["login", "classes", "class", "student"];
+  // 画面：login → classes（1／4 教室の名前）→ add（2／4 生徒の名前）→ cards（3／4 印刷 → 4／4 渡す）→ class（ふだんの 画面）→ student
+  const screens = ["login", "classes", "add", "cards", "class", "student"];
   function show(name) { screens.forEach((n) => $("#scr-" + n).classList.toggle("hidden", n !== name)); window.scrollTo(0, 0); updateGuide(name); }
   let lastClassCount = 0;
+  let cardsPrinted = false;   // カードの 画面で 印刷したか（4／4 に 進める）
 
   /* ============================================================ 案内（つぎに やること）と 読み上げ
-     どの画面でも、いま 何を すればいいかを 赤い見出しで 出す。
+     どの画面でも、いま 何を すればいいかを 赤い見出しで 1つだけ 出す。
      押すべき ボタンを 赤く 光らせる。🔊 で ブラウザの 読み上げ（外部サービスは 使わない） */
   const STEPS = [
-    { n: "①", t: T("アカウントを 作る"), s: T("お名前、メールアドレス、自分で決めた 8文字以上の パスワードを 入れて、黒いボタン「アカウントを 作って はじめる」を 押します。2回目からは「ログインする」を 押します。") },
-    { n: "②", t: T("教室を 作る"), s: T("教室の 名前（例：月曜クラス）を 入れて、「教室を 作る」を 押します。クラスコードという 6文字が 出ます。") },
-    { n: "③", t: T("生徒の 名前を 入れる"), s: T("白い欄に、生徒の にっくねーむを 1行に 1人ずつ 書いて、「この名前を 登録する」を 押します。本名で なくて かまいません。") },
-    { n: "④", t: T("ログインカードを 印刷して 子どもに 渡す"), s: T("「ログインカードを 印刷」を 押すと、1人 1枚の カードが 出ます。子どもは カードのとおりに、アプリの「教室に 参加」で コードを 入れて、自分の 名前を えらびます。パスワードは ありません。") },
-    { n: "⑤", t: T("練習が 集まるのを 見る"), s: T("子どもが 家で 練習すると、この表に 自動で 入ります。名前を 押すと、まちがえ方の クセが 見えます。開きなおすときは「最新に」を 押します。") },
-    { n: "⑥", t: T("宿題を 出す"), s: T("しゅもくと 級、何セット やるかを えらんで、「宿題を 出す」を 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 生徒の 表に 自動で 入ります。終わった 宿題は「消す」で 消せます。") },
+    { n: T("はじめに"), t: T("先生の 登録"), s: T("お名前、メールアドレス、自分で決めた 8文字以上の パスワードを 入れて、黒いボタンを 押します。2回目からは「ログインする」を 押します。") },
+    { n: "1／4", t: T("教室の 名前を 入れる"), s: T("教室の 名前（例：月曜クラス）を 入れて、黒いボタンを 押します。") },
+    { n: "2／4", t: T("生徒の 名前を 入れる"), s: T("白い欄に 生徒の 名前を 書いて、黒いボタンを 押します。2人以上は 1行に 1人ずつ。本名で なくて かまいません。") },
+    { n: "3／4", t: T("カードを 印刷する"), s: T("「印刷する」を 押すと、1人 1枚の ログインカードが 出ます。印刷の 窓が 出たら「印刷」を 押します。") },
+    { n: "4／4", t: T("カードを 子どもに 渡す"), s: T("子どもは カードのとおりに、アプリの「教室に 参加」で 6文字を 入れて、自分の 名前を えらびます。パスワードは ありません。家で 練習すると、教室の 画面に 自動で 出ます。") },
+    { n: T("そのあと"), t: T("練習が 集まるのを 見る"), s: T("子どもが 家で 練習すると、生徒の 表に 自動で 入ります。名前を 押すと、まちがえ方の クセが 見えます。開きなおすときは「表を 新しくする」を 押します。") },
+    { n: T("そのあと"), t: T("宿題を 出す"), s: T("「宿題を 出す」を ひらいて、しゅもくと 級、何セット やるかを えらび、黒いボタンを 押します。子どもの ホーム画面に「先生からの 宿題」として 出て、やった ぶんは 生徒の 表に 自動で 入ります。") },
   ];
   let curHw = [];
+  const anyJoined = () => curStudents.some((s) => (s.uids && s.uids.length) || s.lastSeen || (s.stat && s.stat.last));
   function guideFor(name) {
     if (name === "login") return { i: 0, target: "#lgGo" };
-    if (name === "classes") return lastClassCount ? { i: 1, t: T("教室を ひらく"), s: T("一覧の 教室の 名前を 押すと、その教室の 画面に なります。新しい 教室は 下の欄から 作れます。"), target: ".cls-item" } : { i: 1, target: "#ncName" };
+    if (name === "classes") return lastClassCount ? { i: 1, t: T("教室を ひらく"), s: T("一覧の 教室の 名前を 押すと、その教室の 画面に なります。新しい 教室は 下の 欄から 作れます。"), target: ".cls-item" } : { i: 1, target: "#ncGo" };
+    if (name === "add") return curStudents.length
+      ? { i: 2, t: T("登録できました"), s: T("まだ 入れる 子が いれば「もう1人 足す」。ぜんぶ 入れたら「つぎへ：カードを 印刷する」を 押します。"), target: "#addNext" }
+      : { i: 2, target: "#addNicks" };
+    if (name === "cards") return cardsPrinted ? { i: 4, target: "#cardsToClass" } : { i: 3, target: "#cardsBtn" };
     if (name === "class") {
-      if (!curStudents.length) return { i: 2, target: "#addNicks" };
-      const joined = curStudents.some((s) => (s.uids && s.uids.length) || s.lastSeen || (s.stat && s.stat.last));
-      if (!joined) return { i: 3, target: "#cardsBtn" };
-      return curHw.length ? { i: 4, target: null } : { i: 5, target: "#hwGo" };
+      if (!curStudents.length) return { i: 2, s: T("「＋ 生徒を 足す」を 押します。"), target: "#toAddBtn" };
+      if (!anyJoined()) return { i: 4, s: T("カードを 子どもに 渡してください。子どもが 家で 練習すると、下の 表に 自動で 出ます。まだ 印刷していなければ「カードを 印刷」を 押します。"), target: null };
+      return curHw.length ? { i: 5, target: null } : { i: 6, target: "#hwFold" };
     }
-    if (name === "student") return { i: 4, t: T("この子の 記録"), s: T("上は 今週と 通算の まとめ、下は 1回ごとの 記録です。「教室に もどる」で 一覧に 戻ります。"), target: null };
+    if (name === "student") return { i: 5, t: T("この子の 記録"), s: T("上は 今週と 通算の まとめ、下は 1回ごとの 記録です。「教室に もどる」で 一覧に 戻ります。"), target: null };
     return null;
   }
   function updateGuide(name) {
@@ -181,9 +188,10 @@
   async function renderClasses() {
     const list = await S.listClasses();
     lastClassCount = list.length;
-    $("#classList").innerHTML = list.length
-      ? list.map((c) => '<button class="cls-item" data-id="' + c.id + '"><b>' + esc(c.name) + T("</b><span>コード ") + esc(c.code) + "</span><small>" + fmtDate(c.createdAt) + T(" 作成</small></button>")).join("")
-      : T('<p class="cls-empty">まだ 教室が ありません。下から 作ってください。</p>');
+    // 教室が まだ 無いときは 一覧を 出さず、「教室の 名前を 入れる」だけ（1／4）
+    $("#classListCard").classList.toggle("hidden", !list.length);
+    $("#ncTitle").textContent = list.length ? T("新しい 教室を 作る") : T("教室の 名前を 入れる");
+    $("#classList").innerHTML = list.map((c) => '<button class="cls-item" data-id="' + c.id + '"><b>' + esc(c.name) + "</b><small>" + fmtDate(c.createdAt) + T(" 作成</small></button>")).join("");
     document.querySelectorAll(".cls-item").forEach((b) => b.addEventListener("click", () => openClass(b.dataset.id)));
   }
   /* ---------- 級の基準（級体系）：docs/curriculum/sk.js の 表から えらぶ ---------- */
@@ -197,7 +205,6 @@
   };
   const presetOptions = (sel, withCustom) => CUR_ORDER.map((k) => '<option value="' + k + '"' + (k === sel ? " selected" : "") + ">" + esc(T(CURS[k].name)) + "</option>").join("") +
     (withCustom ? '<option value="custom"' + (sel === "custom" ? " selected" : "") + T(">✏️ この教室だけの 表（自分で 決める）</option>") : "");
-  $("#ncPreset").innerHTML = presetOptions("sk", false);
   function fillHwGrades(preset) {
     const keys = curOf(preset).grades.map((g) => g.key);
     const def = keys.includes("10級") ? "10級" : keys[0];
@@ -244,13 +251,24 @@
       scale.map((s, i) => "<tr><td><b>" + esc(s.key) + "</b></td>" + others.map((c, ci) => "<td>" + (cell[i + ":" + ci] || []).map(esc).join("<br>") + "</td>").join("") + "</tr>").join("") + "</table></div>";
   }
   $("#curCompare").addEventListener("toggle", () => { if ($("#curCompare").open) renderCompare(); });
+  // 教室を 作る（級の基準は 標準。あとから「くわしい 設定」で 変えられる）。作れたら 生徒の 名前の 画面へ 自動で 進む
   $("#newClassForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = $("#ncName").value.trim(); if (!name) return;
-    $("#ncName").value = "";
-    const c = await S.createClass(name, $("#ncPreset").value);
-    await openClass(c.id);
+    const name = $("#ncName").value.trim(), msg = $("#ncMsg"); if (!name) return;
+    msg.textContent = ""; msg.className = "result";
+    $("#ncGo").disabled = true;
+    try {
+      const c = await S.createClass(name, "sk");
+      $("#ncName").value = "";
+      await loadClass(c.id);
+      show("add");
+    } catch (err) {
+      console.error("教室を 作れませんでした", err);
+      msg.textContent = saveFail(); msg.className = "result ng";
+    } finally { $("#ncGo").disabled = false; }
   });
+  // 保存に 失敗したときの 文（英語の 文は 出さない）
+  const saveFail = () => T("保存できませんでした。もう一度 押してください。それでも だめなら、電波を たしかめてください。");
   $("#clsPreset").addEventListener("change", async () => {
     if (!cur) return;
     const preset = $("#clsPreset").value;
@@ -372,9 +390,11 @@
   }
 
   /* ---------- 教室 ---------- */
-  async function openClass(cid) {
-    cur = await S.getClass(cid); if (!cur) return renderClasses();
+  // 教室を 読みこむ（画面は 変えない）。教室の 画面・生徒の 名前の 画面・カードの 画面が 共通で 使う
+  async function loadClass(cid) {
+    cur = await S.getClass(cid); if (!cur) return false;
     $("#clsName").textContent = cur.name;
+    $("#addClsName").textContent = cur.name;
     $("#clsCode").textContent = cur.code;
     if (cur.preset === "custom" && !CHECK(cur.curriculum)) cur.preset = "sk";   // こわれた 表は 使わない
     $("#clsPreset").innerHTML = presetOptions(cur.preset || "sk", true);
@@ -383,8 +403,27 @@
     fillHwGrades(cur.preset || "sk");
     await renderHomework();          // 生徒の 表に 宿題の 列を 出すので、先に 読む
     await renderStudents();
-    $("#cardsOut").classList.add("hidden");
+    renderAddList();
+    cardsPrinted = false;
+    return true;
+  }
+  async function openClass(cid) {
+    try { if (!(await loadClass(cid))) { await renderClasses(); show("classes"); return; } }
+    catch (err) { console.error("教室を ひらけませんでした", err); alert(T("教室を ひらけませんでした。もう一度 押してください。それでも だめなら、電波を たしかめてください。")); return; }
     show("class");
+  }
+  $("#toAddBtn").addEventListener("click", () => { $("#addMsg").textContent = ""; show("add"); $("#addNicks").focus(); });
+  $("#toCardsBtn").addEventListener("click", openCards);
+  $("#addBack").addEventListener("click", (e) => { e.preventDefault(); show("class"); });
+  $("#cardsBack").addEventListener("click", (e) => { e.preventDefault(); show("class"); });
+  $("#cardsToClass").addEventListener("click", () => show("class"));
+  $("#addMore").addEventListener("click", () => { $("#addNicks").focus(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $("#addNext").addEventListener("click", openCards);
+  // 登録ずみの 名前を、生徒の 名前の 画面に 並べる（「登録できた」と 目で わかる）
+  function renderAddList() {
+    const box = $("#addDone"); if (!box) return;
+    box.classList.toggle("hidden", !curStudents.length);
+    $("#addList").innerHTML = curStudents.map((s) => '<span class="name-chip">' + esc(s.nick) + "</span>").join("");
   }
 
   /* ---------- 宿題 ---------- */
@@ -471,7 +510,7 @@
   }
   async function renderStudents() {
     curStudents = await S.listStudents(cur.id);
-    if (!curStudents.length) { $("#studentTable").innerHTML = T('<p class="cls-empty">まだ 生徒が いません。下の欄に 名前を 入れて 追加してください。</p>'); return; }
+    if (!curStudents.length) { $("#studentTable").innerHTML = T('<p class="cls-empty">まだ 生徒が いません。上の「＋ 生徒を 足す」を 押してください。</p>'); return; }
     const order = { follow: 0, ready: 1, hard: 2, ok: 3, none: 4 };
     const sorted = curStudents.slice().sort((a, b) => order[classify(a).k] - order[classify(b).k]);
     const rows = sorted.map((s) => {
@@ -503,44 +542,67 @@
   }
   $("#addForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const msg = $("#addMsg"); msg.textContent = ""; msg.className = "result";
     const nicks = $("#addNicks").value.split(/\r?\n/).map((x) => x.trim().slice(0, 20)).filter(Boolean).slice(0, 60);
-    if (!nicks.length) return;
+    if (!nicks.length) { msg.textContent = T("白い欄に 名前を 書いてから 押してください。"); msg.className = "result ng"; $("#addNicks").focus(); return; }
     const have = new Set(curStudents.map((s) => s.nick));
     const fresh = nicks.filter((n) => !have.has(n));
-    // プランの 上限（人数・期限）。こえるときは 登録せず、理由を 画面に 出す
-    const p = S.planInfo(me), total = await S.countStudents();
-    if (p.expired) { alert(T("おためしの 期間が おわっているため、生徒を 追加できません。教室プランへの 切りかえは 塾向けページから お申し込みください。")); return; }
-    if (total + fresh.length > p.max) {
-      alert(p.home
-        ? p.name + T("は お子さま ") + p.max + T("人までです（いま ") + total + T("人）。2人目からは「家庭プラン（2人目から）＋1,490円」を お申し込みください（katei.html）。反映後に 登録できます。")
-        : p.name + T("は 生徒 ") + p.max + T("人までです（いま ") + total + T("人）。あと ") + Math.max(0, p.max - total) + T("人 登録できます。もっと 登録する ときは 教室プラン（40人）／スクールプラン（150人）へ。"));
-      return;
-    }
-    if (fresh.length) await S.addStudents(cur.id, fresh);
-    $("#addNicks").value = "";
-    await renderStudents();
-    updateGuide("class");
+    $("#addGo").disabled = true;
+    try {
+      // プランの 上限（人数・期限）。こえるときは 登録せず、理由を 画面に 出す
+      const p = S.planInfo(me), total = await S.countStudents();
+      if (p.expired) { msg.textContent = T("おためしの 期間が おわっているため、生徒を 追加できません。教室プランへの 切りかえは 塾向けページから お申し込みください。"); msg.className = "result ng"; return; }
+      if (total + fresh.length > p.max) {
+        msg.textContent = p.home
+          ? p.name + T("は お子さま ") + p.max + T("人までです（いま ") + total + T("人）。2人目からは「家庭プラン（2人目から）＋1,490円」を お申し込みください。反映後に 登録できます。")
+          : p.name + T("は 生徒 ") + p.max + T("人までです（いま ") + total + T("人）。あと ") + Math.max(0, p.max - total) + T("人 登録できます。もっと 登録する ときは 教室プラン（40人）／スクールプラン（150人）へ。");
+        msg.className = "result ng"; return;
+      }
+      if (fresh.length) await S.addStudents(cur.id, fresh);
+      $("#addNicks").value = "";   // 失敗したときは 消さない（打ち直しに ならないように）
+      await renderStudents();
+      renderAddList();
+      msg.textContent = fresh.length ? T("✓ 登録しました：") + fresh.join(T("・")) : T("その名前は もう 登録されています。"); msg.className = "result ok";
+      updateGuide("add");
+    } catch (err) {
+      console.error("生徒を 登録できませんでした", err);
+      msg.textContent = saveFail(); msg.className = "result ng";
+    } finally { $("#addGo").disabled = false; }
   });
 
-  /* ---------- ログインカード ---------- */
-  $("#cardsBtn").addEventListener("click", () => {
-    if (!curStudents.length) { alert(T("先に 生徒を 追加してください")); return; }
+  /* ---------- ログインカード（3／4 印刷 → 4／4 渡す）----------
+     カードの 画面を ひらくと、1人 1枚の カードが 画面に 見える。「印刷する」で ブラウザの 印刷の 窓。
+     生徒が いないときは カードの 画面には 行かず、生徒の 名前の 画面へ */
+  function renderCards() {
     const card = (s) => T('<div class="lc"><div class="lc-head"><img src="../assets/logo.png" alt="">そろばんキングダム ログインカード</div>') +
       '<div class="lc-nick">' + esc(s.nick) + '</div><div class="lc-cls">' + esc(cur.name) + "</div>" +
-      T('<div class="lc-code">クラスコード<b>') + esc(cur.code) + "</b></div>" +
-      T('<div class="lc-steps">① スマホか パソコンで <span class="lc-url">') + SITE + T("</span> を ひらく<br>② メニューの「🏫 教室に 参加」を おす<br>③ 上の コードを 入れて、じぶんの 名前を えらぶ</div></div>");
+      T('<div class="lc-code">教室の 合いことば<b>') + esc(cur.code) + "</b></div>" +
+      T('<div class="lc-steps">① スマホか パソコンで <span class="lc-url">') + SITE + T("</span> を ひらく<br>② メニューの「🏫 教室に 参加」を おす<br>③ 上の 6文字を 入れて、じぶんの 名前を えらぶ</div></div>");
     const sheets = [];
     for (let i = 0; i < curStudents.length; i += 8) sheets.push('<div class="lc-sheet">' + curStudents.slice(i, i + 8).map(card).join("") + "</div>");
     $("#cardsOut").innerHTML = sheets.join("");
-    $("#cardsOut").classList.remove("hidden");
+  }
+  function openCards() {
+    if (!curStudents.length) { show("add"); $("#addMsg").textContent = T("先に 生徒の 名前を 入れてください。"); $("#addMsg").className = "result ng"; $("#addNicks").focus(); return; }
+    renderCards();
+    $("#cardsDone").classList.toggle("hidden", !cardsPrinted);
+    show("cards");
+  }
+  $("#cardsBtn").addEventListener("click", () => {
+    if (!curStudents.length) return openCards();
+    renderCards();
     document.body.classList.add("print-cards");
-    setTimeout(() => { try { window.print(); } catch (e) { } setTimeout(() => document.body.classList.remove("print-cards"), 500); }, 50);
+    setTimeout(() => {
+      try { window.print(); } catch (e) { console.error("印刷に 失敗", e); }
+      // 印刷の 窓が とじたら 4／4 へ（Chrome などは 窓が とじるまで ここで 待つ）
+      setTimeout(() => { document.body.classList.remove("print-cards"); cardsPrinted = true; $("#cardsDone").classList.remove("hidden"); updateGuide("cards"); }, 500);
+    }, 50);
   });
 
-  /* ---------- 保護者への 案内（A4 1枚）。先生は これを 配るだけ＝売りこまない ---------- */
+  /* ---------- 保護者への 案内（A4 1枚）。先生は これを 配るだけ＝売りこまない。画面には 出さず 印刷だけ ---------- */
   $("#noticeBtn").addEventListener("click", () => {
     const tname = me && me.name ? esc(me.name) : "";
-    $("#cardsOut").innerHTML =
+    $("#noticeOut").innerHTML =
       '<div class="pn-sheet">' +
         T('<div class="pn-head"><img src="../assets/logo.png" alt="">保護者の みなさまへ</div>') +
         T('<h1 class="pn-title">家での そろばん練習に「そろばんキングダム」を 使います</h1>') +
@@ -563,9 +625,8 @@
           T("<p>「音楽を 流しますか？」と 聞かれます。小さな 音で 始まり、あとから 上の 🎵 で 変えられます。</p></div>") +
         T('<p class="pn-foot">わからないことは 先生（') + esc(cur.name) + T('）に おたずねください。　そろばんキングダム　sorobankingdom.com</p>') +
       "</div>";
-    $("#cardsOut").classList.remove("hidden");
-    document.body.classList.add("print-cards");
-    setTimeout(() => { try { window.print(); } catch (e) { } setTimeout(() => document.body.classList.remove("print-cards"), 500); }, 50);
+    document.body.classList.add("print-notice");
+    setTimeout(() => { try { window.print(); } catch (e) { console.error("印刷に 失敗", e); } setTimeout(() => document.body.classList.remove("print-notice"), 500); }, 50);
   });
 
   /* ---------- 生徒 ---------- */
